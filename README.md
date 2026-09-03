@@ -34,7 +34,7 @@ accepted product boundaries are recorded in
 - `packages/sdk`: profile-bound XRPL transaction validation, builders and reliable submission
   primitives.
 - `packages/cli`: local, non-custodial command-line workflows.
-- `packages/db`: PostgreSQL schema, migrations and least-privilege role provisioning for a
+- `packages/db`: PostgreSQL schema, fresh-database bootstrap and least-privilege roles for a
   rebuildable local projection.
 - `apps/indexer`: validated-ledger ingestion and XCS projections.
 - `apps/api`: read-only schema/catalog, credential and verification API.
@@ -69,7 +69,7 @@ store can be enabled with `XCS_LOCAL_PAYLOAD_STORE=1`; see
 [`apps/web/README.md`](./apps/web/README.md#local-browser-payload-store). It is local to one browser,
 expires after 24 hours and is not Commons-hosted or publicly verifiable.
 
-The reference deployment uses `xcs_admin` only for migrations and idempotent role provisioning,
+The reference deployment uses `xcs_admin` only for idempotent schema and role bootstrap,
 `xcs_indexer` for bounded projection DML, `xcs_api` for projection reads plus optional pinning CRUD,
 and `xcs_monitor` for PostgreSQL metrics without application-table DML. Provisioning is intentionally
 cluster-wide and requires a PostgreSQL cluster dedicated to XCS. A rotation is disruptive: it

@@ -129,5 +129,5 @@ facts.
 records and drill evidence outside Prometheus according to Commons policy. To rotate the metrics
 token, update the API environment and token file atomically, then restart API and Prometheus; a
 partial rotation intentionally makes the scrape fail. Rotate the database and Grafana passwords
-through their normal secret procedures and re-run least-privilege provisioning after a database
+through their normal secret procedures and rerun database bootstrap after a database
 password change.

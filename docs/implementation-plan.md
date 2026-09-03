@@ -68,7 +68,7 @@ explicit network ID. It then reconciles that hash, requires another readiness sn
 the local business lock immediately before any signed-blob retransmission; a failed gate retains the
 blob for a later retry without reopening the wallet.
 Unit/conformance suites cover the deterministic protocol, source normalization, worker, API, CLI
-and browser flow; CI contains a PostgreSQL 18 job for sixteen database-migration, role-permission,
+and browser flow; CI contains a PostgreSQL 18 job for database-bootstrap, role-permission,
 fencing, replay, and operational-snapshot scenarios. The complete-replay case captures one integrity-bound synthetic
 ledger bundle, validates it twice, runs both copies through the normal worker into empty projections,
 and requires the same fixed full-projection digest and all six deletion causes.
@@ -89,31 +89,17 @@ time and projects Credential lifecycle state from the shared vectors. The indexe
 ledger-derived indices, `Expiration` and close-time values outside the native uint32 range, and the
 API rejects contradictory generation timelines including in aggregate statistics. Seeds and
 configurable run counts are reproducible and part of the Turbo cache key.
-Database migration `0003_projection_integrity.sql` mirrors those boundaries with 16 additive
-storage constraints. It installs them as `NOT VALID` with a 5-second lock timeout, after which
-`db:migrate` validates one table per transaction after the migration commit. Historical violations
-fail the deployment without weakening future-write checks; rebuilding/replaying the projection and
-rerunning the command resumes validation.
-Database migration `0004_indexer_incidents.sql` adds a durable halt record keyed by profile and
-fenced writer epoch. The indexer writes status and incident atomically; its runtime role can append
-but not rewrite incidents, while the API role can only read them. `XCS_DATABASE_SCOPE` also makes the
-storage assumption explicit: `shared` permits multiple profiles, `exclusive-profile` rejects any
-different existing profile, and the controlled pilot requires the exclusive mode.
+The generated database baseline mirrors those boundaries with storage constraints and adds a
+durable halt record keyed by profile and fenced writer epoch. The indexer writes status and incident
+atomically; its runtime role can append but not rewrite incidents, while the API role can only read
+them. `XCS_DATABASE_SCOPE` also makes the storage assumption explicit: `shared` permits multiple
+profiles, `exclusive-profile` rejects any different existing profile, and the controlled pilot
+requires the exclusive mode.
 
-PostgreSQL role provisioning now treats its cluster-wide effects as a dedicated-cluster maintenance
-boundary. Before the `xcs_provision_control` marker can bind the first database, the current build
-requires PostgreSQL 18, `max_prepared_transactions = 0`, the exact hash/timestamp identities of five
-applied migrations, eight schema sentinels and all 16 named projection constraints validated with
-their canonical definitions. A committed `NOLOGIN` quarantine removes incoming and outgoing runtime
-memberships, terminates non-administrator sessions, applies `DROP OWNED`, removes all raw
-advisory-lock privileges and audits ownership drift.
-System/application relation, routine, type and trusted-language ACLs are normalized, while hostile
-`PUBLIC` FDW/server/Large-Object and all explicit `PUBLIC` default ACLs are purged. The built-in
-`pg_monitor` role family is validated before fixed grants and `LOGIN` return. Runtime password
-rotation forces and verifies SCRAM-SHA-256 verifiers. Operators must stop runtime clients for
-provisioning, forbid later database creation without immediate access closure and reprovisioning
-from the control database, and use a `pg_hba.conf` role-to-database SCRAM allowlist as defense in
-depth.
+PostgreSQL bootstrap treats fixed cluster-wide roles as a dedicated-cluster boundary. It applies the
+single current-schema baseline, serializes role changes, removes unexpected direct memberships,
+normalizes role attributes and current-database grants, and writes SCRAM-SHA-256 passwords. A
+`pg_hba.conf` role-to-database SCRAM allowlist remains required defense in depth.
 
 Runtime database serialization no longer relies on advisory locks. Concurrent profile
 initialization and pin reservation use the same `SERIALIZABLE` helper with five bounded,
@@ -147,10 +133,8 @@ registration activity, exact Credential generation timelines, and exact XCS tran
 projections, plus an authoritative complete-lineage schema catalog. The Nuxt application exposes
 corresponding Explorer pages, a Studio workflow index and a Developers page. Its guided schema
 editor includes course-completion and diploma templates, while advanced JSON remains available for
-schemas outside the scalar-field editor. Database migration
-`0002_discovery_indexes.sql` adds only the supporting indexes and leaves existing rows and contracts
-unchanged; `0003_projection_integrity.sql` adds the projection-boundary checks without rewriting
-historical rows.
+schemas outside the scalar-field editor. The generated database baseline includes its supporting
+indexes and projection-boundary checks.
 
 This does **not** close milestones 0–2: PR review/merge, a real blackholed Testnet profile, proof that
 the two providers are independent, live PostgreSQL execution, real adapter-by-adapter XRPL Connect
@@ -251,10 +235,8 @@ Work:
   transaction indexes, and provider disagreement instead of treating incomplete input as empty;
 - persist an indexer state (`starting`, `catching_up`, `ready`, or `halted`) and make authoritative API
   reads return `503` immediately while the indexer is halted or lacks quorum;
-- apply the additive integrity migration to a fresh XCS database and an existing `0002` projection;
-  prove post-commit validation, fail-closed handling of invalid historical rows, retry after a
-  rebuild/replay, transaction rollback, restart, idempotency, and deterministic replay against real
-  PostgreSQL.
+- bootstrap a fresh XCS database; prove transaction rollback, restart, bootstrap idempotency, and
+  deterministic replay against real PostgreSQL.
 
 Exit criteria:
 
@@ -288,7 +270,7 @@ Work:
   user is `validated` with `tesSUCCESS`;
 - capture the exact public ledger transactions and metadata for deterministic indexer regression
   tests, review the bundle for on-ledger identifiers, and bind it to a published manifest digest;
-- add PostgreSQL integration tests that apply the migration to an empty database, ingest fixtures,
+- add PostgreSQL integration tests that bootstrap an empty database, ingest fixtures,
   restart at checkpoints, and rebuild projections;
 - add browser tests with a deterministic mock signer, while retaining the manual real-wallet matrix
   as a release gate;

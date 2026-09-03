@@ -145,43 +145,25 @@ Never use a production seed in tests. A Testnet reset invalidates the activation
 requires a new fixture/profile rather than editing historical expected UIDs.
 
 The destructive PostgreSQL integration suite receives an **admin database URL**, creates random
-databases named `xcs_it_<uuid>` or `xcs_api_it_<uuid>` and the fixed `xcs_indexer`/`xcs_api` roles,
-plus `xcs_monitor` and the `xcs_provision_control` marker, then removes those exact objects after
-each suite. It refuses to run a provisioning case if any fixed role already exists. Provisioning
-revokes database, function and other shared ACLs cluster-wide, so use only a disposable dedicated
-CI/test cluster with `max_prepared_transactions = 0`; never point this suite at a shared or
-production PostgreSQL instance.
+databases named `xcs_it_<uuid>` or `xcs_api_it_<uuid>` and the fixed `xcs_indexer`, `xcs_api` and
+`xcs_monitor` roles, then removes those exact objects after each suite. Fixed roles are cluster-wide,
+so use only a disposable dedicated CI/test cluster; never point this suite at a shared or production
+PostgreSQL instance.
 
 ```sh
 XCS_TEST_DATABASE_URL=postgres://postgres:postgres-integration-password-0001@127.0.0.1:5432/postgres pnpm test:postgres
 ```
 
-It requires PostgreSQL 18 and proves migrations `0000` through `0004`, including the discovery
-indexes, NULL-safe constraints, all 16 projection-integrity constraints and the durable
-`indexer_incidents` history. Provisioning compares the exact `hash`/`created_at` identity of all five
-journal rows and the canonical PostgreSQL 18 definition of every named projection constraint; count
-or name equality alone is insufficient. It rejects an empty, rewritten or incompletely validated
-database before creating the control marker, then binds a fully migrated database and rejects
-another migrated database in the same cluster. The `0003` case proves that `CHECK NOT VALID`
-installation is followed by post-commit, table-by-table validation; invalid historical projection
-data fails closed while preserving a retry path after rebuild/replay. The `0004` cases prove
-append-only runtime grants, fenced incident identity and atomic rollback when an incident cannot be
-recorded.
+It requires PostgreSQL 18 and proves that the single current-schema baseline initializes an empty
+database and is safe to run again. Schema assertions cover discovery indexes, projection-integrity
+constraints and durable `indexer_incidents`. Bootstrap cases prove idempotent role configuration,
+SCRAM-SHA-256 passwords and the exact application-table permissions.
 
-The twelve indexer cases also cover `shared` versus `exclusive-profile` database initialization,
+The indexer cases also cover `shared` versus `exclusive-profile` database initialization,
 lease takeover/fencing, projection rollback, restart/idempotence, transaction-root persistence, and
 equal timestamp-free digests across two replays. They provision the fixed runtime roles in the
-isolated cluster, prove exact column-level mutations, hostile-schema and cross-database denial,
-finite connection limits, membership options, password rotation/session termination, and confirm
-that caller-forced `password_encryption=md5` cannot prevent all runtime passwords from receiving
-verified SCRAM-SHA-256 verifiers. Ownership drift across databases, Large Objects and collations
-fails closed with runtime roles left `NOLOGIN`. The cases also exercise a delegated `SET ROLE`
-session, recovery from a legacy runtime-held provision lock, removal of every raw runtime
-advisory-lock capability, exhaustive runtime/default ACL removal, hostile
-system-catalog/column/type/trusted-language/FDW/server/Large-Object/parameter/tablespace `PUBLIC`
-ACL normalization, and Large Object function denial. Deliberate `pg_monitor` membership and DML
-drift fails closed before the exact built-in monitoring baseline is granted to `xcs_monitor`.
-Concurrent exclusive-profile
+isolated cluster, prove column-level permission boundaries, finite connection limits and monitoring
+membership, and verify SCRAM-SHA-256 password verifiers. Concurrent exclusive-profile
 initialization admits exactly one profile, while the fenced lease cases reject stale writers before
 projection persistence. Two replays with different source tips must stop at the same
 quorum-verified index/hash boundary; the unit suite separately proves that a tip advancing during
@@ -192,13 +174,13 @@ creations, acceptance and all six deletion causes. Both empty projections must m
 complete digest and exact rows. This exercises the real bundle pipeline locally; a reviewed capture
 from public Testnet remains separate release evidence.
 
-Four API cases apply all migrations to another empty database. They prove that authoritative
+The API cases initialize another empty database. They prove that authoritative
 read-only snapshots decode database time through the real driver and least-privilege role; execute
 the operational metrics SQL and runtime type normalization, including `schemaVersion: 2` halt
 history; serialize concurrent pin-quota reservations through a `SERIALIZABLE` challenge-row lock
 without advisory locks; and execute the recursive schema-catalog CTE against a real 256/257-node
 DAG, shared ancestor and corrupted cycle, proving deduplication, termination and explicit overflow
-rather than truncation. Normal `pnpm test` skips these sixteen PostgreSQL cases when the admin URL is
+rather than truncation. Normal `pnpm test` skips PostgreSQL integration cases when the admin URL is
 absent; CI runs them as a required separate job.
 
 The database unit suite exercises the shared `SERIALIZABLE` helper independently: it retries the

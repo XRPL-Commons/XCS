@@ -120,53 +120,33 @@ no request identity or payload content; none of these signals is protocol truth.
 submissions, physical disk capacity and API pool saturation remain outside the API snapshot because
 the process does not reliably observe them.
 
-The initial migration is create-only for a fresh XCS projection database. It is not compatible with
-the database used by the historical `XRPL-Commons/xcs` MVP. Later migrations within this
-architecture must preserve mixed-version reads and use expand/migrate/contract when changing
-populated data.
+The generated `0000_baseline.sql` creates the complete current schema for a fresh XCS projection
+database. It is not compatible with the database used by the historical `XRPL-Commons/xcs` MVP.
+Because this application has not entered production, schema changes regenerate that baseline and
+require recreating the disposable projection database. At production launch the baseline freezes;
+subsequent changes must use reviewed forward migrations and preserve mixed-version reads.
 
-Migration `0002_discovery_indexes.sql` follows that compatibility rule: it adds four indexes for
-schema ordering/search/activity and lifecycle aggregates without changing a table, column,
-constraint or row. Old binaries ignore the indexes. The deployment and lock considerations for a
-populated database are documented in [`runbooks/deployment.md`](./runbooks/deployment.md).
+The baseline includes the discovery indexes, projection-integrity constraints and
+`indexer_incidents`, keyed by profile and writer lease epoch. A fenced writer records halt status and
+the incident in one transaction; runtime grants make the history append-only for `xcs_indexer` and
+read-only for `xcs_api`. A failed incident insert rolls back the halt update rather than publishing
+partial operational evidence.
 
-After the projection-integrity checks in migration `0003`, migration
-`0004_indexer_incidents.sql` adds `indexer_incidents`, keyed by profile and writer lease epoch. A
-fenced writer records the halt status and incident in one transaction; runtime grants make the
-history append-only for `xcs_indexer` and read-only for `xcs_api`. A failed incident insert rolls back
-the halt update rather than publishing partial operational evidence.
-
-PostgreSQL uses four fixed trust identities. `xcs_admin` owns schema changes and runs migrations plus
-the post-migration provisioner; it is absent from runtime services. `xcs_indexer` receives
+PostgreSQL uses four fixed trust identities. `xcs_admin` owns the schema and runs the one-shot
+bootstrap; it is absent from runtime services. `xcs_indexer` receives
 `SELECT`/`INSERT` on append-only projections and column-limited `UPDATE` only for indexer status and
 Credential lifecycle transitions. `xcs_api` receives projection `SELECT` and CRUD on isolated
 pinning tables. `xcs_monitor` inherits `pg_monitor` but no application-schema DML. Runtime roles
 cannot create objects, have finite connection limits, and can connect only to the selected XCS
 database.
 
-The PostgreSQL superuser/migration owner and the reviewed migration artifacts are inside this trust
-boundary. The release-coupled preflight detects drift in the five recorded migrations and the 16
-upgrade `CHECK` constraints, but it is not an anti-superuser attestation of every object in the
-schema. Runtime identities remain outside that administrative boundary: they own no database
-objects and receive no DDL capability.
-
-Because PostgreSQL roles and several ACLs are cluster-wide, provisioning requires an explicitly
-dedicated PostgreSQL 18 cluster with two-phase commit disabled
-(`max_prepared_transactions = 0`). Before binding `xcs_provision_control` to the first control
-database, it requires the exact hash/timestamp identities of the five migration-journal entries,
-eight schema sentinels and all 16 named projection constraints in both their validated and canonical
-definition state. Password rotation holds one reserved superuser session lock across a committed
-`NOLOGIN` quarantine, global non-admin session
-termination, membership purge, `pg_shdepend` ownership audit, exhaustive runtime `DROP OWNED`, and
-the final password/grant transaction. An audit failure leaves runtimes quarantined; success
-terminates stale sessions before restoring `LOGIN` atomically.
-
-Provisioning removes every raw advisory-lock capability from runtime and all other non-superuser
-roles. It normalizes application, column, type, trusted-language, FDW/server, Large Object and
-system `PUBLIC` ACLs against the recorded PostgreSQL install baseline, removes runtime and `PUBLIC`
-default-ACL drift, and validates the attributes, membership graph and ACLs of the built-in
-`pg_monitor` role family before `xcs_monitor` can inherit it. Password rotation forces and verifies
-SCRAM-SHA-256 verifiers independently of the caller's session setting.
+The PostgreSQL administrator and reviewed baseline are inside the trust boundary. Runtime identities
+remain outside it: they own no database objects and receive no DDL capability. Because fixed roles
+are cluster-wide, bootstrap requires an explicit dedicated-cluster acknowledgement. It serializes
+concurrent runs, removes unexpected runtime-role memberships, resets role attributes and timeouts,
+revokes broad access in the current database, grants only the permissions above and writes
+SCRAM-SHA-256 password verifiers. It does not attest or repair unrelated databases or protect
+against a malicious administrator.
 
 Runtime concurrency therefore uses native transactions and row locks. A shared helper runs profile
 initialization and demo-pin reservation at `SERIALIZABLE`, retrying serialization failures and

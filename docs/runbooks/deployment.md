@@ -88,10 +88,10 @@ artifacts only as explicitly labelled staging evidence.
 
 ### Replacing the legacy `XRPL-Commons/xcs` MVP
 
-The migration in `packages/db/drizzle/0000_initial.sql` is the initial schema for the new XCS
+The generated `packages/db/drizzle/0000_baseline.sql` is the complete current schema for the new XCS
 indexer projection. It is **not** an in-place upgrade from the former root-level Nuxt/Drizzle MVP:
 both schemas define `public.schemas` with incompatible keys and columns, and the legacy application
-also owns a different `credentials` table. Never run the new migration against a PostgreSQL database
+also owns a different `credentials` table. Never run the bootstrap against a PostgreSQL database
 or Compose volume previously used by that application.
 
 For a replacement deployment:
@@ -139,14 +139,14 @@ Before recreating a PostgreSQL 18 container that ever used the old mount:
    docker compose stop web api indexer postgres
    ```
 
-4. With the corrected parent mount, initialize PostgreSQL, apply the same XCS migrations, restore
-   the data with the admin identity, then re-run role provisioning.
+4. With the corrected parent mount, initialize PostgreSQL, apply the same XCS baseline, restore the
+   data with the admin identity, then rerun bootstrap to restore runtime grants.
 
    ```sh
    docker compose up -d --wait postgres
-   docker compose run --rm migrate
+   docker compose run --rm db-bootstrap
    docker compose exec -T postgres sh -c 'pg_restore --exit-on-error --single-transaction --data-only --no-owner --no-privileges -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < xcs-before-pg18-volume.dump
-   docker compose run --rm provision
+   docker compose run --rm db-bootstrap
    ```
 
 This logical restore procedure is only for the same XCS schema. It is not a migration from the
@@ -154,190 +154,93 @@ legacy MVP described above, and a raw PostgreSQL data directory must never be co
 versions. For projection-only data, a bounded ledger replay is an alternative; preserve optional
 pinning rows separately because they are not reconstructable from XRPL.
 
-### PostgreSQL identities and provisioning
+### PostgreSQL identities and bootstrap
 
 The reference deployment separates schema ownership from runtime access:
 
-| Identity      | Use                                                 | Database rights                                                                                                                                                                                                      |
-| ------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `xcs_admin`   | Compose bootstrap, migrations and role provisioning | Schema/DDL and role administration; never used by a runtime service                                                                                                                                                  |
-| `xcs_indexer` | Indexer and maintenance replay                      | `SELECT`/`INSERT` on `network_profiles`, `ledger_checkpoints`, `schema_events`, `schemas`, `credential_events`, and `indexer_incidents`; `SELECT`/`INSERT`/`UPDATE` on `indexer_status` and `credential_generations` |
-| `xcs_api`     | Read API and optional Testnet pinning               | `SELECT` on projections; CRUD on `pin_challenges` and `demo_pins` only                                                                                                                                               |
-| `xcs_monitor` | PostgreSQL exporter                                 | `pg_monitor`; no DML rights on XCS application tables                                                                                                                                                                |
+| Identity      | Use                                   | Database rights                                                                                                                                                                                                      |
+| ------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `xcs_admin`   | One-shot database bootstrap           | Schema/DDL and role administration; never used by a runtime service                                                                                                                                                  |
+| `xcs_indexer` | Indexer and maintenance replay        | `SELECT`/`INSERT` on `network_profiles`, `ledger_checkpoints`, `schema_events`, `schemas`, `credential_events`, and `indexer_incidents`; `SELECT`/`INSERT`/`UPDATE` on `indexer_status` and `credential_generations` |
+| `xcs_api`     | Read API and optional Testnet pinning | `SELECT` on projections; CRUD on `pin_challenges` and `demo_pins` only                                                                                                                                               |
+| `xcs_monitor` | PostgreSQL exporter                   | `pg_monitor`; no DML rights on XCS application tables                                                                                                                                                                |
 
-Role provisioning is cluster-wide because PostgreSQL login roles are cluster-wide. It revokes
-`CONNECT` and `TEMPORARY` from `PUBLIC` on every database before restoring the explicit XCS grants.
-Run it only on a PostgreSQL cluster dedicated to XCS, with
-`XCS_DATABASE_CLUSTER_SCOPE=dedicated`; never point `db:provision` at a shared cluster.
-
-The first provisioning run binds that dedicated cluster to the current database with the
-`xcs_provision_control` marker. That database is the canonical control database for every later
-provisioning run; invoking the provisioner through another database fails closed. Do not drop,
-rename or repurpose the marker. Keep the database component of `XCS_MIGRATOR_DATABASE_URL` stable
-across migrations, password rotations and recovery operations.
+Runtime-role creation is cluster-wide because PostgreSQL login roles are cluster-wide. Run bootstrap
+only on a PostgreSQL cluster dedicated to XCS, with `XCS_DATABASE_CLUSTER_SCOPE=dedicated`. Grants
+and `PUBLIC` revocations are scoped to the database selected by `XCS_BOOTSTRAP_DATABASE_URL`.
 
 All runtime roles are denied schema creation, and `CREATE` on `public` is revoked from `PUBLIC`.
 The single-replica alpha caps connections at 12 for `xcs_indexer`, 12 for `xcs_api`, and 3 for
 `xcs_monitor`, leaving capacity for administration and recovery. Before scaling replicas or pool
-sizes, increase and reprovision these limits deliberately while retaining reserved administrator
+sizes, increase and reapply these limits deliberately while retaining reserved administrator
 slots.
 
-Migration uses `XCS_MIGRATOR_DATABASE_URL`; the indexer uses `XCS_INDEXER_DATABASE_URL`; the API uses
-`XCS_DATABASE_URL`. Give the four identities distinct, long URL-safe passwords. Do not expose the
-admin URL to API or indexer containers. Provisioning must authenticate as a PostgreSQL superuser;
-keep that identity confined to migration, provisioning and recovery jobs.
+Bootstrap uses `XCS_BOOTSTRAP_DATABASE_URL`; the indexer uses `XCS_INDEXER_DATABASE_URL`; the API
+uses `XCS_DATABASE_URL`. Give the four identities distinct, long URL-safe passwords. Do not expose
+the admin URL to API or indexer containers. Bootstrap must authenticate as a PostgreSQL role allowed
+to create roles and schema objects; keep that identity confined to bootstrap and recovery jobs.
 
-For each runtime-password rotation, the provisioner overrides any caller-supplied
+For each runtime-password rotation, bootstrap overrides any caller-supplied
 `password_encryption` setting with transaction-local `scram-sha-256`, writes all three passwords,
-then verifies their stored `SCRAM-SHA-256` verifiers before it can restore `LOGIN`. Configure the
-corresponding `pg_hba.conf` role-to-database entries with `scram-sha-256` as well; verifier storage
-does not replace an explicit authentication policy.
+and restores `LOGIN` only after all grants succeed. Configure the corresponding `pg_hba.conf`
+role-to-database entries with `scram-sha-256` as well; verifier storage does not replace an explicit
+authentication policy.
 
-Treat the PostgreSQL superuser/migration owner and the reviewed migration artifacts as trusted
-administrative inputs. The provisioner verifies the release history and upgrade constraints listed
-below; it is not an anti-superuser attestation of every database object. Protect the administrator
-credential and migration supply chain separately. Runtime identities own no objects and receive no
-DDL privilege.
+Treat the PostgreSQL administrator and reviewed baseline as trusted administrative inputs.
+Bootstrap is not an anti-administrator attestation of every database object. Protect the
+administrator credential and build supply chain separately. Runtime identities own no objects and
+receive no DDL privilege.
 
-After every migration, run the idempotent provisioner before starting runtime services:
+On a new or recreated database, run the idempotent bootstrap before starting runtime services:
 
 ```sh
-pnpm --filter @xcs-protocol/db db:migrate
-pnpm --filter @xcs-protocol/db db:provision
+pnpm --filter @xcs-protocol/db db:bootstrap
 ```
 
-Before it creates the control marker or changes a role, the current provisioner verifies the exact
-database baseline expected by this release: PostgreSQL 18.x, `max_prepared_transactions = 0`, the
-Drizzle migration journal with the exact `hash` and `created_at` identity of migrations `0000`
-through `0004`, eight required schema sentinels, and all 16 named projection-integrity constraints
-both validated and definition-identical to this PostgreSQL 18 build. An empty, partially migrated,
-newer-schema, rewritten-migration or constraint-drifted database fails without becoming the cluster
-control database. These checks cover the five recorded migrations and the 16 upgrade constraints,
-not every object a trusted superuser could alter. `max_prepared_transactions` is a server-start
-setting; if an existing dedicated
-cluster enabled two-phase commit, set it back to `0`, restart PostgreSQL, rerun `db:migrate`, and
-only then provision. Runtime roles must never be able to leave a prepared transaction holding
-privileges or locks beyond their terminated session.
+The command applies the single generated baseline with Drizzle and then configures runtime roles in
+one administrative transaction. A second run is a no-op for schema creation and reapplies the same
+role attributes, passwords and grants. It does not upgrade an older or partially modified schema;
+before production, recreate the projection database and regenerate the baseline instead.
 
-Provisioning is deliberately disruptive cluster maintenance. Stop the API, indexer, PostgreSQL
-exporter and every other non-administrator database client before a manual run. The provisioner
-places `xcs_indexer`, `xcs_api` and `xcs_monitor` in a `NOLOGIN` quarantine, terminates remaining
-non-administrator sessions, and removes both incoming and outgoing role memberships before it
-normalizes database, schema, table, sequence and routine privileges. It also audits cluster-wide
-ownership dependencies, including databases, Large Objects and collations. Ownership drift fails
-closed rather than being reassigned or dropped automatically; the runtime roles remain `NOLOGIN`
-until an administrator repairs the exact object and reruns provisioning.
+Bootstrap serializes concurrent administrative runs with a transaction advisory lock. It creates
+missing fixed roles as `NOLOGIN`, removes unexpected direct memberships, normalizes their
+attributes, resets current-database schema/table/sequence/routine privileges, and restores `LOGIN`
+only after passwords and least-privilege grants succeed. It does not audit or repair ownership and
+ACLs outside the selected database; the dedicated-cluster requirement and trusted administrator are
+therefore part of the security boundary.
 
-After the ownership guard, PostgreSQL `DROP OWNED` removes every direct, delegated and default ACL
-held by the runtime roles in the control database; any remaining shared dependency fails closed.
-The provisioner also removes hostile `PUBLIC` ACLs from application objects, columns, foreign-data
-wrappers, foreign servers and Large Objects. It restores system relations, routines, types and
-trusted languages to PostgreSQL's recorded installation baseline, keeps `pg_catalog.pg_authid`
-private, removes public parameter/tablespace grants, and removes every explicit `PUBLIC` default
-ACL. The administrator's defaults for future tables, sequences, routines, types, schemas and Large
-Objects are pinned to no `PUBLIC` privileges.
-
-Before granting monitoring access, it audits the built-in `pg_monitor`, `pg_read_all_settings`,
-`pg_read_all_stats` and `pg_stat_scan_tables` role attributes, their exact membership graph and
-their initial ACLs. Any ownership, policy, privilege or membership drift fails closed. Only the
-unchanged PostgreSQL baseline is inherited by `xcs_monitor`, without `SET ROLE` and without
-application-table DML.
-
-The quarantine revokes every raw advisory-lock function from `PUBLIC` and every non-superuser role
-across the dedicated cluster, and a successful run grants none back to a runtime role. Only the
-superuser provisioner uses its reserved two-integer session-lock namespace. Runtime serialization
-uses PostgreSQL transactions and row locks instead of advisory locks. This cluster-wide revocation
-is another reason a shared PostgreSQL cluster is unsupported.
-
-Provisioning also resets operational role defaults: `xcs_indexer` receives a 5-minute statement
+Bootstrap also resets operational role defaults: `xcs_indexer` receives a 5-minute statement
 timeout and 30-second lock and idle-in-transaction timeouts; `xcs_api` receives 30-second
 statement/idle and 15-second lock timeouts; `xcs_monitor` receives 30-second statement/idle and
 10-second lock timeouts. These PostgreSQL settings are `USERSET`, so a client holding the runtime
 secret can override them; they are not security ceilings. Keep independently enforced
-connection/query/resource quotas, and change the defaults only through a reviewed provisioner
+connection/query/resource quotas, and change the defaults only through a reviewed bootstrap
 change rather than per-database role drift. The residual denial-of-service boundary, including SQL
 `LISTEN`/`NOTIFY`, is documented in [`threat-model.md`](../threat-model.md).
 
-After the audits pass, the provisioner rotates the supplied passwords, restores the fixed `LOGIN`
-attributes and least-privilege grants, and performs a final session termination before returning
-success. API, indexer and monitoring clients must reconnect with the new credentials. The
-provisioner reports role names or a stable failure code, never URLs or password values. The Compose
-dependency chain performs `migrate` then `provision` before it starts the runtime services
-automatically.
+Bootstrap reports only role names or a stable failure code, never URLs or password values. The
+Compose dependency chain completes `db-bootstrap` before it starts runtime services. During password
+rotation, stop the affected clients, rerun bootstrap with all three distinct passwords, then restart
+them. As an independent guard, configure `pg_hba.conf` so `xcs_indexer`, `xcs_api` and `xcs_monitor`
+can authenticate only to the XCS database, with `scram-sha-256` on each allow entry.
 
-The provisioner closes every database that exists at the time of the run, but it cannot govern a
-database created later. Normal operation therefore forbids `CREATE DATABASE` after initial
-provisioning. If an administrator must create one, treat it as a maintenance operation: keep all XCS
-runtime clients stopped, revoke `PUBLIC` and runtime-role access to the new database immediately,
-then rerun provisioning from the canonical control database before restarting any client. As an
-independent guard, configure `pg_hba.conf` so `xcs_indexer`, `xcs_api` and `xcs_monitor` can
-authenticate only to the canonical XCS database, with explicit reject rules before any broader
-application rule and `scram-sha-256` on each allow entry. Test that allowlist from the same networks
-used by the containers after every PostgreSQL configuration change.
+### Pre-production schema changes
 
-### Migration 0002: discovery indexes
-
-`0002_discovery_indexes.sql` is additive. It creates four indexes over existing projection rows and
-does not add tables, columns, constraints or backfilled application data:
+`0000_baseline.sql` creates the complete current schema, including the discovery indexes:
 
 - `schema_events_activity_idx` supports the reverse-chronological schema-registration activity page;
 - `schemas_order_idx` supports stable schema pagination;
 - `schemas_search_idx` is a PostgreSQL GIN expression index for schema name and description search;
 - `credential_generations_stats_idx` supports aggregate lifecycle counts.
 
-Existing API and indexer versions ignore these indexes, so an application rollback does not require
-a database rollback. On an existing populated database, regular `CREATE INDEX` can block concurrent
-writes while each index is built; schedule the migration before exposing the discovery routes and
-monitor the indexer's writer lease and lag. Run `db:migrate`, then the standard `db:provision`, then
-deploy the API and web application. A fresh install receives the same migration through the normal
-sequence. If the application must be rolled back, retain the indexes and forward-fix any database
-issue instead of dropping them during the incident.
+The baseline also creates the projection-integrity checks directly on empty tables. Until production
+launch, change `src/schema/`, remove and regenerate the baseline artifacts, recreate the database,
+run `db:bootstrap`, and replay the ledger-derived projection. Do not edit an applied baseline or
+manually reshape ledger evidence in place.
 
-### Migration 0003: projection integrity
-
-`0003_projection_integrity.sql` is an additive storage-boundary hardening migration. It adds 16
-`CHECK` constraints to `ledger_checkpoints`, `schema_events`, `schemas`,
-`credential_generations`, and `credential_events`. They cover native XRPL uint32 bounds,
-non-negative transaction/node coordinates, non-null event generation IDs, and generation-ledger
-ordering.
-
-The SQL migration sets `lock_timeout` to 5 seconds and adds every constraint as `NOT VALID`. This
-means PostgreSQL enforces it for new or changed rows immediately without scanning all historical
-rows while Drizzle still holds the migration transaction. Once that transaction commits,
-`db:migrate` validates the constraints table by table, in a separate transaction per table and with
-the same 5-second lock timeout plus a configurable statement timeout that defaults to 30 minutes. A
-completed table remains validated if a later table fails, and a subsequent `db:migrate` resumes the
-remaining validation even though `0003` is already recorded in the migration journal.
-
-On an existing populated projection, schedule the migration before deploying the matching services
-and pause indexer writes during the short constraint-addition phase when practical. If the 5-second
-lock timeout expires, no lock is waited on indefinitely: rerun `db:migrate` when write traffic is
-lower. If a table scan exceeds 30 minutes, rerun the same command in a larger maintenance window.
-Increase `XCS_MIGRATION_STATEMENT_TIMEOUT_MS` for that retry as shown below. If historical rows
-violate a constraint, `db:migrate` exits unsuccessfully after installing `0003`; the constraints
-still protect future writes, but the affected table remains unvalidated. The Compose dependency
-chain therefore does not run provisioning or start the API/indexer against that incomplete
-deployment.
-
-The validation scan budget defaults to `1800000` milliseconds. Increase it for a larger projection,
-or set it to `0` only when the maintenance process will monitor and cancel an unbounded scan:
-
-```sh
-XCS_MIGRATION_STATEMENT_TIMEOUT_MS=7200000 pnpm --filter @xcs-protocol/db db:migrate
-```
-
-Do not repair ledger-derived rows by inventing, truncating, or manually rewriting XRPL evidence.
-Retain a backup for diagnosis, rebuild the affected projection (or a fresh complete projection) from
-the audited activation boundary and validated ledgers, compare its deterministic digest, then rerun:
-
-```sh
-pnpm --filter @xcs-protocol/db db:migrate
-pnpm --filter @xcs-protocol/db db:provision
-```
-
-The validation step is intentionally retryable and will skip tables already validated. Application
-rollback can retain this additive migration; forward-fix migration defects instead of editing or
-removing an applied `0003`.
+Before production launch, freeze and archive the reviewed baseline. From that point onward, do not
+regenerate it: introduce reviewed forward migrations with explicit compatibility, lock, backup and
+rollback plans.
 
 ### Deployment configuration
 
@@ -357,7 +260,7 @@ removing an applied `0003`.
    Generate four distinct PostgreSQL passwords and distinct URL-safe internal/metrics tokens of at
    least 32 characters. The metrics token file is required by the production overlay even while
    metrics remain disabled; set `XCS_METRICS_ENABLED=true` only when Prometheus will scrape it. The
-   provisioner derives the administrator password from its selected migrator database URL and
+   bootstrap derives the administrator password from `XCS_BOOTSTRAP_DATABASE_URL` and
    compares it with all three runtime passwords before executing SQL.
 
    The two RPC files contain the complete WSS URLs and therefore also protect provider credentials
@@ -426,7 +329,7 @@ boundary from [`ADR 0002`](../adr/0002-public-product-and-discovery.md):
 - do not add a subject feed, account-wide Credential export or claims ingestion to the deployment.
 
 Validate the rendered configuration, then build and start the required profile. The default core
-contains only PostgreSQL, migration, provisioning, API and indexer. `site` adds Nuxt,
+contains only PostgreSQL, database bootstrap, API and indexer. `site` adds Nuxt,
 `monitoring` adds Prometheus, Grafana and both exporters, and `demo-pinning` adds Kubo:
 
 ```sh
@@ -472,8 +375,8 @@ Signal definitions, SLO/RTO/RPO semantics and the recovery drill are documented 
 
 Use `config --quiet`: it avoids printing direct values if an overlay is accidentally omitted or
 mis-merged. CI separately asserts that the production model contains only secret-file paths. The
-one-shot `migrate` service applies migrations with `xcs_admin`, then the
-one-shot `provision` service establishes runtime grants before the API and indexer start. The API is
+one-shot `db-bootstrap` service applies the current baseline and runtime grants with `xcs_admin`
+before the API and indexer start. The API is
 live at `/health/live`; Compose uses that endpoint for container health and starts the web service
 only after it succeeds. Do not replace this liveness check with `/health/ready`: readiness stays
 unavailable until the dual-source indexer owns a live lease and its status exactly matches a
@@ -619,15 +522,11 @@ detect all personal data. Never pin PII, secrets, or production credentials.
   while their source payload still exists.
 - Monitor checkpoint age, rejected registrations, ledger continuity failures, pin-store failures,
   and disk usage.
-- Roll back application images only to a version compatible with the applied schema. Database
-  changes are forward-fixed; do not manually skip a migration or ledger.
-- Re-run `provision` after a migration or runtime-password rotation. Stop API, indexer, exporter and
-  other non-administrator database clients first; provisioning quarantines the runtime roles,
-  removes memberships, checks ownership and disconnects sessions across the dedicated cluster.
-  Restart clients only after success and verify that they reconnect with the rotated credentials.
-  Keep `xcs_admin` credentials out of runtime containers and logs.
-- Do not create another database during normal operation. If exceptional maintenance requires one,
-  close its access immediately and rerun provisioning from the canonical XCS database before any
-  runtime client restarts; retain the `pg_hba.conf` role-to-database allowlist as defense in depth.
+- Roll back application images only to a version compatible with the current baseline. Before
+  production, rebuild and replay the database for an incompatible schema change; never skip a
+  ledger.
+- Rerun `db-bootstrap` after runtime-password rotation, then restart clients with the matching
+  credentials. Keep `xcs_admin` credentials out of runtime containers and logs.
+- Retain a `pg_hba.conf` role-to-database allowlist as defense in depth.
 - `docker compose down` preserves named volumes. Removing volumes destroys the local projection and
   pin store and is intentionally not part of this runbook.

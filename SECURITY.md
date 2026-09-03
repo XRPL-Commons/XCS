@@ -24,8 +24,8 @@ Report a vulnerability privately to the repository maintainers. Include the affe
 - Payload integrity proves that retrieved bytes match the issuer-bound URI, not that the issuer is trustworthy.
 - Trust decisions remain local to the verifier.
 - Server-side URL resolution is disabled by default and must retain the restrictions in the threat model when enabled.
-- Database provisioning is supported only on a dedicated PostgreSQL cluster. It quarantines runtime
-  roles as `NOLOGIN`, removes delegated memberships, rejects every cluster-wide owner dependency,
-  denies Large Object and unused advisory functions, and terminates non-administrator sessions.
+- Database bootstrap is supported only on a dedicated PostgreSQL cluster because its fixed runtime
+  roles are cluster-wide. It removes unexpected role memberships, applies least-privilege grants in
+  the current database, and stores SCRAM-SHA-256 password verifiers.
 
 See [`docs/threat-model.md`](./docs/threat-model.md) for implemented controls and residual risks.

@@ -112,10 +112,9 @@ responses. `/v1/networks/:network/status` remains diagnostic and may return `200
 is starting, catching up, halted or no longer authoritative. `/health/ready` is a deployment-wide
 load-balancer probe and is not a substitute for the per-profile decision.
 
-Deploy the discovery routes after applying the additive, index-only
-`packages/db/drizzle/0002_discovery_indexes.sql` migration. Existing binaries remain compatible with
-the added indexes; the rollout and populated-database lock considerations are documented in the
-[deployment runbook](../../docs/runbooks/deployment.md#migration-0002-discovery-indexes).
+The discovery indexes are part of the generated current-schema baseline. Before production, reset
+the disposable projection database and run `pnpm --filter @xcs-protocol/db db:bootstrap` after a
+schema change; see the [deployment runbook](../../docs/runbooks/deployment.md).
 
 An organization can reconcile a schema registration transaction without receiving its full memo:
 

@@ -51,34 +51,23 @@ integrators.
 - CI replays one deterministic synthetic ledger bundle through two PostgreSQL projections and pins
   their complete digest, but this proves the harness rather than Testnet history. A reviewed public
   Testnet capture from two demonstrably independent providers remains release evidence.
-- Discovery migration `0002_discovery_indexes.sql` contains regular, additive `CREATE INDEX`
-  statements. It preserves old application compatibility and needs no row backfill, but index
-  creation can block writes on an already populated deployment and should run before the new routes
-  are exposed.
+- Discovery indexes are part of the single generated baseline; this pre-production package does not
+  support applying them to an already populated deployment.
 - PostgreSQL is a self-hostable, rebuildable reference projection, not a Commons authority and not a
   protocol requirement for third-party implementations. A MongoDB adapter would need to reproduce
   atomic checkpoints, single-writer fencing, snapshots, constraints, and deterministic replay.
-- The reference provisioner is deliberately release-coupled and supports only a dedicated
-  PostgreSQL 18 cluster with `max_prepared_transactions = 0`, the exact current migration shape and
-  hash/timestamp identities, and all named projection constraints validated with their canonical
-  definitions. It is not a shared-cluster bootstrapper or a generic forward-compatible migration
-  tool, nor an anti-superuser attestation of every schema object: the superuser/migration owner and
-  reviewed migration artifacts remain trusted. Runtime identities own no objects or DDL rights;
-  runtime concurrency uses `SERIALIZABLE` transactions and fenced row locks, and no runtime role
-  receives a raw PostgreSQL advisory-lock function. Provisioning forces SCRAM-SHA-256 verifiers,
-  while transport security and explicit SCRAM `pg_hba.conf` policy remain operator responsibilities.
-- Migration `0003_projection_integrity.sql` adds 16 PostgreSQL `CHECK` constraints for native XRPL
-  uint32 bounds, non-negative event coordinates, event generation identity, and generation-ledger
-  ordering. It installs them as `NOT VALID` with a 5-second lock timeout; `db:migrate` then validates
-  each table in a separate post-commit transaction with a configurable statement timeout (30
-  minutes by default). An upgrade can therefore fail because a lock is busy, a scan exceeds its
-  configured maintenance window, or historical projection data is invalid. In the latter case
-  `0003` remains applied and its checks protect new writes, but the affected table is not marked
-  validated until operators rebuild or replay the ledger-derived projection and rerun `db:migrate`.
+- The reference bootstrap supports only a fresh database on a dedicated cluster. It creates
+  cluster-wide fixed roles, applies current-database grants and forces SCRAM-SHA-256 verifiers, but
+  it is not a shared-cluster bootstrapper, forward-compatible upgrader or anti-administrator
+  attestation. The administrator and reviewed baseline remain trusted; transport security and an
+  explicit SCRAM `pg_hba.conf` policy remain operator responsibilities.
+- There is intentionally no pre-production upgrade history. Every current constraint and index is
+  created by `0000_baseline.sql`; a schema change requires regenerating the baseline and recreating
+  the projection database. The baseline must freeze before production, after which changes require
+  reviewed forward migrations.
 - Signed PostgreSQL `integer` coordinate columns, including transaction and node indexes, still
-  represent at most `2147483647`, not the full abstract uint32 range. `0003` enforces their
-  non-negative boundary but does not widen them; widening populated columns requires a separate,
-  more locking migration.
+  represent at most `2147483647`, not the full abstract uint32 range. The schema enforces their
+  non-negative boundary but does not widen them.
 - XRPL Commons intends to host the shared Testnet indexer, read API and PostgreSQL projection. That
   projection remains a reconstructible cache and contains neither issuer/subject signing keys nor
   credential claims.

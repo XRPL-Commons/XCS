@@ -5,35 +5,24 @@
 1. Copy `.env.example` to `.env`, set PostgreSQL, and configure distinct
    `XCS_RPC_URL_PRIMARY`/`XCS_RPC_URL_SECONDARY` WSS endpoints operated independently.
    `XCS_INDEXER_DATABASE_URL` must authenticate as the least-privilege `xcs_indexer` role; keep
-   `XCS_MIGRATOR_DATABASE_URL` confined to migration and provisioning commands.
+   `XCS_BOOTSTRAP_DATABASE_URL` confined to the bootstrap command.
 2. Replace the example network profile with the audited profile for the current Testnet reset.
 3. Confirm both `rippled` sources expose every validated ledger from the activation ledger. Clio is
    not yet a supported source for this alpha.
-4. Apply migrations, run the quorum preflight, then start the API and indexer:
+4. Bootstrap the fresh database, run the quorum preflight, then start the API and indexer:
 
 ```sh
-pnpm --filter @xcs-protocol/db db:migrate
-pnpm --filter @xcs-protocol/db db:provision
+pnpm --filter @xcs-protocol/db db:bootstrap
 pnpm --filter @xcs-protocol/indexer preflight
 pnpm --filter @xcs-protocol/api start
 pnpm --filter @xcs-protocol/indexer start
 ```
 
-The idempotent provisioner reapplies the indexer's projection-only grants after migrations without
-printing database URLs or passwords. It is disruptive cluster maintenance: on a manual deployment,
-keep the API, indexer, PostgreSQL exporter and every other non-administrator database client stopped
-until it succeeds. The first run binds the dedicated PostgreSQL cluster to the database selected by
-`XCS_MIGRATOR_DATABASE_URL`; later provisioning through another database fails closed. Do not create
-another database while runtime clients are active. The quarantine, ownership-repair and exceptional
-database-creation procedure is defined in
-[`deployment.md`](./deployment.md#postgresql-identities-and-provisioning).
-
-Provisioning runs its database preflight before binding that first database. It requires PostgreSQL
-18.x with `max_prepared_transactions = 0`, the exact migration-journal hash/timestamp identities for
-`0000` through `0004`, the required schema sentinels, and all 16 projection constraints already
-validated with their canonical definitions. A pending or definition-drifted `0003` validation is
-not a usable partial deployment: repair/replay the projection and rerun `db:migrate`, then rerun
-`db:provision` while runtime clients remain stopped.
+The idempotent command applies the current generated baseline and then configures the three runtime
+roles without printing database URLs or passwords. Run it only on a dedicated cluster: PostgreSQL
+roles are cluster-wide even though the application grants are scoped to the selected database. This
+pre-production baseline is not an upgrader. After a schema change, recreate the disposable
+projection database and regenerate the baseline before bootstrapping it again.
 
 The preflight checks network ID, contiguous retained history, the amendment, activation ledger and
 selected registry policy on both sources. The default `blackholed` policy requires the complete
@@ -74,8 +63,8 @@ Readiness requires matching normalized ledgers from both sources, a live fenced 
 configured amendment and activation hash, no ledger gap, and a fresh checkpoint whose index/hash
 exactly matches the writer's agreed state and includes a transaction root.
 
-The runtime receives no raw PostgreSQL advisory-lock function. Profile initialization uses a
-shared `SERIALIZABLE` helper that retries the complete transaction after SQLSTATE `40001` or `40P01`
+Profile initialization uses a shared `SERIALIZABLE` helper that retries the complete transaction
+after SQLSTATE `40001` or `40P01`
 with bounded full jitter and a five-attempt default budget. Ledger persistence instead locks the
 active lease row with `FOR UPDATE` and writes the projection, checkpoint and status in that same
 transaction. Losing or expiring the lease therefore fails before a stale writer can persist the
@@ -90,8 +79,8 @@ Monitor checkpoint age, source RPC errors, invalid registrations, ingestion retr
 - On a projection bug, stop writes, deploy corrected deterministic code, truncate only rebuildable projections through an explicit maintenance procedure, and replay the append-only events.
 - Never skip a missing ledger or replace an activation hash in place.
 
-An old checkpoint whose `transaction_root` is null predates the integrity migration. It is never
-served as authoritative and must be rebuilt into a fresh projection database.
+Every checkpoint in the current baseline has a transaction root. A projection created by an older
+schema must be rebuilt into a fresh database before it can be served as authoritative.
 
 Accepted schema events store the exact parsed JCS memo separately from the normalized schema used
 for UID computation. A projection created by an older build that stored only the normalized
@@ -101,7 +90,7 @@ recovered from that old row, so its memo digest is not authoritative.
 ## Rebuild and deterministic comparison
 
 `replay` is intentionally create-only: it refuses any profile that already has checkpoints, events,
-schemas, or Credential projections. Point it at a migrated, provisioned, empty database and supply
+schemas, or Credential projections. Point it at a bootstrapped empty database and supply
 one immutable target boundary as both a ledger index and its 64-hex-character hash:
 
 ```sh
@@ -180,4 +169,8 @@ bundle directory.
 
 ## Rollback
 
-Application containers can roll back to a compatible image. Database migrations are forward-fixed unless a tested down migration is explicitly supplied. On-ledger registrations cannot be removed; a normative error requires a new protocol profile/version.
+Application containers can roll back only to an image compatible with the current baseline. Before
+production, a database-schema rollback means recreating and replaying the projection. After the
+baseline freezes for production, forward migrations require an explicit tested rollback strategy.
+On-ledger registrations cannot be removed; a normative error requires a new protocol
+profile/version.

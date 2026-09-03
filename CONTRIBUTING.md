@@ -8,7 +8,8 @@ XCS is an interoperability protocol. Changes to canonicalization, schema validat
 2. For normative changes, add or update an ADR and language-neutral conformance vectors first.
 3. Update both the TypeScript core and independent Go verifier.
 4. Run `pnpm verify` and `go test ./...` from `verifier-go`.
-5. Include migration and recovery notes for persistent-data changes.
+5. Before production, regenerate the database baseline and document reset/recovery steps for
+   persistent-data changes. After production launch, add forward migration notes instead.
 
 Normative identifiers, API fields, error codes and code comments are English. User documentation and the playground are maintained in English and French.
 

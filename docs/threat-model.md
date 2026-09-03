@@ -6,11 +6,10 @@ XCS protects deterministic schema identifiers, ledger-derived lifecycle state, p
 
 Untrusted inputs include schema memos, all XRPL metadata, API path/query/body values, fetched HTTPS/IPFS bytes, wallet responses and deployment configuration.
 
-The PostgreSQL superuser/migration owner and the reviewed migration artifacts are trusted
-administrative inputs. The exact preflight protects the recorded five-migration history and the 16
-upgrade `CHECK` constraints; it does not attest every schema object against a malicious or
-compromised superuser. Runtime roles own no objects and have no DDL privileges, so a runtime-secret
-compromise does not cross that administrative boundary by itself.
+The PostgreSQL administrator and reviewed generated baseline are trusted administrative inputs.
+Bootstrap does not attest every schema object against a malicious or compromised administrator.
+Runtime roles own no objects and have no DDL privileges, so a runtime-secret compromise does not
+cross that administrative boundary by itself.
 
 ## Implemented controls
 
@@ -112,11 +111,11 @@ a separate data-flow, retention and access review.
   an additional shared limiter at a trusted edge. Incorrectly omitting an ingress proxy CIDR safely
   collapses its visitors into one budget; trusting an unnecessarily broad CIDR increases spoofing
   risk, so catch-all `/0` ranges are rejected.
-- The database hardening assumes a trusted PostgreSQL superuser/migration owner and trusted
-  migration artifacts. Exact migration-journal and upgrade-constraint checks detect the covered
-  drift, but do not constitute an anti-superuser attestation of every schema object. Protect and
-  audit the administrator identity and migration supply chain independently.
-- Provisioning forces and verifies SCRAM-SHA-256 password verifiers for runtime roles, but the
+- Database bootstrap assumes a trusted PostgreSQL administrator and trusted baseline artifact. It
+  applies the current-database grants but does not constitute an anti-administrator attestation or
+  audit unrelated databases. Protect and audit the administrator identity and build supply chain
+  independently.
+- Bootstrap forces SCRAM-SHA-256 password verifiers for runtime roles, but the
   operator still owns client transport and `pg_hba.conf` authentication policy. Require TLS where
   traffic crosses a host boundary and explicit `scram-sha-256` role-to-database allow entries; do
   not treat verifier format as a network-access control.
@@ -124,14 +123,11 @@ a separate data-flow, retention and access review.
   provisioned statement, lock and idle-in-transaction timeouts are `USERSET` role defaults rather
   than security ceilings. A client holding a stolen runtime credential can override them for its
   session, consume every allowed connection, hold permitted row locks and run expensive authorized
-  work. Two-phase commit is disabled and runtime roles cannot call a raw advisory-lock function, but
-  operators still need independently enforced connection/query/resource quotas, workload isolation
-  and alerts on long transactions, row-lock pressure and disk growth. The reserved two-integer
-  advisory namespace is reachable only by the superuser provisioner during maintenance.
-- Revoking `EXECUTE` on `pg_notify()` and `pg_logical_emit_message()` closes those function entry
-  points, but PostgreSQL does not use that function ACL for the SQL `LISTEN` and `NOTIFY` commands.
-  A stolen runtime credential can still subscribe to channels or enqueue notifications and create a
-  denial-of-service workload. Operators must constrain connections and workload externally, monitor
-  notification-queue pressure, and set an explicit `max_notify_queue_pages` appropriate to the
-  deployment where PostgreSQL exposes that control; the provisioner does not turn notification ACLs
-  into a security boundary.
+  work. Operators still need independently enforced connection/query/resource quotas, workload
+  isolation and alerts on long transactions, row-lock pressure and disk growth. The bootstrap's
+  advisory lock only serializes concurrent administrative runs; it is not a runtime security
+  boundary.
+- PostgreSQL's default function and `LISTEN`/`NOTIFY` capabilities are not narrowed by bootstrap. A
+  stolen runtime credential can use capabilities PostgreSQL grants through `PUBLIC` and create a
+  denial-of-service workload. Operators must constrain connections and workload externally and
+  monitor notification-queue pressure.
