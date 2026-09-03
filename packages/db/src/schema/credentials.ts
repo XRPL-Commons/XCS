@@ -21,9 +21,7 @@ import { schemas } from './catalog.js'
 export const credentialGenerations = pgTable(
   'credential_generations',
   {
-    profileId: text('profile_id')
-      .notNull()
-      .references(() => networkProfiles.profileId, { onDelete: 'restrict' }),
+    profileId: text('profile_id').notNull(),
     generationId: text('generation_id').notNull(),
     ledgerObjectId: text('ledger_object_id').notNull(),
     issuer: text('issuer').notNull(),
@@ -45,6 +43,11 @@ export const credentialGenerations = pgTable(
       name: 'credential_generations_pk',
       columns: [table.profileId, table.generationId],
     }),
+    foreignKey({
+      name: 'credential_generations_profile_fk',
+      columns: [table.profileId],
+      foreignColumns: [networkProfiles.profileId],
+    }).onDelete('restrict'),
     uniqueIndex('credential_generations_live_uq')
       .on(table.profileId, table.issuer, table.subject, table.schemaUid)
       .where(sql`${table.deletedLedgerIndex} IS NULL`),

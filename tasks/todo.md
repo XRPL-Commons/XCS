@@ -7,8 +7,8 @@
 - [x] Replace the five-step migration history with one generated baseline and a minimal initializer.
 - [x] Replace cluster-wide provisioning machinery with a scoped fresh-cluster role/grant provisioner.
 - [x] Narrow package exports and make operational entrypoints part of the normal package build.
-- [ ] Update API/indexer integration setup, Compose, Docker, CI, configuration, and documentation.
-- [ ] Format and run unit, type, build, PostgreSQL integration, Compose render, and image/startup checks.
+- [x] Update API/indexer integration setup, Compose, Docker, CI, configuration, and documentation.
+- [x] Format and run unit, type, build, PostgreSQL integration, Compose render, and image/startup checks.
 
 ## Invariants to preserve
 
@@ -22,4 +22,8 @@
 
 ## Review
 
-- Pending implementation and verification.
+- Replaced the five historical migrations with one generated baseline for fresh databases and exposed a single idempotent bootstrap entrypoint.
+- Split schema ownership by domain, kept runtime exports separate from administration, and reduced provisioning to dedicated-cluster role normalization plus explicit least-privilege grants.
+- Updated API/indexer PostgreSQL setup, Compose, production images, CI, configuration, and documentation to use the bootstrap contract.
+- Verified `pnpm verify`, all 16 PostgreSQL integration scenarios, clean Drizzle generation, every Compose profile/overlay render, and production image builds.
+- Started the secret-file stack from an empty volume, reran bootstrap successfully, confirmed the API was healthy as UID 1000, and asserted the fresh schema and non-superuser runtime roles.

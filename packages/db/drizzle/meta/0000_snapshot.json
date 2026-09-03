@@ -1,5 +1,5 @@
 {
-  "id": "23d7d6bc-0557-4940-a3b0-cb6e1ba408dd",
+  "id": "bd51fdfe-5c40-4e4c-995d-4bf5c9877561",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1399,8 +1399,8 @@
         }
       },
       "foreignKeys": {
-        "credential_generations_profile_id_network_profiles_profile_id_fk": {
-          "name": "credential_generations_profile_id_network_profiles_profile_id_fk",
+        "credential_generations_profile_fk": {
+          "name": "credential_generations_profile_fk",
           "tableFrom": "credential_generations",
           "tableTo": "network_profiles",
           "columnsFrom": ["profile_id"],

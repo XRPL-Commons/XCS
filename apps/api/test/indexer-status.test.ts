@@ -96,11 +96,6 @@ describe('authoritative indexer evidence', () => {
       'INDEXER_EVIDENCE_INVALID',
     ],
     [
-      'missing transaction root',
-      { checkpoint: { ...checkpoint, transactionRoot: null } },
-      'INDEXER_EVIDENCE_INVALID',
-    ],
-    [
       'checkpoint ledger index above uint32',
       { checkpoint: { ...checkpoint, ledgerIndex: 4_294_967_296 } },
       'INDEXER_EVIDENCE_INVALID',

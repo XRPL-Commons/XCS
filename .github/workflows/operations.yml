@@ -229,7 +229,8 @@ jobs:
                       acldefault('d', database_object.datdba)
                     )
                   ) database_acl
-                  WHERE database_acl.grantee = 0
+                  WHERE database_object.datname = current_database()
+                    AND database_acl.grantee = 0
                     AND database_acl.privilege_type IN ('CONNECT', 'TEMPORARY')
                 )
                 AND NOT EXISTS (
