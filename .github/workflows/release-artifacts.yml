@@ -173,7 +173,7 @@ jobs:
           format: table
           version: v0.72.0
           trivy-config: ops/security/trivy.yaml
-      - name: Scan database tooling image
+      - name: Scan database bootstrap image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: xcs-db:release
@@ -201,7 +201,7 @@ jobs:
           output-file: ${{ env.RELEASE_DIRECTORY }}/xcs-indexer.spdx.json
           upload-artifact: false
           upload-release-assets: false
-      - name: Generate database tooling image SBOM
+      - name: Generate database bootstrap image SBOM
         uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
         with:
           image: xcs-db:release
@@ -279,7 +279,7 @@ jobs:
           subject-name: ${{ steps.images.outputs.indexer_name }}
           subject-digest: ${{ steps.images.outputs.indexer_digest }}
           push-to-registry: true
-      - name: Attest database tooling image provenance
+      - name: Attest database bootstrap image provenance
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
           subject-name: ${{ steps.images.outputs.db_name }}

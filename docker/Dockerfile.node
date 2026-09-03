@@ -23,14 +23,6 @@ RUN --mount=type=cache,id=xcs-pnpm-store,target=/pnpm/store \
 
 RUN test -n "$XCS_PACKAGE" && pnpm --filter "$XCS_PACKAGE..." build
 
-# The database package's normal library build does not emit its two operational
-# entrypoints. Compile them into the same runtime artifact without shipping tsx.
-RUN if [ "$XCS_PACKAGE" = '@xcs-protocol/db' ]; then \
-      pnpm --filter '@xcs-protocol/db' exec tsup \
-        src/index.ts src/schema.ts src/migrate.ts src/provision-main.ts \
-        --format esm --dts --clean; \
-    fi
-
 # pnpm deploy rewrites workspace links and keeps only production dependencies.
 # Legacy mode is explicit because this repository does not inject workspace
 # packages; the lockfile remains the single dependency source of truth.

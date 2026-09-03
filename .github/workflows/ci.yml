@@ -24,7 +24,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm verify
-      - name: Verify generated migrations are committed
+      - name: Verify generated database baseline is committed
         run: |
           pnpm --filter @xcs-protocol/db db:generate
           git diff --exit-code -- packages/db/drizzle

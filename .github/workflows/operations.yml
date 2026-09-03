@@ -78,7 +78,7 @@ jobs:
           docker compose -f docker-compose.yml -f docker-compose.secrets.yml config --quiet
 
           mapfile -t DEFAULT_SERVICES < <(docker compose config --services | sort)
-          EXPECTED=(api indexer migrate postgres provision)
+          EXPECTED=(api db-bootstrap indexer postgres)
           if [[ "${DEFAULT_SERVICES[*]}" != "${EXPECTED[*]}" ]]; then
             printf 'Unexpected default services: %s\n' "${DEFAULT_SERVICES[*]}" >&2
             exit 1
@@ -117,16 +117,19 @@ jobs:
             --profile site --profile monitoring config --format json \
             > "$RUNNER_TEMP/xcs-compose-secrets.json"
           jq -e '
+            (.services["db-bootstrap"].command == ["node", "dist/bin/bootstrap.js"]) and
+            (.services["db-bootstrap"].environment.XCS_DATABASE_URL_TARGET == "XCS_BOOTSTRAP_DATABASE_URL") and
             (.services.postgres.environment.POSTGRES_PASSWORD == null) and
             (.services.postgres.environment.POSTGRES_PASSWORD_FILE == "/run/secrets/postgres_admin_password") and
-            (.services.migrate.environment.XCS_DATABASE_PASSWORD == null) and
-            (.services.provision.environment.XCS_DATABASE_PASSWORD == null) and
-            (.services.provision.environment.XCS_DATABASE_PASSWORD_FILE == "/run/secrets/postgres_admin_password") and
-            (.services.provision.environment.XCS_DATABASE_CLUSTER_SCOPE == "dedicated") and
-            (.services.provision.environment.XCS_INDEXER_DATABASE_PASSWORD == null) and
-            (.services.provision.environment.XCS_API_DATABASE_PASSWORD == null) and
-            (.services.provision.environment.XCS_MONITOR_DATABASE_PASSWORD == null) and
-            (.services.provision.environment.XCS_MONITOR_DATABASE_PASSWORD_FILE == "/run/secrets/monitor_database_password") and
+            (.services["db-bootstrap"].environment.XCS_DATABASE_PASSWORD == null) and
+            (.services["db-bootstrap"].environment.XCS_DATABASE_PASSWORD_FILE == "/run/secrets/postgres_admin_password") and
+            (.services["db-bootstrap"].environment.XCS_DATABASE_CLUSTER_SCOPE == "dedicated") and
+            (.services["db-bootstrap"].environment.XCS_INDEXER_DATABASE_PASSWORD == null) and
+            (.services["db-bootstrap"].environment.XCS_INDEXER_DATABASE_PASSWORD_FILE == "/run/secrets/indexer_database_password") and
+            (.services["db-bootstrap"].environment.XCS_API_DATABASE_PASSWORD == null) and
+            (.services["db-bootstrap"].environment.XCS_API_DATABASE_PASSWORD_FILE == "/run/secrets/api_database_password") and
+            (.services["db-bootstrap"].environment.XCS_MONITOR_DATABASE_PASSWORD == null) and
+            (.services["db-bootstrap"].environment.XCS_MONITOR_DATABASE_PASSWORD_FILE == "/run/secrets/monitor_database_password") and
             (.services.api.environment.XCS_DATABASE_PASSWORD == null) and
             (.services.api.environment.XCS_DATABASE_PASSWORD_FILE == "/run/secrets/api_database_password") and
             (.services.api.environment.XCS_INTERNAL_API_TOKEN == null) and
@@ -160,7 +163,7 @@ jobs:
           jq empty ops/monitoring/grafana/dashboards/*.json
 
       - name: Build production-only core images
-        run: docker compose build migrate provision api indexer
+        run: docker compose build db-bootstrap api indexer
 
       - name: Assert runtime images exclude development tools
         shell: bash
@@ -183,6 +186,12 @@ jobs:
 
           COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.secrets.yml)
           "${COMPOSE[@]}" up --no-build --detach --wait api
+
+          # The bootstrap is deliberately restart-safe. Run it twice after the
+          # dependency chain has completed to prove repeated initialization and
+          # role provisioning do not require a clean volume.
+          "${COMPOSE[@]}" run --rm --no-deps db-bootstrap
+          "${COMPOSE[@]}" run --rm --no-deps db-bootstrap
 
           curl --fail --silent --show-error http://127.0.0.1:3001/health/live > /dev/null
           READY_STATUS="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3001/health/ready)"

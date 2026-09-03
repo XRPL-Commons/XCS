@@ -77,7 +77,7 @@ services:
         max-size: ${XCS_LOG_MAX_SIZE:-10m}
         max-file: ${XCS_LOG_MAX_FILES:-5}
 
-  migrate:
+  db-bootstrap:
     <<: *one-shot-hardening
     image: ${XCS_DB_IMAGE:-xcs-db:local}
     build:
@@ -87,32 +87,9 @@ services:
         XCS_PACKAGE: '@xcs-protocol/db'
         XCS_REVISION: ${XCS_REVISION:-local}
         XCS_VERSION: ${XCS_VERSION:-0.1.0-alpha.1}
-    command: ['node', 'dist/migrate.js']
+    command: ['node', 'dist/bin/bootstrap.js']
     environment:
-      XCS_DATABASE_URL_TARGET: XCS_MIGRATOR_DATABASE_URL
-      XCS_DATABASE_USER: xcs_admin
-      XCS_DATABASE_PASSWORD: ${XCS_POSTGRES_ADMIN_PASSWORD:-}
-      XCS_MIGRATION_STATEMENT_TIMEOUT_MS: ${XCS_MIGRATION_STATEMENT_TIMEOUT_MS:-1800000}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks: [database]
-    mem_limit: ${XCS_JOB_MEMORY_LIMIT:-512m}
-    cpus: ${XCS_JOB_CPU_LIMIT:-0.5}
-
-  provision:
-    <<: *one-shot-hardening
-    image: ${XCS_DB_IMAGE:-xcs-db:local}
-    build:
-      <<: *node-build
-      args:
-        XCS_NODE_IMAGE: ${XCS_NODE_IMAGE:-node:24-alpine}
-        XCS_PACKAGE: '@xcs-protocol/db'
-        XCS_REVISION: ${XCS_REVISION:-local}
-        XCS_VERSION: ${XCS_VERSION:-0.1.0-alpha.1}
-    command: ['node', 'dist/provision-main.js']
-    environment:
-      XCS_DATABASE_URL_TARGET: XCS_MIGRATOR_DATABASE_URL
+      XCS_DATABASE_URL_TARGET: XCS_BOOTSTRAP_DATABASE_URL
       XCS_DATABASE_USER: xcs_admin
       XCS_DATABASE_PASSWORD: ${XCS_POSTGRES_ADMIN_PASSWORD:-}
       XCS_DATABASE_CLUSTER_SCOPE: dedicated
@@ -120,8 +97,8 @@ services:
       XCS_API_DATABASE_PASSWORD: ${XCS_API_DATABASE_PASSWORD:-}
       XCS_MONITOR_DATABASE_PASSWORD: ${XCS_MONITOR_DATABASE_PASSWORD:-}
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
     networks: [database]
     mem_limit: ${XCS_JOB_MEMORY_LIMIT:-512m}
     cpus: ${XCS_JOB_CPU_LIMIT:-0.5}
@@ -157,7 +134,7 @@ services:
       XCS_PINNING_NETWORKS: ${XCS_PINNING_NETWORKS:-}
       XCS_IPFS_API_URL: ${XCS_IPFS_API_URL:-http://ipfs:5001}
     depends_on:
-      provision:
+      db-bootstrap:
         condition: service_completed_successfully
     healthcheck:
       test:
@@ -203,7 +180,7 @@ services:
       XCS_INDEXER_BATCH_SIZE: ${XCS_INDEXER_BATCH_SIZE:-20}
       XCS_INDEXER_LEASE_DURATION_MS: ${XCS_INDEXER_LEASE_DURATION_MS:-30000}
     depends_on:
-      provision:
+      db-bootstrap:
         condition: service_completed_successfully
     volumes:
       - ./config/networks:/workspace/config/networks:ro
@@ -352,7 +329,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      provision:
+      db-bootstrap:
         condition: service_completed_successfully
     networks: [database, monitoring]
     init: true
