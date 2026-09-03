@@ -14,7 +14,7 @@ function requiredEnvironment(name: string): string {
 }
 
 async function main(): Promise<void> {
-  const databaseUrl = requiredEnvironment('XCS_DATABASE_URL')
+  const databaseUrl = requiredEnvironment('XCS_BOOTSTRAP_DATABASE_URL')
   const client = createDatabaseClient(databaseUrl)
 
   try {
