@@ -1,9 +1,916 @@
 {
-  "id": "399e0461-30da-4e95-aa72-2e5751658a20",
+  "id": "23d7d6bc-0557-4940-a3b0-cb6e1ba408dd",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.ledger_checkpoints": {
+      "name": "ledger_checkpoints",
+      "schema": "",
+      "columns": {
+        "profile_id": {
+          "name": "profile_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ledger_index": {
+          "name": "ledger_index",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ledger_hash": {
+          "name": "ledger_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "parent_hash": {
+          "name": "parent_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "close_time": {
+          "name": "close_time",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "transaction_count": {
+          "name": "transaction_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "transaction_root": {
+          "name": "transaction_root",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "processed_at": {
+          "name": "processed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "ledger_checkpoints_profile_hash_uq": {
+          "name": "ledger_checkpoints_profile_hash_uq",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ledger_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "ledger_checkpoints_profile_id_network_profiles_profile_id_fk": {
+          "name": "ledger_checkpoints_profile_id_network_profiles_profile_id_fk",
+          "tableFrom": "ledger_checkpoints",
+          "tableTo": "network_profiles",
+          "columnsFrom": ["profile_id"],
+          "columnsTo": ["profile_id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "ledger_checkpoints_pk": {
+          "name": "ledger_checkpoints_pk",
+          "columns": ["profile_id", "ledger_index"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ledger_checkpoints_index_uint32": {
+          "name": "ledger_checkpoints_index_uint32",
+          "value": "\"ledger_checkpoints\".\"ledger_index\" BETWEEN 0 AND 4294967295"
+        },
+        "ledger_checkpoints_hash": {
+          "name": "ledger_checkpoints_hash",
+          "value": "\"ledger_checkpoints\".\"ledger_hash\" ~ '^[0-9a-f]{64}$'"
+        },
+        "ledger_checkpoints_parent": {
+          "name": "ledger_checkpoints_parent",
+          "value": "\"ledger_checkpoints\".\"parent_hash\" ~ '^[0-9a-f]{64}$'"
+        },
+        "ledger_checkpoints_close_time_uint32": {
+          "name": "ledger_checkpoints_close_time_uint32",
+          "value": "\"ledger_checkpoints\".\"close_time\" BETWEEN 0 AND 4294967295"
+        },
+        "ledger_checkpoints_tx_count": {
+          "name": "ledger_checkpoints_tx_count",
+          "value": "\"ledger_checkpoints\".\"transaction_count\" >= 0"
+        },
+        "ledger_checkpoints_transaction_root": {
+          "name": "ledger_checkpoints_transaction_root",
+          "value": "\"ledger_checkpoints\".\"transaction_root\" ~ '^[0-9a-f]{64}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.network_profiles": {
+      "name": "network_profiles",
+      "schema": "",
+      "columns": {
+        "profile_id": {
+          "name": "profile_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "xcs_version": {
+          "name": "xcs_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "network_id": {
+          "name": "network_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "required_amendment": {
+          "name": "required_amendment",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "registry_address": {
+          "name": "registry_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "registration_amount_drops": {
+          "name": "registration_amount_drops",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "activation_ledger_index": {
+          "name": "activation_ledger_index",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "activation_ledger_hash": {
+          "name": "activation_ledger_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "network_profiles_xcs_version": {
+          "name": "network_profiles_xcs_version",
+          "value": "\"network_profiles\".\"xcs_version\" = '0.1'"
+        },
+        "network_profiles_network_id": {
+          "name": "network_profiles_network_id",
+          "value": "\"network_profiles\".\"network_id\" BETWEEN 0 AND 4294967295"
+        },
+        "network_profiles_registration_amount": {
+          "name": "network_profiles_registration_amount",
+          "value": "\"network_profiles\".\"registration_amount_drops\" = 1"
+        },
+        "network_profiles_activation_index": {
+          "name": "network_profiles_activation_index",
+          "value": "\"network_profiles\".\"activation_ledger_index\" BETWEEN 1 AND 4294967295"
+        },
+        "network_profiles_activation_hash": {
+          "name": "network_profiles_activation_hash",
+          "value": "\"network_profiles\".\"activation_ledger_hash\" ~ '^[0-9a-f]{64}$'"
+        },
+        "network_profiles_registry_address": {
+          "name": "network_profiles_registry_address",
+          "value": "\"network_profiles\".\"registry_address\" ~ '^r[1-9A-HJ-NP-Za-km-z]{24,34}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.indexer_incidents": {
+      "name": "indexer_incidents",
+      "schema": "",
+      "columns": {
+        "profile_id": {
+          "name": "profile_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "writer_epoch": {
+          "name": "writer_epoch",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "error_code": {
+          "name": "error_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "primary_source_tip": {
+          "name": "primary_source_tip",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "secondary_source_tip": {
+          "name": "secondary_source_tip",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_agreed_ledger_index": {
+          "name": "last_agreed_ledger_index",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_agreed_ledger_hash": {
+          "name": "last_agreed_ledger_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recorded_at": {
+          "name": "recorded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "indexer_incidents_profile_id_network_profiles_profile_id_fk": {
+          "name": "indexer_incidents_profile_id_network_profiles_profile_id_fk",
+          "tableFrom": "indexer_incidents",
+          "tableTo": "network_profiles",
+          "columnsFrom": ["profile_id"],
+          "columnsTo": ["profile_id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "indexer_incidents_pk": {
+          "name": "indexer_incidents_pk",
+          "columns": ["profile_id", "writer_epoch"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "indexer_incidents_writer_epoch": {
+          "name": "indexer_incidents_writer_epoch",
+          "value": "\"indexer_incidents\".\"writer_epoch\" BETWEEN 1 AND 9007199254740991"
+        },
+        "indexer_incidents_error_code": {
+          "name": "indexer_incidents_error_code",
+          "value": "\"indexer_incidents\".\"error_code\" ~ '^[A-Z][A-Z0-9_]{0,63}$'"
+        },
+        "indexer_incidents_primary_tip": {
+          "name": "indexer_incidents_primary_tip",
+          "value": "\"indexer_incidents\".\"primary_source_tip\" IS NULL OR \"indexer_incidents\".\"primary_source_tip\" BETWEEN 0 AND 4294967295"
+        },
+        "indexer_incidents_secondary_tip": {
+          "name": "indexer_incidents_secondary_tip",
+          "value": "\"indexer_incidents\".\"secondary_source_tip\" IS NULL OR \"indexer_incidents\".\"secondary_source_tip\" BETWEEN 0 AND 4294967295"
+        },
+        "indexer_incidents_agreed_ledger": {
+          "name": "indexer_incidents_agreed_ledger",
+          "value": "(\"indexer_incidents\".\"last_agreed_ledger_index\" IS NULL AND \"indexer_incidents\".\"last_agreed_ledger_hash\" IS NULL)\n          OR (\"indexer_incidents\".\"last_agreed_ledger_index\" IS NOT NULL\n          AND \"indexer_incidents\".\"last_agreed_ledger_hash\" IS NOT NULL\n          AND \"indexer_incidents\".\"last_agreed_ledger_index\" BETWEEN 0 AND 4294967295\n          AND \"indexer_incidents\".\"last_agreed_ledger_hash\" ~ '^[0-9a-f]{64}$')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.indexer_status": {
+      "name": "indexer_status",
+      "schema": "",
+      "columns": {
+        "profile_id": {
+          "name": "profile_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "primary_source_tip": {
+          "name": "primary_source_tip",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "secondary_source_tip": {
+          "name": "secondary_source_tip",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_agreed_ledger_index": {
+          "name": "last_agreed_ledger_index",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_agreed_ledger_hash": {
+          "name": "last_agreed_ledger_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error_code": {
+          "name": "error_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "writer_id": {
+          "name": "writer_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "writer_epoch": {
+          "name": "writer_epoch",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lease_expires_at": {
+          "name": "lease_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "indexer_status_profile_id_network_profiles_profile_id_fk": {
+          "name": "indexer_status_profile_id_network_profiles_profile_id_fk",
+          "tableFrom": "indexer_status",
+          "tableTo": "network_profiles",
+          "columnsFrom": ["profile_id"],
+          "columnsTo": ["profile_id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "indexer_status_state": {
+          "name": "indexer_status_state",
+          "value": "\"indexer_status\".\"state\" IN ('starting', 'catching_up', 'ready', 'halted')"
+        },
+        "indexer_status_primary_tip": {
+          "name": "indexer_status_primary_tip",
+          "value": "\"indexer_status\".\"primary_source_tip\" IS NULL OR \"indexer_status\".\"primary_source_tip\" BETWEEN 0 AND 4294967295"
+        },
+        "indexer_status_secondary_tip": {
+          "name": "indexer_status_secondary_tip",
+          "value": "\"indexer_status\".\"secondary_source_tip\" IS NULL OR \"indexer_status\".\"secondary_source_tip\" BETWEEN 0 AND 4294967295"
+        },
+        "indexer_status_agreed_ledger": {
+          "name": "indexer_status_agreed_ledger",
+          "value": "(\"indexer_status\".\"last_agreed_ledger_index\" IS NULL AND \"indexer_status\".\"last_agreed_ledger_hash\" IS NULL)\n          OR (\"indexer_status\".\"last_agreed_ledger_index\" IS NOT NULL\n          AND \"indexer_status\".\"last_agreed_ledger_hash\" IS NOT NULL\n          AND \"indexer_status\".\"last_agreed_ledger_index\" BETWEEN 0 AND 4294967295\n          AND \"indexer_status\".\"last_agreed_ledger_hash\" ~ '^[0-9a-f]{64}$')"
+        },
+        "indexer_status_agreed_not_ahead": {
+          "name": "indexer_status_agreed_not_ahead",
+          "value": "\"indexer_status\".\"state\" = 'halted'\n          OR \"indexer_status\".\"last_agreed_ledger_index\" IS NULL\n          OR ((\"indexer_status\".\"primary_source_tip\" IS NULL OR \"indexer_status\".\"last_agreed_ledger_index\" <= \"indexer_status\".\"primary_source_tip\")\n          AND (\"indexer_status\".\"secondary_source_tip\" IS NULL OR \"indexer_status\".\"last_agreed_ledger_index\" <= \"indexer_status\".\"secondary_source_tip\"))"
+        },
+        "indexer_status_ready_shape": {
+          "name": "indexer_status_ready_shape",
+          "value": "\"indexer_status\".\"state\" <> 'ready'\n          OR (\"indexer_status\".\"primary_source_tip\" IS NOT NULL\n          AND \"indexer_status\".\"secondary_source_tip\" IS NOT NULL\n          AND \"indexer_status\".\"last_agreed_ledger_index\" IS NOT NULL\n          AND \"indexer_status\".\"last_agreed_ledger_hash\" IS NOT NULL\n          AND \"indexer_status\".\"writer_id\" IS NOT NULL\n          AND \"indexer_status\".\"lease_expires_at\" IS NOT NULL\n          AND \"indexer_status\".\"last_agreed_ledger_index\" = LEAST(\"indexer_status\".\"primary_source_tip\", \"indexer_status\".\"secondary_source_tip\"))"
+        },
+        "indexer_status_error_code": {
+          "name": "indexer_status_error_code",
+          "value": "\"indexer_status\".\"error_code\" IS NULL OR \"indexer_status\".\"error_code\" ~ '^[A-Z][A-Z0-9_]{0,63}$'"
+        },
+        "indexer_status_error_shape": {
+          "name": "indexer_status_error_shape",
+          "value": "(\"indexer_status\".\"state\" = 'halted' AND \"indexer_status\".\"error_code\" IS NOT NULL)\n          OR (\"indexer_status\".\"state\" <> 'halted' AND \"indexer_status\".\"error_code\" IS NULL)"
+        },
+        "indexer_status_writer_id": {
+          "name": "indexer_status_writer_id",
+          "value": "\"indexer_status\".\"writer_id\" IS NULL OR \"indexer_status\".\"writer_id\" ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'"
+        },
+        "indexer_status_writer_epoch": {
+          "name": "indexer_status_writer_epoch",
+          "value": "\"indexer_status\".\"writer_epoch\" BETWEEN 1 AND 9007199254740991"
+        },
+        "indexer_status_lease_window": {
+          "name": "indexer_status_lease_window",
+          "value": "(\"indexer_status\".\"writer_id\" IS NULL AND \"indexer_status\".\"lease_expires_at\" IS NULL)\n          OR (\"indexer_status\".\"writer_id\" IS NOT NULL\n          AND \"indexer_status\".\"lease_expires_at\" IS NOT NULL\n          AND \"indexer_status\".\"lease_expires_at\" >= \"indexer_status\".\"updated_at\"\n          AND \"indexer_status\".\"lease_expires_at\" <= \"indexer_status\".\"updated_at\" + interval '5 minutes')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.schema_events": {
+      "name": "schema_events",
+      "schema": "",
+      "columns": {
+        "profile_id": {
+          "name": "profile_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "transaction_hash": {
+          "name": "transaction_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ledger_index": {
+          "name": "ledger_index",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ledger_hash": {
+          "name": "ledger_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "transaction_index": {
+          "name": "transaction_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "publisher": {
+          "name": "publisher",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason_code": {
+          "name": "reason_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "schema_uid": {
+          "name": "schema_uid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "memo_json": {
+          "name": "memo_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recorded_at": {
+          "name": "recorded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "schema_events_ledger_idx": {
+          "name": "schema_events_ledger_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ledger_index",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "transaction_index",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "schema_events_activity_idx": {
+          "name": "schema_events_activity_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ledger_index",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "transaction_index",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "transaction_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "schema_events_publisher_idx": {
+          "name": "schema_events_publisher_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "publisher",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "schema_events_profile_id_network_profiles_profile_id_fk": {
+          "name": "schema_events_profile_id_network_profiles_profile_id_fk",
+          "tableFrom": "schema_events",
+          "tableTo": "network_profiles",
+          "columnsFrom": ["profile_id"],
+          "columnsTo": ["profile_id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "schema_events_pk": {
+          "name": "schema_events_pk",
+          "columns": ["profile_id", "transaction_hash"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "schema_events_tx_hash": {
+          "name": "schema_events_tx_hash",
+          "value": "\"schema_events\".\"transaction_hash\" ~ '^[0-9a-f]{64}$'"
+        },
+        "schema_events_ledger_hash": {
+          "name": "schema_events_ledger_hash",
+          "value": "\"schema_events\".\"ledger_hash\" ~ '^[0-9a-f]{64}$'"
+        },
+        "schema_events_ledger_index_uint32": {
+          "name": "schema_events_ledger_index_uint32",
+          "value": "\"schema_events\".\"ledger_index\" BETWEEN 0 AND 4294967295"
+        },
+        "schema_events_tx_index": {
+          "name": "schema_events_tx_index",
+          "value": "\"schema_events\".\"transaction_index\" >= 0"
+        },
+        "schema_events_status": {
+          "name": "schema_events_status",
+          "value": "\"schema_events\".\"status\" IN ('accepted', 'rejected')"
+        },
+        "schema_events_result_shape": {
+          "name": "schema_events_result_shape",
+          "value": "(\"schema_events\".\"status\" = 'accepted' AND \"schema_events\".\"schema_uid\" IS NOT NULL AND \"schema_events\".\"reason_code\" IS NULL AND \"schema_events\".\"memo_json\" IS NOT NULL)\n          OR (\"schema_events\".\"status\" = 'rejected' AND \"schema_events\".\"schema_uid\" IS NULL AND \"schema_events\".\"reason_code\" IS NOT NULL)"
+        },
+        "schema_events_schema_uid": {
+          "name": "schema_events_schema_uid",
+          "value": "\"schema_events\".\"schema_uid\" IS NULL OR \"schema_events\".\"schema_uid\" ~ '^[0-9a-f]{64}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.schemas": {
+      "name": "schemas",
+      "schema": "",
+      "columns": {
+        "profile_id": {
+          "name": "profile_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "schema_uid": {
+          "name": "schema_uid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "publisher": {
+          "name": "publisher",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "parent_uid": {
+          "name": "parent_uid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "supersedes_uid": {
+          "name": "supersedes_uid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "definition": {
+          "name": "definition",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resolved_definition": {
+          "name": "resolved_definition",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "registration_transaction_hash": {
+          "name": "registration_transaction_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ledger_index": {
+          "name": "ledger_index",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "transaction_index": {
+          "name": "transaction_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "registered_at": {
+          "name": "registered_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "schemas_registration_tx_uq": {
+          "name": "schemas_registration_tx_uq",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "registration_transaction_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "schemas_publisher_order_idx": {
+          "name": "schemas_publisher_order_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "publisher",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ledger_index",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "transaction_index",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "schemas_order_idx": {
+          "name": "schemas_order_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ledger_index",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "transaction_index",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "schema_uid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "schemas_search_idx": {
+          "name": "schemas_search_idx",
+          "columns": [
+            {
+              "expression": "to_tsvector('simple', \"name\" || ' ' || \"description\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "schemas_profile_id_network_profiles_profile_id_fk": {
+          "name": "schemas_profile_id_network_profiles_profile_id_fk",
+          "tableFrom": "schemas",
+          "tableTo": "network_profiles",
+          "columnsFrom": ["profile_id"],
+          "columnsTo": ["profile_id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "schemas_registration_event_fk": {
+          "name": "schemas_registration_event_fk",
+          "tableFrom": "schemas",
+          "tableTo": "schema_events",
+          "columnsFrom": ["profile_id", "registration_transaction_hash"],
+          "columnsTo": ["profile_id", "transaction_hash"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "schemas_pk": {
+          "name": "schemas_pk",
+          "columns": ["profile_id", "schema_uid"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "schemas_uid": {
+          "name": "schemas_uid",
+          "value": "\"schemas\".\"schema_uid\" ~ '^[0-9a-f]{64}$'"
+        },
+        "schemas_parent_uid": {
+          "name": "schemas_parent_uid",
+          "value": "\"schemas\".\"parent_uid\" IS NULL OR \"schemas\".\"parent_uid\" ~ '^[0-9a-f]{64}$'"
+        },
+        "schemas_supersedes_uid": {
+          "name": "schemas_supersedes_uid",
+          "value": "\"schemas\".\"supersedes_uid\" IS NULL OR \"schemas\".\"supersedes_uid\" ~ '^[0-9a-f]{64}$'"
+        },
+        "schemas_registration_tx_hash": {
+          "name": "schemas_registration_tx_hash",
+          "value": "\"schemas\".\"registration_transaction_hash\" ~ '^[0-9a-f]{64}$'"
+        },
+        "schemas_ledger_index_uint32": {
+          "name": "schemas_ledger_index_uint32",
+          "value": "\"schemas\".\"ledger_index\" BETWEEN 0 AND 4294967295"
+        },
+        "schemas_transaction_index": {
+          "name": "schemas_transaction_index",
+          "value": "\"schemas\".\"transaction_index\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.credential_events": {
       "name": "credential_events",
       "schema": "",
@@ -30,7 +937,7 @@
           "name": "generation_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "ledger_object_id": {
           "name": "ledger_object_id",
@@ -252,6 +1159,22 @@
           "name": "credential_events_schema",
           "value": "\"credential_events\".\"schema_uid\" ~ '^[0-9a-f]{64}$'"
         },
+        "credential_events_node_index": {
+          "name": "credential_events_node_index",
+          "value": "\"credential_events\".\"node_index\" >= 0"
+        },
+        "credential_events_ledger_index_uint32": {
+          "name": "credential_events_ledger_index_uint32",
+          "value": "\"credential_events\".\"ledger_index\" BETWEEN 0 AND 4294967295"
+        },
+        "credential_events_transaction_index": {
+          "name": "credential_events_transaction_index",
+          "value": "\"credential_events\".\"transaction_index\" >= 0"
+        },
+        "credential_events_expiration_uint32": {
+          "name": "credential_events_expiration_uint32",
+          "value": "\"credential_events\".\"expiration\" IS NULL OR \"credential_events\".\"expiration\" BETWEEN 0 AND 4294967295"
+        },
         "credential_events_type": {
           "name": "credential_events_type",
           "value": "\"credential_events\".\"event_type\" IN ('created', 'accepted', 'deleted')"
@@ -440,6 +1363,39 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "credential_generations_stats_idx": {
+          "name": "credential_generations_stats_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "deleted_ledger_index",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "accepted",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "expiration",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -483,9 +1439,29 @@
           "name": "credential_generations_schema",
           "value": "\"credential_generations\".\"schema_uid\" ~ '^[0-9a-f]{64}$'"
         },
-        "credential_generations_expiration": {
-          "name": "credential_generations_expiration",
-          "value": "\"credential_generations\".\"expiration\" IS NULL OR \"credential_generations\".\"expiration\" >= 0"
+        "credential_generations_expiration_uint32": {
+          "name": "credential_generations_expiration_uint32",
+          "value": "\"credential_generations\".\"expiration\" IS NULL OR \"credential_generations\".\"expiration\" BETWEEN 0 AND 4294967295"
+        },
+        "credential_generations_created_ledger_uint32": {
+          "name": "credential_generations_created_ledger_uint32",
+          "value": "\"credential_generations\".\"created_ledger_index\" BETWEEN 0 AND 4294967295"
+        },
+        "credential_generations_created_transaction_index": {
+          "name": "credential_generations_created_transaction_index",
+          "value": "\"credential_generations\".\"created_transaction_index\" >= 0"
+        },
+        "credential_generations_last_ledger_uint32": {
+          "name": "credential_generations_last_ledger_uint32",
+          "value": "\"credential_generations\".\"last_ledger_index\" BETWEEN 0 AND 4294967295"
+        },
+        "credential_generations_deleted_ledger_uint32": {
+          "name": "credential_generations_deleted_ledger_uint32",
+          "value": "\"credential_generations\".\"deleted_ledger_index\" IS NULL OR \"credential_generations\".\"deleted_ledger_index\" BETWEEN 0 AND 4294967295"
+        },
+        "credential_generations_ledger_order": {
+          "name": "credential_generations_ledger_order",
+          "value": "\"credential_generations\".\"last_ledger_index\" >= \"credential_generations\".\"created_ledger_index\"\n          AND (\"credential_generations\".\"deleted_ledger_index\" IS NULL OR \"credential_generations\".\"deleted_ledger_index\" = \"credential_generations\".\"last_ledger_index\")"
         },
         "credential_generations_deletion": {
           "name": "credential_generations_deletion",
@@ -740,220 +1716,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.ledger_checkpoints": {
-      "name": "ledger_checkpoints",
-      "schema": "",
-      "columns": {
-        "profile_id": {
-          "name": "profile_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "ledger_index": {
-          "name": "ledger_index",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "ledger_hash": {
-          "name": "ledger_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "parent_hash": {
-          "name": "parent_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "close_time": {
-          "name": "close_time",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "transaction_count": {
-          "name": "transaction_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "processed_at": {
-          "name": "processed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "ledger_checkpoints_profile_hash_uq": {
-          "name": "ledger_checkpoints_profile_hash_uq",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "ledger_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "ledger_checkpoints_profile_id_network_profiles_profile_id_fk": {
-          "name": "ledger_checkpoints_profile_id_network_profiles_profile_id_fk",
-          "tableFrom": "ledger_checkpoints",
-          "tableTo": "network_profiles",
-          "columnsFrom": ["profile_id"],
-          "columnsTo": ["profile_id"],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "ledger_checkpoints_pk": {
-          "name": "ledger_checkpoints_pk",
-          "columns": ["profile_id", "ledger_index"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "ledger_checkpoints_index": {
-          "name": "ledger_checkpoints_index",
-          "value": "\"ledger_checkpoints\".\"ledger_index\" >= 0"
-        },
-        "ledger_checkpoints_hash": {
-          "name": "ledger_checkpoints_hash",
-          "value": "\"ledger_checkpoints\".\"ledger_hash\" ~ '^[0-9a-f]{64}$'"
-        },
-        "ledger_checkpoints_parent": {
-          "name": "ledger_checkpoints_parent",
-          "value": "\"ledger_checkpoints\".\"parent_hash\" ~ '^[0-9a-f]{64}$'"
-        },
-        "ledger_checkpoints_close_time": {
-          "name": "ledger_checkpoints_close_time",
-          "value": "\"ledger_checkpoints\".\"close_time\" >= 0"
-        },
-        "ledger_checkpoints_tx_count": {
-          "name": "ledger_checkpoints_tx_count",
-          "value": "\"ledger_checkpoints\".\"transaction_count\" >= 0"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.network_profiles": {
-      "name": "network_profiles",
-      "schema": "",
-      "columns": {
-        "profile_id": {
-          "name": "profile_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "xcs_version": {
-          "name": "xcs_version",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "network_id": {
-          "name": "network_id",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "required_amendment": {
-          "name": "required_amendment",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "registry_address": {
-          "name": "registry_address",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "registration_amount_drops": {
-          "name": "registration_amount_drops",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "activation_ledger_index": {
-          "name": "activation_ledger_index",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "activation_ledger_hash": {
-          "name": "activation_ledger_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "enabled": {
-          "name": "enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "network_profiles_xcs_version": {
-          "name": "network_profiles_xcs_version",
-          "value": "\"network_profiles\".\"xcs_version\" = '0.1'"
-        },
-        "network_profiles_network_id": {
-          "name": "network_profiles_network_id",
-          "value": "\"network_profiles\".\"network_id\" BETWEEN 0 AND 4294967295"
-        },
-        "network_profiles_registration_amount": {
-          "name": "network_profiles_registration_amount",
-          "value": "\"network_profiles\".\"registration_amount_drops\" = 1"
-        },
-        "network_profiles_activation_index": {
-          "name": "network_profiles_activation_index",
-          "value": "\"network_profiles\".\"activation_ledger_index\" BETWEEN 1 AND 4294967295"
-        },
-        "network_profiles_activation_hash": {
-          "name": "network_profiles_activation_hash",
-          "value": "\"network_profiles\".\"activation_ledger_hash\" ~ '^[0-9a-f]{64}$'"
-        },
-        "network_profiles_registry_address": {
-          "name": "network_profiles_registry_address",
-          "value": "\"network_profiles\".\"registry_address\" ~ '^r[1-9A-HJ-NP-Za-km-z]{24,34}$'"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.pin_challenges": {
       "name": "pin_challenges",
       "schema": "",
@@ -1103,363 +1865,6 @@
         "pin_challenges_expiry": {
           "name": "pin_challenges_expiry",
           "value": "\"pin_challenges\".\"expires_at\" > \"pin_challenges\".\"created_at\""
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.schema_events": {
-      "name": "schema_events",
-      "schema": "",
-      "columns": {
-        "profile_id": {
-          "name": "profile_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "transaction_hash": {
-          "name": "transaction_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "ledger_index": {
-          "name": "ledger_index",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "ledger_hash": {
-          "name": "ledger_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "transaction_index": {
-          "name": "transaction_index",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "publisher": {
-          "name": "publisher",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reason_code": {
-          "name": "reason_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "schema_uid": {
-          "name": "schema_uid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "memo_json": {
-          "name": "memo_json",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "recorded_at": {
-          "name": "recorded_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "schema_events_ledger_idx": {
-          "name": "schema_events_ledger_idx",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "ledger_index",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "transaction_index",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "schema_events_publisher_idx": {
-          "name": "schema_events_publisher_idx",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "publisher",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "schema_events_profile_id_network_profiles_profile_id_fk": {
-          "name": "schema_events_profile_id_network_profiles_profile_id_fk",
-          "tableFrom": "schema_events",
-          "tableTo": "network_profiles",
-          "columnsFrom": ["profile_id"],
-          "columnsTo": ["profile_id"],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "schema_events_pk": {
-          "name": "schema_events_pk",
-          "columns": ["profile_id", "transaction_hash"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "schema_events_tx_hash": {
-          "name": "schema_events_tx_hash",
-          "value": "\"schema_events\".\"transaction_hash\" ~ '^[0-9a-f]{64}$'"
-        },
-        "schema_events_ledger_hash": {
-          "name": "schema_events_ledger_hash",
-          "value": "\"schema_events\".\"ledger_hash\" ~ '^[0-9a-f]{64}$'"
-        },
-        "schema_events_tx_index": {
-          "name": "schema_events_tx_index",
-          "value": "\"schema_events\".\"transaction_index\" >= 0"
-        },
-        "schema_events_status": {
-          "name": "schema_events_status",
-          "value": "\"schema_events\".\"status\" IN ('accepted', 'rejected')"
-        },
-        "schema_events_result_shape": {
-          "name": "schema_events_result_shape",
-          "value": "(\"schema_events\".\"status\" = 'accepted' AND \"schema_events\".\"schema_uid\" IS NOT NULL AND \"schema_events\".\"reason_code\" IS NULL AND \"schema_events\".\"memo_json\" IS NOT NULL)\n          OR (\"schema_events\".\"status\" = 'rejected' AND \"schema_events\".\"schema_uid\" IS NULL AND \"schema_events\".\"reason_code\" IS NOT NULL)"
-        },
-        "schema_events_schema_uid": {
-          "name": "schema_events_schema_uid",
-          "value": "\"schema_events\".\"schema_uid\" IS NULL OR \"schema_events\".\"schema_uid\" ~ '^[0-9a-f]{64}$'"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.schemas": {
-      "name": "schemas",
-      "schema": "",
-      "columns": {
-        "profile_id": {
-          "name": "profile_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "schema_uid": {
-          "name": "schema_uid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "publisher": {
-          "name": "publisher",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "parent_uid": {
-          "name": "parent_uid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "supersedes_uid": {
-          "name": "supersedes_uid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "definition": {
-          "name": "definition",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "resolved_definition": {
-          "name": "resolved_definition",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "registration_transaction_hash": {
-          "name": "registration_transaction_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "ledger_index": {
-          "name": "ledger_index",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "transaction_index": {
-          "name": "transaction_index",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "registered_at": {
-          "name": "registered_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "schemas_registration_tx_uq": {
-          "name": "schemas_registration_tx_uq",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "registration_transaction_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "schemas_publisher_order_idx": {
-          "name": "schemas_publisher_order_idx",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "publisher",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "ledger_index",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "transaction_index",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "schemas_profile_id_network_profiles_profile_id_fk": {
-          "name": "schemas_profile_id_network_profiles_profile_id_fk",
-          "tableFrom": "schemas",
-          "tableTo": "network_profiles",
-          "columnsFrom": ["profile_id"],
-          "columnsTo": ["profile_id"],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "schemas_registration_event_fk": {
-          "name": "schemas_registration_event_fk",
-          "tableFrom": "schemas",
-          "tableTo": "schema_events",
-          "columnsFrom": ["profile_id", "registration_transaction_hash"],
-          "columnsTo": ["profile_id", "transaction_hash"],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "schemas_pk": {
-          "name": "schemas_pk",
-          "columns": ["profile_id", "schema_uid"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "schemas_uid": {
-          "name": "schemas_uid",
-          "value": "\"schemas\".\"schema_uid\" ~ '^[0-9a-f]{64}$'"
-        },
-        "schemas_parent_uid": {
-          "name": "schemas_parent_uid",
-          "value": "\"schemas\".\"parent_uid\" IS NULL OR \"schemas\".\"parent_uid\" ~ '^[0-9a-f]{64}$'"
-        },
-        "schemas_supersedes_uid": {
-          "name": "schemas_supersedes_uid",
-          "value": "\"schemas\".\"supersedes_uid\" IS NULL OR \"schemas\".\"supersedes_uid\" ~ '^[0-9a-f]{64}$'"
-        },
-        "schemas_registration_tx_hash": {
-          "name": "schemas_registration_tx_hash",
-          "value": "\"schemas\".\"registration_transaction_hash\" ~ '^[0-9a-f]{64}$'"
         }
       },
       "isRLSEnabled": false

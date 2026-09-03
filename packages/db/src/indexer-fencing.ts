@@ -7,7 +7,7 @@ import {
   indexerStatuses,
   type IndexerStatusRow,
   type IndexerStatusState,
-} from './schema.js'
+} from './schema/index.js'
 
 const UINT32_MAX = 4_294_967_295
 const MAX_SAFE_EPOCH = Number.MAX_SAFE_INTEGER

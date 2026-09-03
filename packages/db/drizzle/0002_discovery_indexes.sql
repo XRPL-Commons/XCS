@@ -1,4 +1,0 @@
-CREATE INDEX "credential_generations_stats_idx" ON "credential_generations" USING btree ("profile_id","deleted_ledger_index","accepted","expiration");--> statement-breakpoint
-CREATE INDEX "schema_events_activity_idx" ON "schema_events" USING btree ("profile_id","ledger_index","transaction_index","transaction_hash");--> statement-breakpoint
-CREATE INDEX "schemas_order_idx" ON "schemas" USING btree ("profile_id","ledger_index","transaction_index","schema_uid");--> statement-breakpoint
-CREATE INDEX "schemas_search_idx" ON "schemas" USING gin (to_tsvector('simple', "name" || ' ' || "description"));

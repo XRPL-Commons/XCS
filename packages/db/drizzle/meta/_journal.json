@@ -5,36 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1787137915943,
-      "tag": "0000_initial",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1787583095929,
-      "tag": "0001_durable_indexer_status",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1787677420371,
-      "tag": "0002_discovery_indexes",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1787763893542,
-      "tag": "0003_projection_integrity",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1788121971942,
-      "tag": "0004_indexer_incidents",
+      "when": 1788475188184,
+      "tag": "0000_baseline",
       "breakpoints": true
     }
   ]
