@@ -126,6 +126,9 @@ Because this application has not entered production, schema changes regenerate t
 require recreating the disposable projection database. At production launch the baseline freezes;
 subsequent changes must use reviewed forward migrations and preserve mixed-version reads.
 
+The [database model](./database.md) provides a Mermaid relationship diagram, a table-by-table catalog,
+the main integrity boundaries and the runtime-role access model.
+
 The baseline includes the discovery indexes, projection-integrity constraints and
 `indexer_incidents`, keyed by profile and writer lease epoch. A fenced writer records halt status and
 the incident in one transaction; runtime grants make the history append-only for `xcs_indexer` and

@@ -35,7 +35,7 @@ accepted product boundaries are recorded in
   primitives.
 - `packages/cli`: local, non-custodial command-line workflows.
 - `packages/db`: PostgreSQL schema, fresh-database bootstrap and least-privilege roles for a
-  rebuildable local projection.
+  rebuildable local projection; see the [database model](./docs/database.md) for the table map.
 - `apps/indexer`: validated-ledger ingestion and XCS projections.
 - `apps/api`: read-only schema/catalog, credential and verification API.
 - `apps/web`: accountless Nuxt 4 Testnet application for exploration, issuance and verification.

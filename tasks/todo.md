@@ -27,3 +27,13 @@
 - Updated API/indexer PostgreSQL setup, Compose, production images, CI, configuration, and documentation to use the bootstrap contract.
 - Verified `pnpm verify`, all 16 PostgreSQL integration scenarios, clean Drizzle generation, every Compose profile/overlay render, and production image builds.
 - Started the secret-file stack from an empty volume, reran bootstrap successfully, confirmed the API was healthy as UID 1000, and asserted the fresh schema and non-superuser runtime roles.
+
+## Database documentation follow-up
+
+- [x] Add a human-readable database model with a Mermaid relationship diagram and catalog all application tables.
+- [x] Document table ownership, mutation patterns, integrity boundaries, and runtime-role access.
+- [x] Link the database model from the repository map and persistence architecture.
+- [x] Format and validate the documentation, then update the open pull request.
+
+The Mermaid parser accepts the ER diagram, the catalog covers all ten baseline application tables,
+and every documentation link resolves inside the repository.
