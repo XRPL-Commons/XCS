@@ -4,8 +4,6 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { sha256Hex } from '@xcs-protocol/core'
-
 import {
   CONTROLLED_PILOT_ACKNOWLEDGEMENT,
   loadIndexerConfig,
@@ -13,6 +11,7 @@ import {
   loadIndexerRuntimeConfig,
   loadLedgerRpcConfig,
 } from '../src/config.js'
+import { sha256Hex } from '../src/serialization.js'
 
 const paths: string[] = []
 

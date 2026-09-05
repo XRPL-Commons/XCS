@@ -1,13 +1,4 @@
-import {
-  canonicalize,
-  computeSchemaUid,
-  encodeUtf8,
-  MAX_SCHEMA_CATALOG_ENTRIES,
-  sha256Hex,
-  validateSchema,
-  validateSchemaCatalogBundle,
-  type JsonValue,
-} from '@xcs-protocol/core'
+import { computeSchemaUid, parseSchema } from '@xcs-protocol/core'
 import type {
   CredentialEventRow,
   CredentialGenerationRow,
@@ -21,6 +12,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { createApi } from '../src/app.js'
 import type { OperationalMetricsRepository } from '../src/operational-metrics.js'
+import { MAX_SCHEMA_CATALOG_ENTRIES, type SchemaCatalogBundle } from '../src/schema-catalog.js'
+import { canonicalJson, encodeUtf8, sha256Hex } from '../src/serialization.js'
 import type { ApiRepository, SchemaProjectionEvidence } from '../src/types.js'
 import { StaticTrustPolicy } from '../src/verification.js'
 
@@ -228,7 +221,7 @@ function schemaCatalogFixture() {
       lineage: [parentUid],
     },
   ].map(({ uid, definition, transactionIndex, transactionHash, fields, lineage }) => {
-    const normalizedDefinition = validateSchema(definition)
+    const normalizedDefinition = parseSchema(definition)
     const registration: SchemaEventRow = {
       profileId: network.profileId,
       transactionHash,
@@ -817,7 +810,7 @@ describe('read API', () => {
 
   it('documents closed success contracts for the developer verification flow', async () => {
     const repository = new RouteRepository()
-    const nestedDefinition = validateSchema({
+    const nestedDefinition = parseSchema({
       ...registeredSchema,
       fields: {
         programId: { type: 'string' },
@@ -1496,7 +1489,7 @@ describe('read API', () => {
 
     expect(response.statusCode).toBe(200)
     expect(response.headers['cache-control']).toBe('no-store')
-    const catalog = validateSchemaCatalogBundle(response.json())
+    const catalog = response.json() as SchemaCatalogBundle
     expect(catalog.targetUid).toBe(fixture.targetUid)
     expect(catalog.profile).toMatchObject({
       profileId: network.profileId,
@@ -1823,9 +1816,7 @@ describe('read API', () => {
         ledgerHash: acceptedSchemaRegistration.ledgerHash,
         transactionIndex: acceptedSchemaRegistration.transactionIndex,
         schemaUid: registeredSchemaUid,
-        schemaDigestHex: sha256Hex(
-          encodeUtf8(canonicalize(acceptedSchemaRegistration.memoJson as JsonValue)),
-        ),
+        schemaDigestHex: sha256Hex(encodeUtf8(canonicalJson(acceptedSchemaRegistration.memoJson))),
         reasonCode: null,
       },
     })
@@ -1837,7 +1828,7 @@ describe('read API', () => {
       ...registeredSchema,
       fields: { programId: { type: 'string' as const, optional: false } },
     }
-    const normalizedSchema = validateSchema(rawMemoJson)
+    const normalizedSchema = parseSchema(rawMemoJson)
     const normalizedSchemaUid = computeSchemaUid({
       schema: normalizedSchema,
       networkId: network.networkId,
@@ -1859,11 +1850,11 @@ describe('read API', () => {
     expect(acceptedUnnormalizedMemo.json()).toMatchObject({
       registration: {
         schemaUid: normalizedSchemaUid,
-        schemaDigestHex: sha256Hex(encodeUtf8(canonicalize(rawMemoJson))),
+        schemaDigestHex: sha256Hex(encodeUtf8(canonicalJson(rawMemoJson))),
       },
     })
     expect(acceptedUnnormalizedMemo.json().registration.schemaDigestHex).not.toBe(
-      sha256Hex(encodeUtf8(canonicalize(normalizedSchema as unknown as JsonValue))),
+      sha256Hex(encodeUtf8(canonicalJson(normalizedSchema))),
     )
 
     snapshot.getSchemaRegistrationByTransaction = async () => ({
@@ -2380,9 +2371,9 @@ describe('read API', () => {
       schema: UID,
       claims: { proof: '' },
     }
-    const emptyPayloadSize = encodeUtf8(canonicalize(payload)).length
+    const emptyPayloadSize = encodeUtf8(canonicalJson(payload)).length
     payload.claims.proof = 'x'.repeat(1024 * 1024 - emptyPayloadSize)
-    expect(encodeUtf8(canonicalize(payload))).toHaveLength(1024 * 1024)
+    expect(encodeUtf8(canonicalJson(payload))).toHaveLength(1024 * 1024)
 
     const requestBody = {
       network: 'testnet',

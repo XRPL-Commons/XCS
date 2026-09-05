@@ -1,11 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import {
-  computeSchemaUid,
-  MAX_SCHEMA_CATALOG_ENTRIES,
-  validateSchema,
-  type SchemaDefinition,
-} from '@xcs-protocol/core'
+import { computeSchemaUid, parseSchema, type SchemaDefinition } from '@xcs-protocol/core'
 import { createDatabaseClient, schemaEvents, schemas, type DatabaseClient } from '@xcs-protocol/db'
 import { bootstrapDatabase, databasePasswordFromUrl } from '@xcs-protocol/db/bootstrap'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -13,7 +8,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { PostgresOperationalMetricsRepository } from '../src/operational-metrics-repository.js'
 import { PostgresPinningRepository } from '../src/pinning-repository.js'
 import { PostgresApiRepository } from '../src/repository.js'
-import { authoritativeSchemaCatalogBundle } from '../src/schema-catalog.js'
+import {
+  authoritativeSchemaCatalogBundle,
+  MAX_SCHEMA_CATALOG_ENTRIES,
+} from '../src/schema-catalog.js'
 
 const rawAdminDatabaseUrl = process.env.XCS_TEST_DATABASE_URL?.trim()
 const adminDatabaseUrl = rawAdminDatabaseUrl === '' ? undefined : rawAdminDatabaseUrl
@@ -78,7 +76,7 @@ function validCatalogNodes(count: number): CatalogNode[] {
     const root = nodes[0]
     const previous = nodes.at(-1)
     const ownFields = { [`field${index}`]: { type: 'string' as const } }
-    const definition = validateSchema({
+    const definition = parseSchema({
       xcsVersion: '0.1',
       name: `Catalog schema ${index}`,
       description: `PostgreSQL catalog closure node ${index}.`,
@@ -418,14 +416,14 @@ describePostgres('PostgreSQL 18 API integration', () => {
     const nodes = validCatalogNodes(MAX_SCHEMA_CATALOG_ENTRIES + 1)
     const cycleAUid = `${'f'.repeat(63)}0`
     const cycleBUid = `${'f'.repeat(63)}1`
-    const cycleADefinition = validateSchema({
+    const cycleADefinition = parseSchema({
       xcsVersion: '0.1',
       name: 'Projection cycle A',
       description: 'Deliberately corrupted relational projection used to exercise the SQL CTE.',
       extends: cycleBUid,
       fields: { cycleA: { type: 'string' } },
     })
-    const cycleBDefinition = validateSchema({
+    const cycleBDefinition = parseSchema({
       xcsVersion: '0.1',
       name: 'Projection cycle B',
       description: 'Deliberately corrupted relational projection used to exercise the SQL CTE.',

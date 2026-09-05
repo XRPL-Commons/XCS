@@ -1,11 +1,9 @@
 import {
-  canonicalize,
-  classifyCredentialPayload,
-  decodeUtf8Hex,
+  verifyCredentialPayload,
   XcsError,
-  type JsonValue,
+  type CredentialLifecycleState,
+  type CredentialPayloadStatus,
   type ResolvedSchema,
-  type VerificationReport,
 } from '@xcs-protocol/core'
 import type { CredentialGenerationRow, SchemaRow } from '@xcs-protocol/db'
 
@@ -15,7 +13,16 @@ import { DEFAULT_LEDGER_MAX_AGE_SECONDS } from './ledger-freshness.js'
 import { assertAuthoritativeLedgerEvidence, assertIndexerReady } from './indexer-status.js'
 import { PayloadInvalidError, PayloadUnavailableError } from './payload-resolver.js'
 import { authoritativeResolvedSchema, schemaProjectionEvidenceUids } from './schema-projection.js'
+import { canonicalJson, decodeHexUtf8 } from './serialization.js'
 import type { ApiRepository, PayloadResolver, TrustPolicy } from './types.js'
+
+export interface VerificationReport {
+  onChain: CredentialLifecycleState | 'not_found'
+  schema: 'valid' | 'unknown'
+  payload: CredentialPayloadStatus | 'not_checked'
+  issuerTrust: 'trusted' | 'untrusted' | 'unknown'
+  generationId?: string
+}
 
 export interface VerifyRequest {
   network: string
@@ -47,7 +54,7 @@ function onChainStatus(
 function decodeCredentialUri(generation: CredentialGenerationRow): string | undefined {
   if (generation.uriHex === null) return undefined
   try {
-    return decodeUtf8Hex(generation.uriHex)
+    return decodeHexUtf8(generation.uriHex)
   } catch {
     return undefined
   }
@@ -69,13 +76,13 @@ async function payloadStatus(input: {
     issuer: request.issuer,
     subject: request.subject,
     schemaUid: request.schemaUid,
-    schema,
+    fields: schema.fields,
   }
 
   if (request.payload !== undefined) {
     try {
-      return classifyCredentialPayload(
-        { status: 'retrieved', content: canonicalize(request.payload as JsonValue) },
+      return verifyCredentialPayload(
+        { status: 'retrieved', content: canonicalJson(request.payload) },
         uri,
         context,
       )
@@ -87,10 +94,10 @@ async function payloadStatus(input: {
 
   try {
     const content = await resolver.resolve(uri)
-    return classifyCredentialPayload({ status: 'retrieved', content }, uri, context)
+    return verifyCredentialPayload({ status: 'retrieved', content }, uri, context)
   } catch (error) {
     if (error instanceof PayloadUnavailableError) {
-      return classifyCredentialPayload({ status: 'unavailable' }, uri, context)
+      return verifyCredentialPayload({ status: 'unavailable' }, uri, context)
     }
     if (error instanceof PayloadInvalidError || error instanceof XcsError) return 'invalid'
     throw error

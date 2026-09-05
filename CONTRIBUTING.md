@@ -9,5 +9,4 @@ Keep changes small, testable, and owned by one layer.
 5. Run the affected package checks, then `pnpm verify` when the whole workspace is stable.
 6. Include rollout and recovery notes for persistent-data changes.
 
-
 Changes to schema validity, UID derivation, canonical payload bytes, URI integrity, or lifecycle projection are protocol changes. Document them in an ADR and update the specification before shipping them.

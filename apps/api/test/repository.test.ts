@@ -7,12 +7,12 @@ import {
   type SchemaRow,
   type XcsDatabase,
 } from '@xcs-protocol/db'
-import { MAX_SCHEMA_CATALOG_ENTRIES } from '@xcs-protocol/core'
 import type { SQL } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { describe, expect, it, vi } from 'vitest'
 
 import { PostgresApiRepository } from '../src/repository.js'
+import { MAX_SCHEMA_CATALOG_ENTRIES } from '../src/schema-catalog.js'
 
 const NOW = new Date('2026-08-24T12:00:00.000Z')
 const schemaRegistration: SchemaEventRow = {
