@@ -1,12 +1,12 @@
 import {
-  canonicalize,
   computeSchemaUid,
-  parseJsonStrict,
+  parseSchema,
   resolveSchema,
-  validateSchema,
   XcsError,
   type JsonValue,
 } from '@xcs-protocol/core'
+
+import { canonicalJson, parseJson } from './serialization.js'
 
 import type {
   LedgerTransaction,
@@ -136,8 +136,8 @@ export function interpretSchemaRegistration(
 
   let parsed: JsonValue | undefined
   try {
-    parsed = parseJsonStrict(extracted.envelope.jsonText)
-    if (canonicalize(parsed as JsonValue) !== extracted.envelope.jsonText) {
+    parsed = parseJson(extracted.envelope.jsonText) as JsonValue
+    if (canonicalJson(parsed) !== extracted.envelope.jsonText) {
       return {
         status: 'rejected',
         transactionHash: transaction.hash,
@@ -148,7 +148,7 @@ export function interpretSchemaRegistration(
       }
     }
 
-    const definition = validateSchema(parsed)
+    const definition = parseSchema(parsed)
     const resolved = resolveSchema(definition, {
       networkId: profile.networkId,
       publisher: extracted.envelope.publisher,
@@ -180,7 +180,12 @@ export function interpretSchemaRegistration(
       transactionHash: transaction.hash,
       transactionIndex: transaction.transactionIndex,
       publisher: extracted.envelope.publisher,
-      reasonCode: error instanceof XcsError ? error.code : 'REGISTRATION_INVALID',
+      reasonCode:
+        error instanceof XcsError
+          ? error.code
+          : error instanceof SyntaxError
+            ? 'JSON_INVALID'
+            : 'REGISTRATION_INVALID',
       ...(parsed === undefined ? {} : { memoJson: parsed }),
     }
   }

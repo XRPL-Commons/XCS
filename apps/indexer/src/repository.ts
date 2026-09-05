@@ -16,7 +16,7 @@ import {
   type IndexerLeaseToken,
   type XcsDatabase,
 } from '@xcs-protocol/db'
-import { canonicalize, type JsonValue } from '@xcs-protocol/core'
+import type { JsonValue } from '@xcs-protocol/core'
 import { and, asc, desc, eq, isNull } from 'drizzle-orm'
 
 import { assertLedgerContinuity } from './continuity.js'
@@ -31,6 +31,7 @@ import type {
   NetworkProfile,
   SchemaCatalogEntry,
 } from './types.js'
+import { canonicalJson } from './serialization.js'
 
 export type IndexerRepositoryErrorCode = 'CHECKPOINT_EVIDENCE_MISSING' | 'CHECKPOINT_CONFLICT'
 
@@ -115,7 +116,7 @@ function plainDatabaseJson(value: unknown): JsonValue {
   // Strict JSON intentionally uses null-prototype objects. Drizzle inspects
   // value prototypes before JSONB encoding, so materialize an equivalent
   // ordinary JSON value at the persistence boundary.
-  return JSON.parse(canonicalize(value as JsonValue)) as JsonValue
+  return JSON.parse(canonicalJson(value)) as JsonValue
 }
 
 async function ensureNetworkProfile(database: XcsDatabase, profile: NetworkProfile): Promise<void> {

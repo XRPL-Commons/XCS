@@ -1,7 +1,8 @@
-import { sha256Hex, type NetworkProfile } from '@xcs-protocol/core'
+import type { NetworkProfile } from '@xcs-protocol/core'
 
 import { LedgerFixtureBundleSource, validateLedgerFixtureBundle } from './fixture-bundle.js'
 import { createReplayTarget, ReplayTargetError, type ReplayTarget } from './replay-target.js'
+import { sha256Hex } from './serialization.js'
 
 export interface PrepareFixtureReplayInput {
   readonly directory: string

@@ -190,6 +190,29 @@ describe('credential transaction builders', () => {
     expect(credentialHexToUri(transaction.URI ?? '')).toBe(uri)
   })
 
+  it('rejects expiration values that XRPL cannot serialize safely', () => {
+    for (const expiration of [
+      '2030-01-01T00:00:00.123Z',
+      '2030-02-30T00:00:00Z',
+      '1999-12-31T23:59:59Z',
+      'not-a-date',
+    ]) {
+      expect(() =>
+        buildCredentialCreate({
+          issuer: ISSUER,
+          subject: SUBJECT,
+          schemaUid: UID,
+          uri,
+          expiration,
+        }),
+      ).toThrow(
+        expect.objectContaining({
+          code: 'XCS_SDK_INVALID_EXPIRATION',
+        }),
+      )
+    }
+  })
+
   it('builds subject acceptance and the three native deletion forms', () => {
     expect(buildCredentialAccept({ subject: SUBJECT, issuer: ISSUER, schemaUid: UID })).toEqual({
       TransactionType: 'CredentialAccept',

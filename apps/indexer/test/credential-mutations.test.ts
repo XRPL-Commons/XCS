@@ -1,4 +1,4 @@
-import { createIpfsRawPayloadUri } from '@xcs-protocol/core'
+import { createIpfsPayloadUri } from '@xcs-protocol/core'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -34,7 +34,7 @@ function credentialFields(overrides: Record<string, unknown> = {}) {
     Issuer: ISSUER,
     Subject: SUBJECT,
     CredentialType: SCHEMA_UID.toUpperCase(),
-    URI: Buffer.from(createIpfsRawPayloadUri('example'), 'utf8').toString('hex').toUpperCase(),
+    URI: Buffer.from(createIpfsPayloadUri('example'), 'utf8').toString('hex').toUpperCase(),
     Flags: 0,
     ...overrides,
   }
