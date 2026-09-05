@@ -2,19 +2,10 @@ import cors from '@fastify/cors'
 import rateLimit from '@fastify/rate-limit'
 import swagger from '@fastify/swagger'
 import swaggerUi from '@fastify/swagger-ui'
-import {
-  canonicalize,
-  computeSchemaUid,
-  encodeUtf8,
-  isClassicAddress,
-  MAX_SCHEMA_CATALOG_ENTRIES,
-  sha256Hex,
-  validateSchema,
-  type JsonValue,
-  type VerificationReport,
-} from '@xcs-protocol/core'
+import { computeSchemaUid, parseSchema } from '@xcs-protocol/core'
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify'
 import { createHash, timingSafeEqual } from 'node:crypto'
+import { isValidClassicAddress } from 'xrpl'
 
 import {
   assertCredentialGenerationEvidence,
@@ -41,7 +32,7 @@ import {
   encodeSchemaRegistrationCursor,
 } from './pagination.js'
 import { DemoPinningService, PinningError } from './pinning.js'
-import { authoritativeSchemaCatalogBundle } from './schema-catalog.js'
+import { authoritativeSchemaCatalogBundle, MAX_SCHEMA_CATALOG_ENTRIES } from './schema-catalog.js'
 import {
   authoritativeResolvedSchema,
   SchemaProjectionInvalidError,
@@ -52,1090 +43,79 @@ import {
   VerificationNetworkNotFoundError,
   verifyCredential,
   type VerifyRequest,
+  type VerificationReport,
 } from './verification.js'
+import { canonicalJson, encodeUtf8, sha256Hex } from './serialization.js'
 
-const PROFILE_PATTERN = '^[a-z0-9][a-z0-9._-]{0,127}$'
-const UID_PATTERN = '^[0-9a-f]{64}$'
-const INPUT_HASH_PATTERN = '^[0-9A-Fa-f]{64}$'
-const LOWERCASE_HASH = /^[0-9a-f]{64}$/u
-const HEX_BYTES = /^(?:[0-9A-Fa-f]{2})*$/u
-const REASON_CODE = /^[A-Z][A-Z0-9_]{0,127}$/u
-const ADDRESS_PATTERN = '^r[1-9A-HJ-NP-Za-km-z]{24,34}$'
-const CREDENTIAL_EVENT_HISTORY_LIMIT = 100
-const CREDENTIAL_GENERATION_TIMELINE_LIMIT = 100
-const EXACT_CREDENTIAL_EVENT_QUERY_LIMIT = 2
-const DISCOVERY_SEARCH_DEFAULT_LIMIT = 20
-const DISCOVERY_SEARCH_MAX_LIMIT = 50
-const DISCOVERY_PAGE_DEFAULT_LIMIT = 20
-const DISCOVERY_PAGE_MAX_LIMIT = 100
-const MAX_NODE_INDEX = 2_147_483_647
-const MAX_UINT32 = 4_294_967_295
-const SEARCH_QUERY_CONTENT = /[\p{L}\p{N}]/u
-const SEARCH_QUERY_CONTROL = /[\u0000-\u001f\u007f]/u
-const INTERNAL_SSR_TOKEN = /^[A-Za-z0-9_-]{32,256}$/u
-const INTERNAL_SSR_CLIENT_KEY = /^[0-9a-f]{64}$/u
-const INTERNAL_SSR_TOKEN_HEADER = 'x-xcs-internal-token'
-const INTERNAL_SSR_CLIENT_KEY_HEADER = 'x-xcs-client-key'
-const INTERNAL_METRICS_TOKEN_HEADER = 'authorization'
-const INTERNAL_METRICS_TOKEN = /^[A-Za-z0-9_-]{32,256}$/u
-const errorResponseSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['error', 'message'],
-  properties: {
-    error: { type: 'string' },
-    message: { type: 'string' },
-  },
-} as const
-const rateLimitResponseSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['statusCode', 'error', 'message'],
-  properties: {
-    statusCode: { type: 'integer', const: 429 },
-    error: { type: 'string' },
-    message: { type: 'string' },
-  },
-} as const
-const networkParamsSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['network'],
-  properties: { network: { type: 'string', pattern: PROFILE_PATTERN } },
-} as const
-const publicIndexerStatusSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['profileId', 'state', 'sourceTips', 'lastAgreedLedger', 'errorCode', 'updatedAt'],
-  properties: {
-    profileId: { type: 'string', pattern: PROFILE_PATTERN },
-    state: { type: 'string', enum: ['starting', 'catching_up', 'ready', 'halted'] },
-    sourceTips: {
-      type: 'object',
-      additionalProperties: false,
-      required: ['primary', 'secondary'],
-      properties: {
-        primary: { type: 'integer', nullable: true, minimum: 0, maximum: 4_294_967_295 },
-        secondary: { type: 'integer', nullable: true, minimum: 0, maximum: 4_294_967_295 },
-      },
-    },
-    lastAgreedLedger: {
-      anyOf: [
-        {
-          type: 'object',
-          additionalProperties: false,
-          required: ['index', 'hash'],
-          properties: {
-            index: { type: 'integer', minimum: 0, maximum: 4_294_967_295 },
-            hash: { type: 'string', pattern: UID_PATTERN },
-          },
-        },
-        { type: 'null' },
-      ],
-    },
-    errorCode: {
-      type: 'string',
-      nullable: true,
-      pattern: '^[A-Z][A-Z0-9_]{0,63}$',
-    },
-    updatedAt: { type: 'string', format: 'date-time' },
-  },
-} as const
-const publicCredentialEventSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: [
-    'transactionHash',
-    'nodeIndex',
-    'generationId',
-    'ledgerIndex',
-    'ledgerHash',
-    'transactionIndex',
-    'eventType',
-    'issuer',
-    'subject',
-    'schemaUid',
-    'accepted',
-    'deletionCause',
-  ],
-  properties: {
-    transactionHash: { type: 'string', pattern: UID_PATTERN },
-    nodeIndex: { type: 'integer', minimum: 0 },
-    generationId: { type: 'string', pattern: UID_PATTERN },
-    ledgerIndex: { type: 'integer', minimum: 0, maximum: 4_294_967_295 },
-    ledgerHash: { type: 'string', pattern: UID_PATTERN },
-    transactionIndex: { type: 'integer', minimum: 0 },
-    eventType: { type: 'string', enum: ['created', 'accepted', 'deleted'] },
-    issuer: { type: 'string', pattern: ADDRESS_PATTERN },
-    subject: { type: 'string', pattern: ADDRESS_PATTERN },
-    schemaUid: { type: 'string', pattern: UID_PATTERN },
-    accepted: { type: 'boolean' },
-    deletionCause: {
-      anyOf: [
-        {
-          type: 'string',
-          enum: [
-            'issuer_revoked',
-            'subject_rejected',
-            'subject_removed',
-            'expired_cleanup',
-            'account_deleted',
-            'self_deleted',
-          ],
-        },
-        { type: 'null' },
-      ],
-    },
-  },
-} as const
-const credentialEventHistoryResponseSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['items'],
-  properties: {
-    items: {
-      type: 'array',
-      items: { ...publicCredentialEventSchema, additionalProperties: true },
-    },
-  },
-} as const
-const exactCredentialEventResponseSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['transactionHash', 'event'],
-  properties: {
-    transactionHash: { type: 'string', pattern: UID_PATTERN },
-    event: { anyOf: [publicCredentialEventSchema, { type: 'null' }] },
-  },
-} as const
-const publicSchemaRegistrationSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: [
-    'status',
-    'publisher',
-    'ledgerIndex',
-    'ledgerHash',
-    'transactionIndex',
-    'schemaUid',
-    'schemaDigestHex',
-    'reasonCode',
-  ],
-  properties: {
-    status: { type: 'string', enum: ['accepted', 'rejected'] },
-    publisher: { type: 'string', pattern: ADDRESS_PATTERN },
-    ledgerIndex: { type: 'integer', minimum: 0, maximum: 4_294_967_295 },
-    ledgerHash: { type: 'string', pattern: UID_PATTERN },
-    transactionIndex: { type: 'integer', minimum: 0 },
-    schemaUid: { anyOf: [{ type: 'string', pattern: UID_PATTERN }, { type: 'null' }] },
-    schemaDigestHex: { anyOf: [{ type: 'string', pattern: UID_PATTERN }, { type: 'null' }] },
-    reasonCode: { anyOf: [{ type: 'string', minLength: 1, maxLength: 128 }, { type: 'null' }] },
-  },
-} as const
-const exactSchemaRegistrationResponseSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['transactionHash', 'registration'],
-  properties: {
-    transactionHash: { type: 'string', pattern: UID_PATTERN },
-    registration: { anyOf: [publicSchemaRegistrationSchema, { type: 'null' }] },
-  },
-} as const
+import {
+  PROFILE_PATTERN,
+  UID_PATTERN,
+  INPUT_HASH_PATTERN,
+  LOWERCASE_HASH,
+  HEX_BYTES,
+  REASON_CODE,
+  ADDRESS_PATTERN,
+  CREDENTIAL_EVENT_HISTORY_LIMIT,
+  CREDENTIAL_GENERATION_TIMELINE_LIMIT,
+  EXACT_CREDENTIAL_EVENT_QUERY_LIMIT,
+  DISCOVERY_SEARCH_DEFAULT_LIMIT,
+  DISCOVERY_SEARCH_MAX_LIMIT,
+  DISCOVERY_PAGE_DEFAULT_LIMIT,
+  DISCOVERY_PAGE_MAX_LIMIT,
+  MAX_NODE_INDEX,
+  MAX_UINT32,
+  SEARCH_QUERY_CONTENT,
+  SEARCH_QUERY_CONTROL,
+  INTERNAL_SSR_TOKEN,
+  INTERNAL_SSR_CLIENT_KEY,
+  INTERNAL_SSR_TOKEN_HEADER,
+  INTERNAL_SSR_CLIENT_KEY_HEADER,
+  INTERNAL_METRICS_TOKEN_HEADER,
+  INTERNAL_METRICS_TOKEN,
+  errorResponseSchema,
+  rateLimitResponseSchema,
+  networkParamsSchema,
+  publicIndexerStatusSchema,
+  publicCredentialEventSchema,
+  credentialEventHistoryResponseSchema,
+  exactCredentialEventResponseSchema,
+  publicSchemaRegistrationSchema,
+  exactSchemaRegistrationResponseSchema,
+  publicCheckpointSchema,
+  networkReadinessResponseSchema,
+  publicSchemaSummarySchema,
+  xcsFieldDescriptorSchema,
+  xcsFieldsSchema,
+  xcsSchemaDefinitionSchema,
+  schemaCatalogResponseSchema,
+  publicSchemaRowSchema,
+  schemaListResponseSchema,
+  credentialStateSchema,
+  publicCredentialGenerationSchema,
+  exactCredentialResponseSchema,
+  verificationResponseSchema,
+  publicCredentialGenerationSummarySchema,
+  publicTransactionSummarySchema,
+  discoveryStatsResponseSchema,
+  discoverySearchResponseSchema,
+  publicSchemaActivityItemSchema,
+  discoveryActivityResponseSchema,
+  credentialGenerationResponseSchema,
+  transactionResponseSchema,
+} from './http-schemas.js'
 
-const publicCheckpointSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['ledgerIndex', 'ledgerHash', 'closeTime', 'transactionRoot'],
-  properties: {
-    ledgerIndex: { type: 'integer', minimum: 0, maximum: 4_294_967_295 },
-    ledgerHash: { type: 'string', pattern: UID_PATTERN },
-    closeTime: { type: 'integer', minimum: 0, maximum: 4_294_967_295 },
-    transactionRoot: { type: 'string', pattern: UID_PATTERN },
-  },
-} as const
-
-const networkReadinessResponseSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['profileId', 'status', 'checkpoint'],
-  properties: {
-    profileId: { type: 'string', pattern: PROFILE_PATTERN },
-    status: { type: 'string', enum: ['ready'] },
-    checkpoint: publicCheckpointSchema,
-  },
-} as const
-
-const publicSchemaSummarySchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: [
-    'schemaUid',
-    'publisher',
-    'name',
-    'description',
-    'parentUid',
-    'supersedesUid',
-    'registrationTransactionHash',
-    'ledgerIndex',
-    'transactionIndex',
-  ],
-  properties: {
-    schemaUid: { type: 'string', pattern: UID_PATTERN },
-    publisher: { type: 'string', pattern: ADDRESS_PATTERN },
-    name: { type: 'string' },
-    description: { type: 'string' },
-    parentUid: { anyOf: [{ type: 'string', pattern: UID_PATTERN }, { type: 'null' }] },
-    supersedesUid: { anyOf: [{ type: 'string', pattern: UID_PATTERN }, { type: 'null' }] },
-    registrationTransactionHash: { type: 'string', pattern: UID_PATTERN },
-    ledgerIndex: { type: 'integer', minimum: 0, maximum: 4_294_967_295 },
-    transactionIndex: { type: 'integer', minimum: 0 },
-  },
-} as const
-
-const xcsFieldDescriptorSchema = {
-  $id: 'XcsFieldDescriptor',
-  oneOf: [
-    {
-      type: 'object',
-      additionalProperties: false,
-      required: ['type'],
-      properties: {
-        type: { type: 'string', enum: ['string', 'bool', 'uint', 'int', 'bytes', 'address'] },
-        optional: { type: 'boolean' },
-      },
-    },
-    {
-      type: 'object',
-      additionalProperties: false,
-      required: ['type', 'items'],
-      properties: {
-        type: { type: 'string', const: 'array' },
-        optional: { type: 'boolean' },
-        items: { $ref: 'XcsFieldDescriptor#' },
-      },
-    },
-    {
-      type: 'object',
-      additionalProperties: false,
-      required: ['type', 'fields'],
-      properties: {
-        type: { type: 'string', const: 'object' },
-        optional: { type: 'boolean' },
-        fields: {
-          type: 'object',
-          minProperties: 1,
-          additionalProperties: { $ref: 'XcsFieldDescriptor#' },
-        },
-      },
-    },
-  ],
-} as const
-
-const xcsFieldsSchema = {
-  type: 'object',
-  minProperties: 1,
-  additionalProperties: { $ref: 'XcsFieldDescriptor#' },
-} as const
-
-const xcsSchemaDefinitionSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['xcsVersion', 'name', 'description', 'fields'],
-  properties: {
-    xcsVersion: { type: 'string', const: '0.1' },
-    name: { type: 'string', minLength: 1 },
-    description: { type: 'string', minLength: 1 },
-    extends: { type: 'string', pattern: UID_PATTERN },
-    supersedes: { type: 'string', pattern: UID_PATTERN },
-    fields: xcsFieldsSchema,
-  },
-} as const
-
-const schemaCatalogResponseSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['format', 'profile', 'targetUid', 'checkpoint', 'schemas'],
-  properties: {
-    format: { type: 'string', const: 'xcs-schema-catalog/1' },
-    profile: {
-      type: 'object',
-      additionalProperties: false,
-      required: [
-        'profileId',
-        'xcsVersion',
-        'networkId',
-        'requiredAmendment',
-        'registryAddress',
-        'registrationAmountDrops',
-        'activationLedgerIndex',
-        'activationLedgerHash',
-      ],
-      properties: {
-        profileId: { type: 'string', pattern: PROFILE_PATTERN },
-        xcsVersion: { type: 'string', const: '0.1' },
-        networkId: { type: 'integer', minimum: 0, maximum: MAX_UINT32 },
-        requiredAmendment: { type: 'string', pattern: '^[0-9A-F]{64}$' },
-        registryAddress: { type: 'string', pattern: ADDRESS_PATTERN },
-        registrationAmountDrops: { type: 'string', const: '1' },
-        activationLedgerIndex: { type: 'integer', minimum: 1, maximum: MAX_UINT32 },
-        activationLedgerHash: { type: 'string', pattern: UID_PATTERN },
-      },
-    },
-    targetUid: { type: 'string', pattern: UID_PATTERN },
-    checkpoint: {
-      type: 'object',
-      additionalProperties: false,
-      required: ['ledgerIndex', 'ledgerHash'],
-      properties: {
-        ledgerIndex: { type: 'integer', minimum: 1, maximum: MAX_UINT32 },
-        ledgerHash: { type: 'string', pattern: UID_PATTERN },
-      },
-    },
-    schemas: {
-      type: 'array',
-      minItems: 1,
-      maxItems: MAX_SCHEMA_CATALOG_ENTRIES,
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        required: [
-          'uid',
-          'definition',
-          'publisher',
-          'ledgerIndex',
-          'ledgerHash',
-          'transactionIndex',
-          'transactionHash',
-        ],
-        properties: {
-          uid: { type: 'string', pattern: UID_PATTERN },
-          definition: xcsSchemaDefinitionSchema,
-          publisher: { type: 'string', pattern: ADDRESS_PATTERN },
-          ledgerIndex: { type: 'integer', minimum: 1, maximum: MAX_UINT32 },
-          ledgerHash: { type: 'string', pattern: UID_PATTERN },
-          transactionIndex: { type: 'integer', minimum: 0, maximum: MAX_UINT32 },
-          transactionHash: { type: 'string', pattern: UID_PATTERN },
-        },
-      },
-    },
-  },
-} as const
-
-const publicSchemaRowSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: [
-    'profileId',
-    ...publicSchemaSummarySchema.required,
-    'definition',
-    'resolvedDefinition',
-    'registeredAt',
-  ],
-  properties: {
-    profileId: { type: 'string', pattern: PROFILE_PATTERN },
-    ...publicSchemaSummarySchema.properties,
-    definition: xcsSchemaDefinitionSchema,
-    resolvedDefinition: {
-      type: 'object',
-      additionalProperties: false,
-      required: ['definition', 'fields', 'lineage'],
-      properties: {
-        definition: xcsSchemaDefinitionSchema,
-        fields: xcsFieldsSchema,
-        lineage: { type: 'array', items: { type: 'string', pattern: UID_PATTERN } },
-      },
-    },
-    registeredAt: { type: 'string', format: 'date-time' },
-  },
-} as const
-
-const schemaListResponseSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['items'],
-  properties: {
-    items: { type: 'array', items: publicSchemaRowSchema },
-    nextCursor: { type: 'string', minLength: 1, maxLength: 512 },
-  },
-} as const
-
-const credentialStateSchema = {
-  type: 'string',
-  enum: ['pending', 'active', 'expired', 'deleted'],
-} as const
-
-const publicCredentialGenerationSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: [
-    'generationId',
-    'ledgerObjectId',
-    'issuer',
-    'subject',
-    'schemaUid',
-    'uriHex',
-    'expiration',
-    'accepted',
-    'createdLedgerIndex',
-    'createdTransactionIndex',
-    'lastLedgerIndex',
-    'deletedLedgerIndex',
-    'deletionCause',
-  ],
-  properties: {
-    generationId: { type: 'string', pattern: UID_PATTERN },
-    ledgerObjectId: { type: 'string', pattern: UID_PATTERN },
-    issuer: { type: 'string', pattern: ADDRESS_PATTERN },
-    subject: { type: 'string', pattern: ADDRESS_PATTERN },
-    schemaUid: { type: 'string', pattern: UID_PATTERN },
-    uriHex: { anyOf: [{ type: 'string', pattern: '^(?:[0-9A-Fa-f]{2})*$' }, { type: 'null' }] },
-    expiration: {
-      anyOf: [{ type: 'integer', minimum: 0, maximum: 4_294_967_295 }, { type: 'null' }],
-    },
-    accepted: { type: 'boolean' },
-    createdLedgerIndex: { type: 'integer', minimum: 0, maximum: 4_294_967_295 },
-    createdTransactionIndex: { type: 'integer', minimum: 0 },
-    lastLedgerIndex: { type: 'integer', minimum: 0, maximum: 4_294_967_295 },
-    deletedLedgerIndex: {
-      anyOf: [{ type: 'integer', minimum: 0, maximum: 4_294_967_295 }, { type: 'null' }],
-    },
-    deletionCause: {
-      anyOf: [
-        {
-          type: 'string',
-          enum: [
-            'issuer_revoked',
-            'subject_rejected',
-            'subject_removed',
-            'expired_cleanup',
-            'account_deleted',
-            'self_deleted',
-          ],
-        },
-        { type: 'null' },
-      ],
-    },
-  },
-} as const
-
-const exactCredentialResponseSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: [
-    'profileId',
-    ...publicCredentialGenerationSchema.required,
-    'createdAt',
-    'updatedAt',
-    'state',
-  ],
-  properties: {
-    profileId: { type: 'string', pattern: PROFILE_PATTERN },
-    ...publicCredentialGenerationSchema.properties,
-    createdAt: { type: 'string', format: 'date-time' },
-    updatedAt: { type: 'string', format: 'date-time' },
-    state: credentialStateSchema,
-  },
-} as const
-
-const verificationResponseSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['onChain', 'schema', 'payload', 'issuerTrust'],
-  properties: {
-    onChain: {
-      type: 'string',
-      enum: ['pending', 'active', 'expired', 'deleted', 'not_found'],
-    },
-    schema: { type: 'string', enum: ['valid', 'invalid', 'unknown'] },
-    payload: {
-      type: 'string',
-      enum: ['valid', 'unavailable', 'tampered', 'invalid', 'not_checked'],
-    },
-    issuerTrust: { type: 'string', enum: ['trusted', 'untrusted', 'unknown'] },
-    generationId: { type: 'string', pattern: UID_PATTERN },
-  },
-} as const
-
-const publicCredentialGenerationSummarySchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: [
-    'generationId',
-    'issuer',
-    'subject',
-    'schemaUid',
-    'state',
-    'createdLedgerIndex',
-    'lastLedgerIndex',
-  ],
-  properties: {
-    generationId: { type: 'string', pattern: UID_PATTERN },
-    issuer: { type: 'string', pattern: ADDRESS_PATTERN },
-    subject: { type: 'string', pattern: ADDRESS_PATTERN },
-    schemaUid: { type: 'string', pattern: UID_PATTERN },
-    state: credentialStateSchema,
-    createdLedgerIndex: { type: 'integer', minimum: 0, maximum: 4_294_967_295 },
-    lastLedgerIndex: { type: 'integer', minimum: 0, maximum: 4_294_967_295 },
-  },
-} as const
-
-const publicTransactionSummarySchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: [
-    'transactionHash',
-    'ledgerIndex',
-    'ledgerHash',
-    'transactionIndex',
-    'registrationStatus',
-    'credentialEventCount',
-  ],
-  properties: {
-    transactionHash: { type: 'string', pattern: UID_PATTERN },
-    ledgerIndex: { type: 'integer', minimum: 0, maximum: 4_294_967_295 },
-    ledgerHash: { type: 'string', pattern: UID_PATTERN },
-    transactionIndex: { type: 'integer', minimum: 0 },
-    registrationStatus: {
-      anyOf: [{ type: 'string', enum: ['accepted', 'rejected'] }, { type: 'null' }],
-    },
-    credentialEventCount: { type: 'integer', minimum: 0 },
-  },
-} as const
-
-const discoveryStatsResponseSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['network', 'schemas', 'credentialGenerations', 'checkpoint'],
-  properties: {
-    network: { type: 'string', pattern: PROFILE_PATTERN },
-    schemas: {
-      type: 'object',
-      additionalProperties: false,
-      required: ['total', 'publishers'],
-      properties: {
-        total: { type: 'integer', minimum: 0 },
-        publishers: { type: 'integer', minimum: 0 },
-      },
-    },
-    credentialGenerations: {
-      type: 'object',
-      additionalProperties: false,
-      required: ['total', 'pending', 'active', 'expired', 'deleted'],
-      properties: {
-        total: { type: 'integer', minimum: 0 },
-        pending: { type: 'integer', minimum: 0 },
-        active: { type: 'integer', minimum: 0 },
-        expired: { type: 'integer', minimum: 0 },
-        deleted: { type: 'integer', minimum: 0 },
-      },
-    },
-    checkpoint: publicCheckpointSchema,
-  },
-} as const
-
-const discoverySearchResponseSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['items', 'hasMore'],
-  properties: {
-    items: {
-      type: 'array',
-      items: {
-        anyOf: [
-          {
-            type: 'object',
-            additionalProperties: false,
-            required: ['type', ...publicSchemaSummarySchema.required],
-            properties: {
-              type: { type: 'string', const: 'schema' },
-              ...publicSchemaSummarySchema.properties,
-            },
-          },
-          {
-            type: 'object',
-            additionalProperties: false,
-            required: ['type', ...publicCredentialGenerationSummarySchema.required],
-            properties: {
-              type: { type: 'string', const: 'credential_generation' },
-              ...publicCredentialGenerationSummarySchema.properties,
-            },
-          },
-          {
-            type: 'object',
-            additionalProperties: false,
-            required: ['type', ...publicTransactionSummarySchema.required],
-            properties: {
-              type: { type: 'string', const: 'transaction' },
-              ...publicTransactionSummarySchema.properties,
-            },
-          },
-        ],
-      },
-    },
-    hasMore: { type: 'boolean' },
-  },
-} as const
-
-const publicSchemaActivityItemSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['transactionHash', ...publicSchemaRegistrationSchema.required],
-  properties: {
-    transactionHash: { type: 'string', pattern: UID_PATTERN },
-    ...publicSchemaRegistrationSchema.properties,
-  },
-} as const
-
-const discoveryActivityResponseSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['items'],
-  properties: {
-    items: { type: 'array', items: publicSchemaActivityItemSchema },
-    nextCursor: { type: 'string' },
-  },
-} as const
-
-const credentialGenerationResponseSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['generation', 'state', 'timeline'],
-  properties: {
-    generation: publicCredentialGenerationSchema,
-    state: credentialStateSchema,
-    timeline: { type: 'array', items: publicCredentialEventSchema },
-  },
-} as const
-
-const transactionResponseSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: [
-    'transactionHash',
-    'ledgerIndex',
-    'ledgerHash',
-    'transactionIndex',
-    'registration',
-    'credentialEvents',
-  ],
-  properties: {
-    transactionHash: { type: 'string', pattern: UID_PATTERN },
-    ledgerIndex: { type: 'integer', minimum: 0, maximum: 4_294_967_295 },
-    ledgerHash: { type: 'string', pattern: UID_PATTERN },
-    transactionIndex: { type: 'integer', minimum: 0 },
-    registration: { anyOf: [publicSchemaRegistrationSchema, { type: 'null' }] },
-    credentialEvents: {
-      type: 'object',
-      additionalProperties: false,
-      required: ['items'],
-      properties: {
-        items: { type: 'array', items: publicCredentialEventSchema },
-        nextCursor: { type: 'string', pattern: '^[0-9]+$' },
-      },
-    },
-  },
-} as const
-
-function publicNetwork(row: Awaited<ReturnType<ApiRepository['listNetworks']>>[number]) {
-  return {
-    profileId: row.profileId,
-    xcsVersion: row.xcsVersion,
-    networkId: row.networkId,
-    requiredAmendment: row.requiredAmendment,
-    registryAddress: row.registryAddress,
-    registrationAmountDrops: String(row.registrationAmountDrops),
-    activationLedgerIndex: row.activationLedgerIndex,
-    activationLedgerHash: row.activationLedgerHash,
-  }
-}
-
-function invalidIndexerEvidence(
-  message = 'The indexed evidence is incomplete or inconsistent.',
-): never {
-  throw new IndexerUnavailableError('INDEXER_EVIDENCE_INVALID', message)
-}
-
-function publicSchemaSummary(row: NonNullable<Awaited<ReturnType<ApiRepository['getSchema']>>>) {
-  return {
-    schemaUid: row.schemaUid,
-    publisher: row.publisher,
-    name: row.name,
-    description: row.description,
-    parentUid: row.parentUid,
-    supersedesUid: row.supersedesUid,
-    registrationTransactionHash: row.registrationTransactionHash,
-    ledgerIndex: row.ledgerIndex,
-    transactionIndex: row.transactionIndex,
-  }
-}
-
-function publicCredentialGeneration(
-  generation: NonNullable<Awaited<ReturnType<ApiRepository['getCredential']>>>,
-  expected: CredentialGenerationEvidenceExpectation,
-) {
-  assertCredentialGenerationEvidence(generation, expected)
-  return {
-    generationId: generation.generationId,
-    ledgerObjectId: generation.ledgerObjectId,
-    issuer: generation.issuer,
-    subject: generation.subject,
-    schemaUid: generation.schemaUid,
-    uriHex: generation.uriHex,
-    expiration: generation.expiration,
-    accepted: generation.accepted,
-    createdLedgerIndex: generation.createdLedgerIndex,
-    createdTransactionIndex: generation.createdTransactionIndex,
-    lastLedgerIndex: generation.lastLedgerIndex,
-    deletedLedgerIndex: generation.deletedLedgerIndex,
-    deletionCause: generation.deletionCause,
-  }
-}
-
-function publicDiscoveryStats(stats: Awaited<ReturnType<ApiRepository['getDiscoveryStats']>>): {
-  schemas: { total: number; publishers: number }
-  credentialGenerations: {
-    total: number
-    pending: number
-    active: number
-    expired: number
-    deleted: number
-  }
-  projectionLedgerIndexes: number[]
-} {
-  const schemaCounts = [stats.schemas.total, stats.schemas.publishers]
-  const credentialCounts = [
-    stats.credentialGenerations.total,
-    stats.credentialGenerations.pending,
-    stats.credentialGenerations.active,
-    stats.credentialGenerations.expired,
-    stats.credentialGenerations.deleted,
-    stats.credentialGenerations.invalidEvidence,
-  ]
-  const validCounts = [...schemaCounts, ...credentialCounts].every(
-    (value) => Number.isSafeInteger(value) && value >= 0,
-  )
-  const schemaLedgerShape =
-    stats.schemas.total === 0
-      ? stats.schemas.minimumLedgerIndex === null && stats.schemas.maximumLedgerIndex === null
-      : Number.isSafeInteger(stats.schemas.minimumLedgerIndex) &&
-        Number.isSafeInteger(stats.schemas.maximumLedgerIndex) &&
-        stats.schemas.minimumLedgerIndex! <= stats.schemas.maximumLedgerIndex!
-  const credentialLedgerShape =
-    stats.credentialGenerations.total === 0
-      ? stats.credentialGenerations.minimumCreatedLedgerIndex === null &&
-        stats.credentialGenerations.maximumLastLedgerIndex === null
-      : Number.isSafeInteger(stats.credentialGenerations.minimumCreatedLedgerIndex) &&
-        Number.isSafeInteger(stats.credentialGenerations.maximumLastLedgerIndex) &&
-        stats.credentialGenerations.minimumCreatedLedgerIndex! <=
-          stats.credentialGenerations.maximumLastLedgerIndex!
-  if (
-    !validCounts ||
-    stats.schemas.publishers > stats.schemas.total ||
-    stats.credentialGenerations.invalidEvidence !== 0 ||
-    stats.credentialGenerations.pending +
-      stats.credentialGenerations.active +
-      stats.credentialGenerations.expired +
-      stats.credentialGenerations.deleted !==
-      stats.credentialGenerations.total ||
-    !schemaLedgerShape ||
-    !credentialLedgerShape
-  ) {
-    return invalidIndexerEvidence(
-      'The indexed discovery aggregates are incomplete or inconsistent.',
-    )
-  }
-  return {
-    schemas: {
-      total: stats.schemas.total,
-      publishers: stats.schemas.publishers,
-    },
-    credentialGenerations: {
-      total: stats.credentialGenerations.total,
-      pending: stats.credentialGenerations.pending,
-      active: stats.credentialGenerations.active,
-      expired: stats.credentialGenerations.expired,
-      deleted: stats.credentialGenerations.deleted,
-    },
-    projectionLedgerIndexes: [
-      stats.schemas.minimumLedgerIndex,
-      stats.schemas.maximumLedgerIndex,
-      stats.credentialGenerations.minimumCreatedLedgerIndex,
-      stats.credentialGenerations.maximumLastLedgerIndex,
-    ].filter((value): value is number => value !== null),
-  }
-}
-
-function publicCredentialEvent(
-  row: Awaited<ReturnType<ApiRepository['getCredentialEvents']>>[number],
-  expected: {
-    readonly transactionHash: string
-    readonly issuer: string
-    readonly subject: string
-    readonly schemaUid: string
-    readonly activationLedgerIndex: number
-    readonly generationId?: string
-    readonly ledgerIndex?: number
-    readonly ledgerHash?: string
-    readonly transactionIndex?: number
-  },
-) {
-  const validEventShape =
-    row.transactionHash === expected.transactionHash &&
-    row.issuer === expected.issuer &&
-    row.subject === expected.subject &&
-    row.schemaUid === expected.schemaUid &&
-    (expected.generationId === undefined || row.generationId === expected.generationId) &&
-    (expected.ledgerIndex === undefined || row.ledgerIndex === expected.ledgerIndex) &&
-    (expected.ledgerHash === undefined || row.ledgerHash === expected.ledgerHash) &&
-    (expected.transactionIndex === undefined ||
-      row.transactionIndex === expected.transactionIndex) &&
-    LOWERCASE_HASH.test(row.transactionHash) &&
-    typeof row.generationId === 'string' &&
-    LOWERCASE_HASH.test(row.generationId) &&
-    LOWERCASE_HASH.test(row.ledgerObjectId) &&
-    LOWERCASE_HASH.test(row.ledgerHash) &&
-    LOWERCASE_HASH.test(row.schemaUid) &&
-    isClassicAddress(row.issuer) &&
-    isClassicAddress(row.subject) &&
-    Number.isSafeInteger(row.nodeIndex) &&
-    row.nodeIndex >= 0 &&
-    row.nodeIndex <= MAX_NODE_INDEX &&
-    Number.isSafeInteger(row.ledgerIndex) &&
-    row.ledgerIndex >= expected.activationLedgerIndex &&
-    row.ledgerIndex <= MAX_UINT32 &&
-    Number.isSafeInteger(row.transactionIndex) &&
-    row.transactionIndex >= 0 &&
-    row.transactionIndex <= MAX_NODE_INDEX &&
-    (row.uriHex === null || HEX_BYTES.test(row.uriHex)) &&
-    (row.expiration === null ||
-      (Number.isSafeInteger(row.expiration) &&
-        row.expiration >= 0 &&
-        row.expiration <= MAX_UINT32)) &&
-    (row.eventType === 'created' || row.eventType === 'accepted' || row.eventType === 'deleted') &&
-    (row.eventType === 'deleted'
-      ? typeof row.deletionCause === 'string' && CREDENTIAL_DELETION_CAUSES.has(row.deletionCause)
-      : row.deletionCause === null) &&
-    (row.eventType !== 'created' ||
-      (row.generationId === row.transactionHash &&
-        row.accepted === (row.issuer === row.subject))) &&
-    (row.eventType !== 'accepted' || row.accepted === true)
-  if (!validEventShape) {
-    throw new IndexerUnavailableError(
-      'INDEXER_EVIDENCE_INVALID',
-      'The indexed credential event evidence is incomplete or inconsistent.',
-    )
-  }
-  return {
-    transactionHash: row.transactionHash,
-    nodeIndex: row.nodeIndex,
-    generationId: row.generationId,
-    ledgerIndex: row.ledgerIndex,
-    ledgerHash: row.ledgerHash,
-    transactionIndex: row.transactionIndex,
-    eventType: row.eventType,
-    issuer: row.issuer,
-    subject: row.subject,
-    schemaUid: row.schemaUid,
-    accepted: row.accepted,
-    deletionCause: row.deletionCause,
-  }
-}
-
-function invalidSchemaRegistrationEvidence(): never {
-  throw new IndexerUnavailableError(
-    'INDEXER_EVIDENCE_INVALID',
-    'The indexed schema registration evidence is incomplete or inconsistent.',
-  )
-}
-
-function publicSchemaRegistration(
-  row: NonNullable<Awaited<ReturnType<ApiRepository['getSchemaRegistrationByTransaction']>>>,
-  network: { readonly networkId: number; readonly activationLedgerIndex: number },
-  expectedTransactionHash: string,
-) {
-  if (
-    row.transactionHash !== expectedTransactionHash ||
-    !isClassicAddress(row.publisher) ||
-    !Number.isSafeInteger(row.ledgerIndex) ||
-    row.ledgerIndex < network.activationLedgerIndex ||
-    row.ledgerIndex > 4_294_967_295 ||
-    !LOWERCASE_HASH.test(row.ledgerHash) ||
-    !Number.isSafeInteger(row.transactionIndex) ||
-    row.transactionIndex < 0
-  ) {
-    return invalidSchemaRegistrationEvidence()
-  }
-  const common = {
-    status: row.status,
-    publisher: row.publisher,
-    ledgerIndex: row.ledgerIndex,
-    ledgerHash: row.ledgerHash,
-    transactionIndex: row.transactionIndex,
-  }
-
-  if (row.status === 'accepted') {
-    if (
-      row.schemaUid === null ||
-      !LOWERCASE_HASH.test(row.schemaUid) ||
-      row.reasonCode !== null ||
-      row.memoJson === null
-    ) {
-      return invalidSchemaRegistrationEvidence()
-    }
-    try {
-      const canonicalMemoJson = canonicalize(row.memoJson as JsonValue)
-      const schema = validateSchema(row.memoJson)
-      const computedSchemaUid = computeSchemaUid({
-        schema,
-        networkId: network.networkId,
-        ledgerHash: row.ledgerHash,
-        ledgerIndex: row.ledgerIndex,
-        transactionIndex: row.transactionIndex,
-        publisher: row.publisher,
-      })
-      if (computedSchemaUid !== row.schemaUid) return invalidSchemaRegistrationEvidence()
-      return {
-        ...common,
-        status: 'accepted' as const,
-        schemaUid: row.schemaUid,
-        schemaDigestHex: sha256Hex(encodeUtf8(canonicalMemoJson)),
-        reasonCode: null,
-      }
-    } catch {
-      return invalidSchemaRegistrationEvidence()
-    }
-  }
-
-  if (row.status === 'rejected') {
-    if (row.schemaUid !== null || row.reasonCode === null || !REASON_CODE.test(row.reasonCode)) {
-      return invalidSchemaRegistrationEvidence()
-    }
-    return {
-      ...common,
-      status: 'rejected' as const,
-      schemaUid: null,
-      schemaDigestHex: null,
-      reasonCode: row.reasonCode,
-    }
-  }
-
-  return invalidSchemaRegistrationEvidence()
-}
-
-function publicTransactionProjection(
-  projection: Awaited<ReturnType<ApiRepository['getTransactionProjectionSummary']>>,
-  network: { readonly networkId: number; readonly activationLedgerIndex: number },
-  expectedTransactionHash: string,
-) {
-  if (
-    !Number.isSafeInteger(projection.credentialEventCount) ||
-    projection.credentialEventCount < 0 ||
-    (projection.credentialEventCount === 0) !== (projection.firstCredentialEvent === undefined)
-  ) {
-    return invalidIndexerEvidence('The indexed transaction summary is incomplete or inconsistent.')
-  }
-  const registration =
-    projection.registration === undefined
-      ? null
-      : publicSchemaRegistration(projection.registration, network, expectedTransactionHash)
-  const firstCredentialEvent =
-    projection.firstCredentialEvent === undefined
-      ? null
-      : publicCredentialEvent(projection.firstCredentialEvent, {
-          transactionHash: expectedTransactionHash,
-          issuer: projection.firstCredentialEvent.issuer,
-          subject: projection.firstCredentialEvent.subject,
-          schemaUid: projection.firstCredentialEvent.schemaUid,
-          activationLedgerIndex: network.activationLedgerIndex,
-        })
-  if (registration === null && firstCredentialEvent === null) return null
-
-  const coordinate = registration ?? firstCredentialEvent!
-  if (
-    registration !== null &&
-    firstCredentialEvent !== null &&
-    (registration.ledgerIndex !== firstCredentialEvent.ledgerIndex ||
-      registration.ledgerHash !== firstCredentialEvent.ledgerHash ||
-      registration.transactionIndex !== firstCredentialEvent.transactionIndex)
-  ) {
-    return invalidIndexerEvidence('The indexed transaction coordinates are inconsistent.')
-  }
-  return {
-    transactionHash: expectedTransactionHash,
-    ledgerIndex: coordinate.ledgerIndex,
-    ledgerHash: coordinate.ledgerHash,
-    transactionIndex: coordinate.transactionIndex,
-    registration,
-    registrationStatus: registration?.status ?? null,
-    credentialEventCount: projection.credentialEventCount,
-  }
-}
-
-function publicCredentialTimeline(
-  rows: readonly Awaited<ReturnType<ApiRepository['getCredentialEventsByGeneration']>>[number][],
-  generation: NonNullable<Awaited<ReturnType<ApiRepository['getCredentialGenerationById']>>>,
-  activationLedgerIndex: number,
-) {
-  if (rows.length === 0 || rows.length > CREDENTIAL_GENERATION_TIMELINE_LIMIT) {
-    return invalidIndexerEvidence('The indexed credential timeline is incomplete or inconsistent.')
-  }
-  const items = rows.map((row) =>
-    publicCredentialEvent(row, {
-      transactionHash: row.transactionHash,
-      issuer: generation.issuer,
-      subject: generation.subject,
-      schemaUid: generation.schemaUid,
-      generationId: generation.generationId,
-      activationLedgerIndex,
-    }),
-  )
-  for (let index = 0; index < rows.length; index += 1) {
-    const row = rows[index]!
-    const previous = rows[index - 1]
-    if (
-      row.ledgerObjectId !== generation.ledgerObjectId ||
-      row.uriHex !== generation.uriHex ||
-      row.expiration !== generation.expiration ||
-      (previous !== undefined &&
-        (row.ledgerIndex < previous.ledgerIndex ||
-          (row.ledgerIndex === previous.ledgerIndex &&
-            row.transactionIndex < previous.transactionIndex) ||
-          (row.ledgerIndex === previous.ledgerIndex &&
-            row.transactionIndex === previous.transactionIndex &&
-            row.nodeIndex <= previous.nodeIndex)))
-    ) {
-      return invalidIndexerEvidence(
-        'The indexed credential timeline is incomplete or inconsistent.',
-      )
-    }
-  }
-  const created = rows.filter((row) => row.eventType === 'created')
-  const accepted = rows.filter((row) => row.eventType === 'accepted')
-  const deleted = rows.filter((row) => row.eventType === 'deleted')
-  const first = rows[0]!
-  const last = rows.at(-1)!
-  if (
-    created.length !== 1 ||
-    first.eventType !== 'created' ||
-    first.transactionHash !== generation.generationId ||
-    first.ledgerIndex !== generation.createdLedgerIndex ||
-    first.transactionIndex !== generation.createdTransactionIndex ||
-    accepted.length > 1 ||
-    deleted.length > 1 ||
-    deleted.some((row) => row.accepted !== generation.accepted) ||
-    last.ledgerIndex !== generation.lastLedgerIndex ||
-    generation.accepted !== (first.accepted || accepted.length === 1) ||
-    (generation.deletedLedgerIndex === null
-      ? deleted.length !== 0
-      : deleted.length !== 1 ||
-        last.eventType !== 'deleted' ||
-        last.ledgerIndex !== generation.deletedLedgerIndex ||
-        last.deletionCause !== generation.deletionCause)
-  ) {
-    return invalidIndexerEvidence('The indexed credential timeline is incomplete or inconsistent.')
-  }
-  return items
-}
+import {
+  publicNetwork,
+  invalidIndexerEvidence,
+  publicSchemaSummary,
+  publicCredentialGeneration,
+  publicDiscoveryStats,
+  publicCredentialEvent,
+  invalidSchemaRegistrationEvidence,
+  publicSchemaRegistration,
+  publicTransactionProjection,
+  publicCredentialTimeline,
+} from './presenters.js'
 
 export interface CreateApiOptions {
   repository: ApiRepository
@@ -1628,7 +608,8 @@ export async function createApi(options: CreateApiOptions): Promise<FastifyInsta
       }
       const hashCandidate = query.toLowerCase()
       const normalizedHash = LOWERCASE_HASH.test(hashCandidate) ? hashCandidate : undefined
-      const publisher = normalizedHash === undefined && isClassicAddress(query) ? query : undefined
+      const publisher =
+        normalizedHash === undefined && isValidClassicAddress(query) ? query : undefined
 
       return options.repository.withConsistentSnapshot(async (repository) => {
         const network = await repository.getNetwork(request.params.network)
@@ -2256,7 +1237,10 @@ export async function createApi(options: CreateApiOptions): Promise<FastifyInsta
       },
     },
     async (request, reply) => {
-      if (request.query.publisher !== undefined && !isClassicAddress(request.query.publisher)) {
+      if (
+        request.query.publisher !== undefined &&
+        !isValidClassicAddress(request.query.publisher)
+      ) {
         return reply
           .code(400)
           .send({ error: 'ADDRESS_INVALID', message: 'publisher must be a valid classic address' })
@@ -2352,7 +1336,10 @@ export async function createApi(options: CreateApiOptions): Promise<FastifyInsta
       },
     },
     async (request, reply) => {
-      if (!isClassicAddress(request.params.issuer) || !isClassicAddress(request.params.subject)) {
+      if (
+        !isValidClassicAddress(request.params.issuer) ||
+        !isValidClassicAddress(request.params.subject)
+      ) {
         return reply.code(400).send({
           error: 'ADDRESS_INVALID',
           message: 'issuer and subject must be valid XRPL classic addresses',
@@ -2418,7 +1405,10 @@ export async function createApi(options: CreateApiOptions): Promise<FastifyInsta
       },
     },
     async (request, reply) => {
-      if (!isClassicAddress(request.params.issuer) || !isClassicAddress(request.params.subject)) {
+      if (
+        !isValidClassicAddress(request.params.issuer) ||
+        !isValidClassicAddress(request.params.subject)
+      ) {
         return reply.code(400).send({
           error: 'ADDRESS_INVALID',
           message: 'issuer and subject must be valid XRPL classic addresses',
@@ -2493,7 +1483,10 @@ export async function createApi(options: CreateApiOptions): Promise<FastifyInsta
       },
     },
     async (request, reply) => {
-      if (!isClassicAddress(request.params.issuer) || !isClassicAddress(request.params.subject)) {
+      if (
+        !isValidClassicAddress(request.params.issuer) ||
+        !isValidClassicAddress(request.params.subject)
+      ) {
         return reply.code(400).send({
           error: 'ADDRESS_INVALID',
           message: 'issuer and subject must be valid XRPL classic addresses',
@@ -2576,7 +1569,10 @@ export async function createApi(options: CreateApiOptions): Promise<FastifyInsta
       },
     },
     async (request, reply) => {
-      if (!isClassicAddress(request.body.issuer) || !isClassicAddress(request.body.subject)) {
+      if (
+        !isValidClassicAddress(request.body.issuer) ||
+        !isValidClassicAddress(request.body.subject)
+      ) {
         return reply.code(400).send({
           error: 'ADDRESS_INVALID',
           message: 'issuer and subject must be valid XRPL classic addresses',

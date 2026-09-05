@@ -28,6 +28,15 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-08-19',
   css: ['~/assets/css/main.css'],
   devtools: { enabled: false },
+  vite: {
+    optimizeDeps: {
+      // These linked workspace packages publish from dist. Force a fresh
+      // pre-bundle on each server start so rebuilt package code cannot be
+      // replaced by Nuxt's persistent dependency cache.
+      force: true,
+      include: ['@xcs-protocol/core', '@xcs-protocol/sdk'],
+    },
+  },
   modules: ['@nuxtjs/i18n', 'nuxt-security'],
   i18n: {
     defaultLocale: 'fr',

@@ -1,11 +1,8 @@
 <script setup lang="ts">
 import {
-  canonicalize,
   createHttpsPayloadUri,
-  createIpfsRawPayloadUri,
-  parseJsonStrict,
-  validateCredentialPayload,
-  type CredentialPayload,
+  createIpfsPayloadUri,
+  encodeCredentialPayload,
 } from '@xcs-protocol/core'
 import { buildCredentialCreate } from '@xcs-protocol/sdk'
 import type { CredentialCreate } from 'xrpl'
@@ -18,12 +15,13 @@ import {
   resolvedSchemaToGuidedClaims,
   type GuidedClaimField,
 } from '~/utils/claimAuthoring'
-import { buildCredentialAcceptLink, buildCredentialVerifyLink } from '~/utils/operationLinks'
+import { buildCredentialAcceptLink, buildCredentialPermalink } from '~/utils/operationLinks'
 import {
   verifyHttpsPayloadPublication,
   type PayloadPublicationProof,
 } from '~/utils/payloadPublication'
 import { parseWalletCredentialTransactionError } from '~/utils/walletCompatibility'
+import { parseJson } from '~/utils/serialization'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -197,7 +195,7 @@ async function loadGuidedClaimForm() {
     }
     guidedClaims.value = claimsObjectToGuidedClaims(
       resolvedSchemaToGuidedClaims(schema.resolved),
-      parseJsonStrict(claimsText.value),
+      parseJson(claimsText.value),
     )
     loadedSchemaUid.value = requestedUid
     loadedSchemaName.value = schema.name
@@ -225,10 +223,7 @@ function selectClaimsEditorMode(mode: 'guided' | 'json') {
   }
   let convertedClaims: GuidedClaimField[]
   try {
-    convertedClaims = claimsObjectToGuidedClaims(
-      guidedClaims.value,
-      parseJsonStrict(claimsText.value),
-    )
+    convertedClaims = claimsObjectToGuidedClaims(guidedClaims.value, parseJson(claimsText.value))
   } catch (error) {
     formError.value = error instanceof Error ? error.message : String(error)
     return
@@ -291,27 +286,17 @@ async function buildPreview() {
     const profile = await getActiveNetworkProfile()
     const schema = await getSchema(normalizedSchemaUid, profile.profileId)
     if (revision !== previewRevision) throw new Error('ISSUANCE_PREVIEW_CHANGED_DURING_BUILD')
-    const claims = parseJsonStrict(claimsInput)
-    const payload = validateCredentialPayload(
-      {
-        xcsVersion: '0.1',
-        issuer: issuerAddress,
-        subject: subjectAddress,
-        schema: normalizedSchemaUid,
-        claims,
-      },
-      {
-        issuer: issuerAddress,
-        subject: subjectAddress,
-        schemaUid: normalizedSchemaUid,
-        schema: schema.resolved,
-      },
-    )
-    const canonical = canonicalize(payload as CredentialPayload)
+    const claims = parseJson(claimsInput)
+    const canonical = encodeCredentialPayload(claims, {
+      issuer: issuerAddress,
+      subject: subjectAddress,
+      schemaUid: normalizedSchemaUid,
+      fields: schema.resolved.fields,
+    }).json
     canonicalPayload.value = canonical
     credentialUri.value =
       selectedStorageMode === 'local-test'
-        ? createIpfsRawPayloadUri(canonical)
+        ? createIpfsPayloadUri(canonical)
         : createHttpsPayloadUri(payloadUrl, canonical)
     const raw = buildCredentialCreate({
       issuer: issuerAddress,
@@ -458,7 +443,7 @@ const acceptLink = computed(() => {
   return buildCredentialAcceptLink({ ...issuedLinkInputs.value, generationId })
 })
 
-const verifyLink = computed(() => {
+const credentialLink = computed(() => {
   const generationId = result.value?.businessEvidence?.generationId
   if (
     result.value?.businessConfirmation !== 'confirmed' ||
@@ -467,7 +452,10 @@ const verifyLink = computed(() => {
   ) {
     return null
   }
-  return buildCredentialVerifyLink({ ...issuedLinkInputs.value, generationId })
+  return buildCredentialPermalink({
+    profileId: issuedLinkInputs.value.profileId,
+    generationId,
+  })
 })
 </script>
 
@@ -672,13 +660,15 @@ const verifyLink = computed(() => {
       :business-confirmation="result.businessConfirmation"
       :business-evidence="result.businessEvidence"
     />
-    <div v-if="acceptLink && verifyLink" class="form-card">
+    <div v-if="acceptLink && credentialLink" class="form-card">
       <h2>{{ $t('issue.links') }}</h2>
       <p>
-        <NuxtLinkLocale :to="acceptLink">{{ $t('issue.acceptLink') }}</NuxtLinkLocale>
+        <NuxtLinkLocale data-testid="issue-credential-link" :to="credentialLink">
+          {{ $t('issue.credentialLink') }}
+        </NuxtLinkLocale>
       </p>
       <p>
-        <NuxtLinkLocale :to="verifyLink">{{ $t('issue.verifyLink') }}</NuxtLinkLocale>
+        <NuxtLinkLocale :to="acceptLink">{{ $t('issue.acceptLink') }}</NuxtLinkLocale>
       </p>
     </div>
   </section>

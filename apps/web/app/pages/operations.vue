@@ -8,7 +8,7 @@ import {
   serializeOperationReceipts,
   type StoredOperation,
 } from '~/utils/operationJournal'
-import { buildCredentialAcceptLink, buildCredentialVerifyLink } from '~/utils/operationLinks'
+import { buildCredentialAcceptLink, buildCredentialPermalink } from '~/utils/operationLinks'
 
 const { operations, busy, loadOperations, retryOperation, reconfirmOperation, abandonOperation } =
   useWallet()
@@ -94,7 +94,13 @@ function downloadReceipts() {
 function operationAcceptLink(operation: StoredOperation): string | null {
   const business = operation.business
   const evidence = operationBusinessEvidence(operation)
-  if (business?.action !== 'credential-issue' || !evidence?.generationId) return null
+  if (
+    operationBusinessConfirmation(operation) !== 'confirmed' ||
+    business?.action !== 'credential-issue' ||
+    !evidence?.generationId
+  ) {
+    return null
+  }
   return buildCredentialAcceptLink({
     profileId: operation.profileId,
     issuer: business.issuer,
@@ -103,22 +109,12 @@ function operationAcceptLink(operation: StoredOperation): string | null {
   })
 }
 
-function operationVerifyLink(operation: StoredOperation): string | null {
-  const business = operation.business
-  const evidence = operationBusinessEvidence(operation)
-  if (business?.action !== 'credential-issue' || !evidence?.generationId) return null
-  return buildCredentialVerifyLink({
-    profileId: operation.profileId,
-    issuer: business.issuer,
-    subject: business.subject,
-    schemaUid: business.schemaUid,
-    generationId: evidence.generationId,
-  })
-}
-
 function operationCredentialLink(operation: StoredOperation): string | null {
+  if (operationBusinessConfirmation(operation) !== 'confirmed') return null
   const generationId = operationBusinessEvidence(operation)?.generationId
-  return generationId ? `/credentials/${generationId}` : null
+  return generationId
+    ? buildCredentialPermalink({ profileId: operation.profileId, generationId })
+    : null
 }
 
 onMounted(refresh)
@@ -293,21 +289,12 @@ onMounted(refresh)
             </dd>
           </template>
         </dl>
-        <div
-          v-if="operationAcceptLink(operation) && operationVerifyLink(operation)"
-          class="button-row"
-        >
+        <div v-if="operationAcceptLink(operation)" class="button-row">
           <NuxtLinkLocale
             class="button secondary"
             :to="operationAcceptLink(operation) ?? '/accept'"
           >
             {{ $t('operations.acceptLink') }}
-          </NuxtLinkLocale>
-          <NuxtLinkLocale
-            class="button secondary"
-            :to="operationVerifyLink(operation) ?? '/verify'"
-          >
-            {{ $t('operations.verifyLink') }}
           </NuxtLinkLocale>
         </div>
         <NuxtLinkLocale

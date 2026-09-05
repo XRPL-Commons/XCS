@@ -21,6 +21,7 @@ import {
 import {
   assertLinkGeneration,
   assertLinkProfile,
+  buildCredentialPermalink,
   singleRouteQueryValue,
 } from '~/utils/operationLinks'
 import { LOCAL_PAYLOAD_LOCATION } from '~/utils/localPayloadStore'
@@ -29,7 +30,8 @@ import { parseWalletCredentialTransactionError } from '~/utils/walletCompatibili
 const route = useRoute()
 const { t } = useI18n()
 const { account, busy: walletBusy, prepare, signAndSubmit } = useWallet()
-const { getActiveNetworkProfile, getCredential, getSchema, verify } = useXcsApi()
+const { getActiveNetworkProfile, getCredential, getCredentialGeneration, getSchema, verify } =
+  useXcsApi()
 const localPayloadStore = useLocalPayloadStore()
 const issuer = ref(singleRouteQueryValue(route.query.issuer))
 const schemaUid = ref(singleRouteQueryValue(route.query.schema))
@@ -64,6 +66,9 @@ const message = ref('')
 const result = shallowRef<WalletSubmissionResult | null>(null)
 const busy = computed(() => walletBusy.value || reviewBusy.value)
 const messageDisplay = computed(() => {
+  if (message.value === 'CREDENTIAL_LINK_SUBJECT_WALLET_MISMATCH') {
+    return t('accept.subjectWalletMismatch')
+  }
   const walletTransactionError = parseWalletCredentialTransactionError(message.value)
   return walletTransactionError
     ? t('wallet.errors.credentialUnsupported', {
@@ -75,6 +80,20 @@ const messageDisplay = computed(() => {
 const messageIsLocalized = computed(
   () => message.value.length > 0 && messageDisplay.value !== message.value,
 )
+const resultCredentialLink = computed(() => {
+  const generationId = result.value?.businessEvidence?.generationId
+  if (
+    result.value?.businessConfirmation !== 'confirmed' ||
+    !generationId ||
+    !reviewProfileId.value
+  ) {
+    return null
+  }
+  return buildCredentialPermalink({
+    profileId: reviewProfileId.value,
+    generationId,
+  })
+})
 const blockReason = computed(() => {
   if (!review.value) return undefined
   if (action.value === 'accept' && acceptanceReview.value?.claims === undefined) {
@@ -253,6 +272,7 @@ async function fetchExactReview(input: {
   payloadConsent?: PayloadFetchConsentToken | undefined
   expectedGenerationId?: string | undefined
 }): Promise<{ credentialReview: CredentialReview; schema: ApiSchemaDetail | null }> {
+  await assertLinkedGenerationCoordinates(input)
   const [credential, metadataReport, schemaResult] = await Promise.all([
     getCredential(input.issuer, input.subject, input.schemaUid, input.profileId),
     verify(
@@ -325,6 +345,7 @@ async function fetchExactMutationReview(input: {
   profileId: string
   expectedGenerationId?: string | undefined
 }): Promise<CredentialMutationReview> {
+  await assertLinkedGenerationCoordinates(input)
   const credentialReview = loadCredentialMutationReview(
     await getCredential(input.issuer, input.subject, input.schemaUid, input.profileId),
     {
@@ -335,6 +356,26 @@ async function fetchExactMutationReview(input: {
   )
   assertLinkGeneration(input.expectedGenerationId, credentialReview.generationId)
   return credentialReview
+}
+
+async function assertLinkedGenerationCoordinates(input: {
+  issuer: string
+  subject: string
+  schemaUid: string
+  profileId: string
+  expectedGenerationId?: string | undefined
+}): Promise<void> {
+  if (!input.expectedGenerationId) return
+  const detail = await getCredentialGeneration(input.expectedGenerationId, input.profileId)
+  const generation = detail.generation
+  assertLinkGeneration(input.expectedGenerationId, generation.generationId)
+  if (generation.issuer !== input.issuer) throw new Error('CREDENTIAL_LINK_ISSUER_MISMATCH')
+  if (generation.schemaUid.toLowerCase() !== input.schemaUid.toLowerCase()) {
+    throw new Error('CREDENTIAL_LINK_SCHEMA_MISMATCH')
+  }
+  if (generation.subject !== input.subject) {
+    throw new Error('CREDENTIAL_LINK_SUBJECT_WALLET_MISMATCH')
+  }
 }
 
 async function buildPreview() {
@@ -775,10 +816,10 @@ async function submit() {
       :business-evidence="result.businessEvidence"
     />
     <NuxtLinkLocale
-      v-if="result?.businessEvidence?.generationId"
+      v-if="resultCredentialLink"
       class="button secondary"
       data-testid="subject-result-permalink"
-      :to="`/credentials/${result.businessEvidence.generationId}`"
+      :to="resultCredentialLink"
     >
       {{ $t('accept.openPermalink') }}
     </NuxtLinkLocale>

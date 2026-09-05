@@ -55,20 +55,12 @@ export function buildCredentialAcceptLink(input: {
   })
 }
 
-export function buildCredentialVerifyLink(input: {
+export function buildCredentialPermalink(input: {
   readonly profileId: string
-  readonly issuer: string
-  readonly subject: string
-  readonly schemaUid: string
   readonly generationId: string
 }): string {
-  return queryPath('/verify', {
-    profile: input.profileId,
-    issuer: input.issuer,
-    subject: input.subject,
-    schema: normalizedHash(input.schemaUid, 'VERIFY_LINK_SCHEMA_UID_INVALID'),
-    generation: normalizedHash(input.generationId, 'VERIFY_LINK_GENERATION_INVALID'),
-  })
+  const generationId = normalizedHash(input.generationId, 'CREDENTIAL_PERMALINK_GENERATION_INVALID')
+  return queryPath(`/credentials/${generationId}`, { profile: input.profileId })
 }
 
 export function assertLinkProfile(

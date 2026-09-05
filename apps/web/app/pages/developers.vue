@@ -217,10 +217,10 @@ async function verifyLocalPayload(): Promise<void> {
       issuer: latest.review.issuer,
       subject: latest.review.subject,
       schemaUid: latest.review.schemaUid,
-      schema: latest.schema.resolved,
+      fields: latest.schema.resolved.fields,
     })
     const uri = credentialHexToUri(latest.detail.generation.uriHex ?? '')
-    if (uri !== latest.review.uri || verifyPayloadIntegrity(payloadText, uri).status !== 'valid') {
+    if (uri !== latest.review.uri || !verifyPayloadIntegrity(payloadText, uri).valid) {
       throw new Error('PAYLOAD_INTEGRITY_INVALID')
     }
 

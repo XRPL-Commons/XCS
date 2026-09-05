@@ -15,17 +15,10 @@ import {
 import { basename, dirname, join, resolve } from 'node:path'
 import { gunzipSync, gzipSync } from 'node:zlib'
 
-import {
-  canonicalize,
-  encodeUtf8,
-  parseJsonStrict,
-  sha256Hex,
-  validateNetworkProfile,
-  type JsonValue,
-  type NetworkProfile,
-} from '@xcs-protocol/core'
+import { parseNetworkProfile, type NetworkProfile } from '@xcs-protocol/core'
 
 import { assertLedgerContinuity, assertTransactionOrdering } from './continuity.js'
+import { canonicalJson, encodeUtf8, parseJson, sha256Hex } from './serialization.js'
 import type {
   Checkpoint,
   LedgerSource,
@@ -154,7 +147,7 @@ function uint32(value: unknown, label: string): number {
 
 function canonicalBytes(value: unknown): Uint8Array {
   try {
-    return encodeUtf8(canonicalize(value as JsonValue))
+    return encodeUtf8(canonicalJson(value))
   } catch (error) {
     return fail('FIXTURE_BUNDLE_INVALID', 'Fixture data must be canonicalizable JSON', error)
   }
@@ -200,7 +193,7 @@ async function readFileBounded(path: string, maximumBytes: number): Promise<Uint
 function profileFromFileBytes(bytes: Uint8Array): NetworkProfile {
   let parsed: unknown
   try {
-    parsed = parseJsonStrict(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
+    parsed = parseJson(bytes)
   } catch (error) {
     return fail('FIXTURE_BUNDLE_INVALID', 'profile file must be strict UTF-8 JSON', error)
   }
@@ -209,7 +202,7 @@ function profileFromFileBytes(bytes: Uint8Array): NetworkProfile {
 
 function fixtureNetworkProfile(value: unknown, label: string): NetworkProfile {
   try {
-    return validateNetworkProfile(value)
+    return parseNetworkProfile(value)
   } catch (error) {
     return fail('FIXTURE_BUNDLE_INVALID', `${label} is not a valid network profile`, error)
   }
@@ -777,7 +770,7 @@ async function readIndexChunk(
   }
   let parsed: unknown
   try {
-    parsed = parseJsonStrict(new TextDecoder('utf-8', { fatal: true }).decode(content))
+    parsed = parseJson(content)
   } catch (error) {
     return fail(
       'FIXTURE_BUNDLE_INTEGRITY_FAILED',
@@ -849,7 +842,7 @@ async function readLedger(directory: string, entry: LedgerFixtureEntry): Promise
   }
   let parsed: unknown
   try {
-    parsed = parseJsonStrict(new TextDecoder('utf-8', { fatal: true }).decode(content))
+    parsed = parseJson(content)
   } catch (error) {
     return fail(
       'FIXTURE_BUNDLE_INTEGRITY_FAILED',
@@ -893,7 +886,7 @@ async function inspectLedgerFixtureBundle(
       join(directory, 'manifest.json'),
       LEDGER_FIXTURE_MAX_MANIFEST_BYTES,
     )
-    manifestInput = parseJsonStrict(new TextDecoder('utf-8', { fatal: true }).decode(manifestBytes))
+    manifestInput = parseJson(manifestBytes)
   } catch (error) {
     return fail(
       'FIXTURE_BUNDLE_INVALID',
@@ -917,8 +910,7 @@ async function inspectLedgerFixtureBundle(
   }
   if (
     expectedProfile !== undefined &&
-    canonicalize(manifest.profile as unknown as JsonValue) !==
-      canonicalize(expectedProfile as unknown as JsonValue)
+    canonicalJson(manifest.profile) !== canonicalJson(expectedProfile)
   ) {
     return fail(
       'FIXTURE_BUNDLE_INVALID',
@@ -1003,10 +995,7 @@ export async function captureLedgerFixtureBundle(
   }
   const capturedAt = (input.capturedAt ?? new Date()).toISOString()
   const fileProfile = profileFromFileBytes(input.profileFileBytes)
-  if (
-    canonicalize(fileProfile as unknown as JsonValue) !==
-    canonicalize(profile as unknown as JsonValue)
-  ) {
+  if (canonicalJson(fileProfile) !== canonicalJson(profile)) {
     return fail('FIXTURE_BUNDLE_INVALID', 'profile file bytes do not describe the capture profile')
   }
   const profileFileSha256 = sha256Hex(input.profileFileBytes)
@@ -1136,8 +1125,8 @@ export class LedgerFixtureBundleSource implements LedgerSource {
 
   async preflight(profile: NetworkProfile): Promise<LedgerSourcePreflight> {
     if (
-      canonicalize(fixtureNetworkProfile(profile, 'source profile') as unknown as JsonValue) !==
-      canonicalize(this.manifest.profile as unknown as JsonValue)
+      canonicalJson(fixtureNetworkProfile(profile, 'source profile')) !==
+      canonicalJson(this.manifest.profile)
     ) {
       return fail('FIXTURE_BUNDLE_INVALID', 'fixture source profile does not match')
     }

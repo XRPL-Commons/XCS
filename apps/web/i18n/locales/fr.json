@@ -181,7 +181,7 @@
     "submitted": "CredentialCreate validé : ",
     "links": "Partager le credential confirmé",
     "acceptLink": "Ouvrir le lien d’acceptation du sujet",
-    "verifyLink": "Ouvrir le lien de vérification",
+    "credentialLink": "Voir et vérifier le credential exact",
     "guidedClaims": "Formulaire guidé",
     "jsonClaims": "Mode JSON",
     "loadSchema": "Charger le schéma",
@@ -456,6 +456,7 @@
     "issuerAcknowledgementRequired": "Confirmez votre propre décision de confiance pour cette génération exacte d’un émetteur inconnu avant de l’accepter.",
     "issuerAcknowledgementStale": "Le contexte de confiance de l’émetteur a changé. Relisez-le et confirmez de nouveau votre décision.",
     "issuerUntrusted": "La politique locale de ce vérificateur marque l’émetteur comme non fiable. L’acceptation est bloquée.",
+    "subjectWalletMismatch": "Le wallet connecté n’est pas le sujet de ce credential. Déconnectez-le puis connectez le wallet du destinataire avant d’accepter, rejeter ou retirer cette génération.",
     "rejectSafety": "Le rejet supprime cet objet non accepté pending ou expired sans approuver son émetteur ni ses claims. Aucun payload ni statut de confiance n’est chargé pour cette action.",
     "removeSafety": "Le retrait supprime cette génération acceptée active ou expired du compte du sujet. Aucun payload ni statut de confiance n’est chargé ; la réussite XCS exige ensuite la preuve indexée deleted avec la cause subject_removed (issuer_revoked pour un credential auto-émis).",
     "openPermalink": "Ouvrir la preuve exacte de cette génération",
@@ -471,6 +472,7 @@
     "expiration": "Expiration",
     "noExpiration": "Sans expiration",
     "generation": "Identifiant de génération",
+    "openPermalink": "Ouvrir la preuve exacte de cette génération",
     "submitted": "Révocation issuer validée : "
   },
   "verify": {
@@ -526,8 +528,7 @@
     "proofTransactionIndex": "Index de transaction de la preuve indexée",
     "reason": "Raison protocolaire",
     "acceptLink": "Acceptation du sujet",
-    "credentialLink": "Preuve exacte de la génération",
-    "verifyLink": "Vérification"
+    "credentialLink": "Preuve exacte de la génération"
   },
   "footer": {
     "summary": "XCS v0.1 — standard ouvert et implémentation de référence MIT.",

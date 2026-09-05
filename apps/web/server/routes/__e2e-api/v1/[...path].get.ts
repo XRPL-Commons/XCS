@@ -1,15 +1,13 @@
 import {
-  canonicalize,
   computeSchemaUid,
   createHttpsPayloadUri,
-  encodeUtf8Hex,
-  validateSchema,
-  type JsonValue,
+  parseSchema,
   type NetworkProfile,
   type SchemaDefinition,
 } from '@xcs-protocol/core'
 
 import { assertBrowserE2eServerMode } from '../../../../app/utils/browserE2eMode'
+import { canonicalJson, encodeHexUtf8 } from '../../../../app/utils/serialization'
 
 const PROFILE_ID = 'xrpl-testnet-xcs-browser-e2e'
 const ISSUER = 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh'
@@ -29,7 +27,7 @@ const SCHEMA: SchemaDefinition = {
   },
 }
 const SCHEMA_UID = computeSchemaUid({
-  schema: validateSchema(SCHEMA),
+  schema: parseSchema(SCHEMA),
   networkId: 1,
   ledgerHash: LEDGER_HASH,
   ledgerIndex: 100_001,
@@ -42,7 +40,7 @@ const ACCEPTED_TRANSACTION_HASH = '78'.repeat(32)
 const HISTORICAL_GENERATION_ID = '56'.repeat(32)
 const DELETED_TRANSACTION_HASH = 'bc'.repeat(32)
 const PAYLOAD_URL = 'https://issuer.xcs.invalid/diploma.json'
-const CANONICAL_PAYLOAD = canonicalize({
+const CANONICAL_PAYLOAD = canonicalJson({
   xcsVersion: '0.1',
   issuer: ISSUER,
   subject: SUBJECT,
@@ -55,7 +53,7 @@ const CANONICAL_PAYLOAD = canonicalize({
     prenom: 'Personne Test',
     honors: 'with distinction',
   },
-} as JsonValue)
+})
 const CREDENTIAL_URI = createHttpsPayloadUri(PAYLOAD_URL, CANONICAL_PAYLOAD)
 const PROFILE: NetworkProfile = {
   profileId: PROFILE_ID,
@@ -144,7 +142,7 @@ export default defineEventHandler((event) => {
         issuer: ISSUER,
         subject: SUBJECT,
         schemaUid: SCHEMA_UID,
-        uriHex: encodeUtf8Hex(CREDENTIAL_URI),
+        uriHex: encodeHexUtf8(CREDENTIAL_URI),
         expiration: null,
         accepted: true,
         createdLedgerIndex: 100_001,
@@ -232,7 +230,7 @@ export default defineEventHandler((event) => {
         issuer: ISSUER,
         subject: SUBJECT,
         schemaUid: SCHEMA_UID,
-        uriHex: encodeUtf8Hex(CREDENTIAL_URI),
+        uriHex: encodeHexUtf8(CREDENTIAL_URI),
         expiration: null,
         accepted: true,
         createdLedgerIndex: 99_990,
@@ -282,7 +280,7 @@ export default defineEventHandler((event) => {
       issuer: ISSUER,
       subject: SUBJECT,
       schemaUid: SCHEMA_UID,
-      uriHex: encodeUtf8Hex(CREDENTIAL_URI),
+      uriHex: encodeHexUtf8(CREDENTIAL_URI),
       expiration: null,
       accepted: true,
       createdLedgerIndex: 100_001,

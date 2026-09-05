@@ -1,11 +1,6 @@
-import {
-  canonicalize,
-  createIpfsRawPayloadUri,
-  inspectPayloadUri,
-  parseJsonStrict,
-  verifyPayloadIntegrity,
-  type JsonValue,
-} from '@xcs-protocol/core'
+import { createIpfsPayloadUri, parsePayloadUri, verifyPayloadIntegrity } from '@xcs-protocol/core'
+
+import { canonicalJson, parseJson } from './serialization'
 
 export const LOCAL_PAYLOAD_STORE_MAX_BYTES = 64 * 1024
 export const LOCAL_PAYLOAD_STORE_MAX_ENTRIES = 20
@@ -167,8 +162,8 @@ function inspectCanonicalPayload(
   }
   let parsed: unknown
   try {
-    parsed = parseJsonStrict(content)
-    if (canonicalize(parsed as JsonValue) !== content) throw new Error('not canonical')
+    parsed = parseJson(content)
+    if (canonicalJson(parsed) !== content) throw new Error('not canonical')
   } catch (cause) {
     throw new Error('LOCAL_PAYLOAD_NOT_CANONICAL_JCS', { cause })
   }
@@ -176,7 +171,7 @@ function inspectCanonicalPayload(
   if (sensitiveFieldPath !== undefined && !nonPersonalTestDataAcknowledged) {
     throw new LocalPayloadPiiFieldError(sensitiveFieldPath)
   }
-  return { credentialUri: createIpfsRawPayloadUri(content), byteLength }
+  return { credentialUri: createIpfsPayloadUri(content), byteLength }
 }
 
 function removeExpired(storage: LocalPayloadStorage, nowMs: number): void {
@@ -204,7 +199,7 @@ export function storeLocalTestPayload(input: {
     input.content,
     input.nonPersonalTestDataAcknowledged === true,
   )
-  const parsedUri = inspectPayloadUri(inspected.credentialUri)
+  const parsedUri = parsePayloadUri(inspected.credentialUri)
   if (parsedUri.kind !== 'ipfs') throw new Error('LOCAL_PAYLOAD_URI_INVALID')
   const key = storageKey(parsedUri.cid)
   removeExpired(input.storage, nowMs)
@@ -270,7 +265,7 @@ export function readLocalTestPayload(input: {
   readonly credentialUri: string
   readonly now?: () => Date
 }): LocalPayloadRead {
-  const parsedUri = inspectPayloadUri(input.credentialUri)
+  const parsedUri = parsePayloadUri(input.credentialUri)
   if (parsedUri.kind !== 'ipfs') throw new Error('LOCAL_PAYLOAD_IPFS_URI_REQUIRED')
   const value = input.storage.getItem(storageKey(parsedUri.cid))
   if (value === null) throw new Error('LOCAL_PAYLOAD_NOT_FOUND')
@@ -295,7 +290,7 @@ export function readLocalTestPayload(input: {
     throw new Error('LOCAL_PAYLOAD_DIGEST_MISMATCH')
   }
   const integrity = verifyPayloadIntegrity(record.content, input.credentialUri)
-  if (integrity.status !== 'valid') throw new Error('LOCAL_PAYLOAD_DIGEST_MISMATCH')
+  if (!integrity.valid) throw new Error('LOCAL_PAYLOAD_DIGEST_MISMATCH')
   return {
     content: record.content,
     fetchUrl: input.credentialUri,

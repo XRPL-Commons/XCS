@@ -1,4 +1,4 @@
-import { inspectPayloadUri } from '@xcs-protocol/core'
+import { parsePayloadUri } from '@xcs-protocol/core'
 import {
   clearLocalTestPayloads,
   inspectLocalTestPayloadLocation,
@@ -64,7 +64,7 @@ export function useLocalPayloadStore() {
   }
 
   async function readPayload(options: ReadPayloadOptions): Promise<HttpsPayloadRead> {
-    if (inspectPayloadUri(options.credentialUri).kind === 'https') {
+    if (parsePayloadUri(options.credentialUri).kind === 'https') {
       return readCanonicalHttpsPayload(options)
     }
     return readLocalTestPayload({
@@ -75,7 +75,7 @@ export function useLocalPayloadStore() {
   }
 
   function inspectPayloadLocation(credentialUri: string): string {
-    if (inspectPayloadUri(credentialUri).kind === 'https') {
+    if (parsePayloadUri(credentialUri).kind === 'https') {
       return inspectPilotHttpsPayloadHost(credentialUri)
     }
     try {

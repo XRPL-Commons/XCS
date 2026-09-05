@@ -1,8 +1,9 @@
-import { canonicalize, createIpfsRawPayloadUri, type JsonValue } from '@xcs-protocol/core'
+import { createIpfsPayloadUri, type JsonValue } from '@xcs-protocol/core'
 import { describe, expect, it } from 'vitest'
 
 import { extractCredentialMutations } from '../src/credential-mutations.js'
 import { interpretSchemaRegistration } from '../src/registration.js'
+import { canonicalJson } from '../src/serialization.js'
 import type { LedgerTransaction, NetworkProfile, SchemaDefinition } from '../src/types.js'
 
 const REGISTRY = 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh'
@@ -69,7 +70,7 @@ function registrationPayment(): LedgerTransaction {
           Memo: {
             MemoType: utf8Hex('xcs:schema_register'),
             MemoFormat: utf8Hex('application/json'),
-            MemoData: utf8Hex(canonicalize(schema as unknown as JsonValue)),
+            MemoData: utf8Hex(canonicalJson(schema)),
           },
         },
       ],
@@ -107,7 +108,7 @@ function objectId(index: number): string {
 
 function credentialFields(next?: () => number): Record<string, unknown> {
   const credentialType = next === undefined ? SCHEMA_UID : mixedHexCase(SCHEMA_UID, next)
-  const uriHex = utf8Hex(createIpfsRawPayloadUri('generative extraction fixture'))
+  const uriHex = utf8Hex(createIpfsPayloadUri('generative extraction fixture'))
   return {
     Issuer: PUBLISHER,
     Subject: SUBJECT,
@@ -289,17 +290,17 @@ describe('generative indexer extraction', () => {
       },
       {
         name: 'malformed JSON',
-        reasonCode: 'JSON_INVALID',
+        reasonCode: 'INVALID_JSON',
         mutate: (candidate) => {
           registrationMemo(candidate).MemoData = utf8Hex('{"xcsVersion":')
         },
       },
       {
         name: 'invalid schema',
-        reasonCode: 'SCHEMA_INVALID',
+        reasonCode: 'INVALID_SCHEMA',
         mutate: (candidate) => {
           const invalidSchema = { ...schema, future: true } as unknown as JsonValue
-          registrationMemo(candidate).MemoData = utf8Hex(canonicalize(invalidSchema))
+          registrationMemo(candidate).MemoData = utf8Hex(canonicalJson(invalidSchema))
         },
       },
     ]

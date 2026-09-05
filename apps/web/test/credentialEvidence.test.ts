@@ -1,4 +1,4 @@
-import { encodeUtf8Hex, type CredentialPayload, type ResolvedSchema } from '@xcs-protocol/core'
+import type { CredentialPayload, ResolvedSchema } from '@xcs-protocol/core'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -10,6 +10,7 @@ import {
   createPayloadFetchConsentToken,
   type CredentialReview,
 } from '../app/utils/credentialReview'
+import { encodeHexUtf8 } from '../app/utils/serialization'
 
 const schema: ResolvedSchema = {
   definition: {
@@ -143,7 +144,7 @@ describe('exact Credential evidence', () => {
       issuer: review.issuer,
       subject: review.subject,
       schemaUid: review.schemaUid,
-      uriHex: encodeUtf8Hex(review.uri!),
+      uriHex: encodeHexUtf8(review.uri!),
       expiration: null,
       accepted: true,
       state: 'deleted',

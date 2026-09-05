@@ -1,20 +1,18 @@
 import { createHmac, randomBytes } from 'node:crypto'
 
 import {
-  createIpfsRawPayloadUri,
-  decodeUtf8,
-  isClassicAddress,
+  createIpfsPayloadUri,
   parseCredentialPayload,
-  parseJsonStrict,
   verifyPayloadIntegrity,
   type CredentialPayload,
 } from '@xcs-protocol/core'
-import { deriveAddress, verifyKeypairSignature } from 'xrpl'
+import { deriveAddress, isValidClassicAddress, verifyKeypairSignature } from 'xrpl'
 
 import { assertAuthoritativeLedgerEvidence } from './indexer-status.js'
 import { DEFAULT_LEDGER_MAX_AGE_SECONDS } from './ledger-freshness.js'
 import { hasPiiShapedFieldName } from './pii-field-filter.js'
 import { authoritativeResolvedSchema, schemaProjectionEvidenceUids } from './schema-projection.js'
+import { parseJson } from './serialization.js'
 import type { ApiRepository, ContentPinStore, PinningRepository } from './types.js'
 
 const MAX_DEMO_PIN_BYTES = 64 * 1024
@@ -97,7 +95,7 @@ export class DemoPinningService {
     if (!this.options.enabledNetworks.has(input.network)) {
       throw new PinningError('PINNING_NETWORK_DISABLED', 404)
     }
-    if (!isClassicAddress(input.wallet)) throw new PinningError('WALLET_INVALID', 400)
+    if (!isValidClassicAddress(input.wallet)) throw new PinningError('WALLET_INVALID', 400)
     const network = await this.options.apiRepository.getNetwork(input.network)
     if (network === undefined) throw new PinningError('NETWORK_NOT_FOUND', 404)
     if (network.networkId !== 1) throw new PinningError('PINNING_NETWORK_DISABLED', 404)
@@ -186,7 +184,7 @@ export class DemoPinningService {
     const content = decodeBase64(input.payloadBase64)
     let payloadHeader: CredentialPayload
     try {
-      const parsed = parseJsonStrict(decodeUtf8(content))
+      const parsed = parseJson(content)
       if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
         throw new Error('payload is not an object')
       }
@@ -240,7 +238,7 @@ export class DemoPinningService {
         issuer: input.wallet,
         subject: payloadHeader.subject,
         schemaUid: payloadHeader.schema,
-        schema,
+        fields: schema.fields,
       })
     } catch (error) {
       if (error instanceof PinningError) throw error
@@ -250,8 +248,8 @@ export class DemoPinningService {
       throw new PinningError('DEMO_PIN_PII_FIELD_FORBIDDEN', 400)
     }
 
-    const cid = createIpfsRawPayloadUri(content).slice('ipfs://'.length)
-    if (verifyPayloadIntegrity(content, `ipfs://${cid}`).status !== 'valid') {
+    const cid = createIpfsPayloadUri(content).slice('ipfs://'.length)
+    if (!verifyPayloadIntegrity(content, `ipfs://${cid}`).valid) {
       throw new PinningError('CID_INTEGRITY_ERROR', 500)
     }
     const now = this.now()

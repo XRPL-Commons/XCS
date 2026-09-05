@@ -1,15 +1,14 @@
 import {
-  canonicalize,
   computeSchemaUid,
-  isClassicAddress,
-  validateSchema,
   type FieldDescriptor,
-  type JsonValue,
   type ResolvedSchema,
   type SchemaDefinition,
+  parseSchema,
 } from '@xcs-protocol/core'
 import type { SchemaRow } from '@xcs-protocol/db'
+import { isValidClassicAddress } from 'xrpl'
 
+import { canonicalJson } from './serialization.js'
 import type { SchemaProjectionEvidence } from './types.js'
 
 const HASH = /^[0-9a-f]{64}$/u
@@ -32,11 +31,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function canonical(value: unknown): string {
-  return canonicalize(value as JsonValue)
+  return canonicalJson(value)
 }
 
 function validateProjectedFields(value: unknown): Record<string, FieldDescriptor> {
-  const projection = validateSchema({
+  const projection = parseSchema({
     xcsVersion: '0.1',
     name: 'Resolved projection',
     description: 'Resolved projection fields.',
@@ -60,7 +59,7 @@ function assertDefinitionMetadata(row: SchemaRow, definition: SchemaDefinition):
 }
 
 function storedResolvedSchema(row: SchemaRow): ResolvedSchema {
-  const definition = validateSchema(row.definition)
+  const definition = parseSchema(row.definition)
   if (canonical(definition) !== canonical(row.definition)) {
     throw new Error('Schema definition projection is not normalized')
   }
@@ -76,7 +75,7 @@ function storedResolvedSchema(row: SchemaRow): ResolvedSchema {
     throw new Error('Resolved schema projection has an invalid shape')
   }
 
-  const resolvedDefinition = validateSchema(row.resolvedDefinition.definition)
+  const resolvedDefinition = parseSchema(row.resolvedDefinition.definition)
   if (
     canonical(resolvedDefinition) !== canonical(row.resolvedDefinition.definition) ||
     canonical(resolvedDefinition) !== canonical(definition)
@@ -160,7 +159,7 @@ function validateEvidenceRow(
   if (
     row.profileId !== expected.profileId ||
     !HASH.test(row.schemaUid) ||
-    !isClassicAddress(row.publisher) ||
+    !isValidClassicAddress(row.publisher) ||
     !Number.isSafeInteger(row.ledgerIndex) ||
     row.ledgerIndex < expected.activationLedgerIndex ||
     row.ledgerIndex > MAX_UINT32 ||
@@ -186,7 +185,7 @@ function validateEvidenceRow(
   ) {
     throw new Error('Schema registration evidence is inconsistent')
   }
-  const registrationDefinition = validateSchema(registration.memoJson)
+  const registrationDefinition = parseSchema(registration.memoJson)
   if (canonical(registrationDefinition) !== canonical(projection.definition)) {
     throw new Error('Schema definition does not match its registration memo')
   }

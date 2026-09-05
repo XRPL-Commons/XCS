@@ -3,7 +3,8 @@ import type {
   SubmissionJournalEntry,
   SubmissionJournalStage,
 } from '@xcs-protocol/sdk'
-import { inspectPayloadUri, isClassicAddress } from '@xcs-protocol/core'
+import { parsePayloadUri } from '@xcs-protocol/core'
+import { isValidClassicAddress } from 'xrpl'
 
 const DATABASE_NAME = 'xcs-wallet-journal'
 const DATABASE_VERSION = 1
@@ -156,7 +157,7 @@ export function validateOperationBusinessContext(input: unknown): OperationBusin
     const publisher = candidate.publisher
     if (
       publisher !== undefined &&
-      (typeof publisher !== 'string' || !isClassicAddress(publisher))
+      (typeof publisher !== 'string' || !isValidClassicAddress(publisher))
     ) {
       throw new Error('OPERATION_PUBLISHER_INVALID')
     }
@@ -184,7 +185,7 @@ export function validateOperationBusinessContext(input: unknown): OperationBusin
   if (typeof candidate.issuer !== 'string' || typeof candidate.subject !== 'string') {
     throw new Error('OPERATION_CREDENTIAL_ADDRESS_INVALID')
   }
-  if (!isClassicAddress(candidate.issuer) || !isClassicAddress(candidate.subject)) {
+  if (!isValidClassicAddress(candidate.issuer) || !isValidClassicAddress(candidate.subject)) {
     throw new Error('OPERATION_CREDENTIAL_ADDRESS_INVALID')
   }
   if (typeof candidate.schemaUid !== 'string') throw new Error('OPERATION_SCHEMA_UID_INVALID')
@@ -207,7 +208,7 @@ export function validateOperationBusinessContext(input: unknown): OperationBusin
     if (credentialUri !== undefined) {
       if (typeof credentialUri !== 'string') throw new Error('OPERATION_CREDENTIAL_URI_INVALID')
       try {
-        inspectPayloadUri(credentialUri)
+        parsePayloadUri(credentialUri)
       } catch {
         throw new Error('OPERATION_CREDENTIAL_URI_INVALID')
       }

@@ -1,10 +1,4 @@
-import {
-  canonicalize,
-  computeSchemaUid,
-  type CredentialPayload,
-  type JsonValue,
-  type ResolvedSchema,
-} from '@xcs-protocol/core'
+import { computeSchemaUid, type CredentialPayload, type ResolvedSchema } from '@xcs-protocol/core'
 import type {
   CredentialEventRow,
   CredentialGenerationRow,
@@ -19,6 +13,7 @@ import type {
 import { describe, expect, it } from 'vitest'
 
 import { DemoPinningService, PinningError } from '../src/pinning.js'
+import { canonicalJson } from '../src/serialization.js'
 import type {
   ApiRepository,
   ContentPinStore,
@@ -355,7 +350,7 @@ function validPayloadBase64(): string {
     schema: UID,
     claims: { name: 'XRPL 101' },
   }
-  return Buffer.from(canonicalize(payload as JsonValue)).toString('base64')
+  return Buffer.from(canonicalJson(payload)).toString('base64')
 }
 
 async function attemptValidPin(fixture: ReturnType<typeof service>) {
@@ -429,13 +424,13 @@ describe('demo pinning', () => {
       wallet: ISSUER,
       ipAddress: '203.0.113.42',
     })
-    const content = canonicalize({
+    const content = canonicalJson({
       xcsVersion: '0.1',
       issuer: ISSUER,
       subject: SUBJECT,
       schema: UID,
       claims: { name: 'XRPL 101', prenom: 'Personne Test' },
-    } as JsonValue)
+    })
 
     await expect(
       fixture.service.pin({
@@ -553,7 +548,7 @@ describe('demo pinning', () => {
         publicKey: PUBLIC_KEY,
         signature: SIGNATURE,
         payloadBase64: Buffer.from(
-          canonicalize({
+          canonicalJson({
             xcsVersion: '0.1',
             issuer: ISSUER,
             subject: SUBJECT,

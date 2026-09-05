@@ -4,13 +4,12 @@ import {
   assertLinkGeneration,
   assertLinkProfile,
   buildCredentialAcceptLink,
-  buildCredentialVerifyLink,
+  buildCredentialPermalink,
   credentialPermalinkSubjectAction,
   singleRouteQueryValue,
 } from '../app/utils/operationLinks'
 
 const ISSUER = 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh'
-const SUBJECT = 'r9cZA1mLK5R5Am25ArfXFmqgNwjZgnfk59'
 const SCHEMA_UID = '12'.repeat(32)
 const GENERATION_ID = '34'.repeat(32)
 
@@ -45,18 +44,13 @@ describe('credential operation links', () => {
     expect(link).not.toContain('subject=')
   })
 
-  it('binds all exact lookup coordinates in a verification link', () => {
-    const link = buildCredentialVerifyLink({
-      profileId: 'profile with spaces',
-      issuer: ISSUER,
-      subject: SUBJECT,
-      schemaUid: SCHEMA_UID,
-      generationId: GENERATION_ID,
-    })
-
-    expect(link).toBe(
-      `/verify?profile=profile+with+spaces&issuer=${ISSUER}&subject=${SUBJECT}&schema=${SCHEMA_UID}&generation=${GENERATION_ID}`,
-    )
+  it('binds an exact generation permalink to its network profile', () => {
+    expect(
+      buildCredentialPermalink({
+        profileId: 'profile with spaces',
+        generationId: GENERATION_ID.toUpperCase(),
+      }),
+    ).toBe(`/credentials/${GENERATION_ID}?profile=profile+with+spaces`)
   })
 
   it('derives permalink CTAs from current generation state and accepted flag', () => {

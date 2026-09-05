@@ -420,21 +420,8 @@ export function useWallet() {
         {
           journal: operationStore,
           operationId,
+          allowSignerLastLedgerSequenceRefresh: $walletManager.wallet?.id === 'xaman',
           onValidatedSignature: async ({ txBlob, txHash, lastLedgerSequence }) => {
-            await refreshConnectedWallet()
-            assertWalletContext(transaction, signingAddress, signingSession)
-            assertCurrent?.()
-            await assertBusinessGenerationCurrent(normalizedBusiness, activeProfile.profileId)
-            await afterSignatureValidated?.()
-            assertWalletContext(transaction, signingAddress, signingSession)
-            assertCurrent?.()
-            const latestProfile = await getActiveNetworkProfile()
-            if (!sameProfile(activeProfile, latestProfile)) {
-              throw new Error('NETWORK_PROFILE_CHANGED_AFTER_SIGNATURE')
-            }
-            await getNetworkReadiness(activeProfile.profileId)
-            assertWalletContext(transaction, signingAddress, signingSession)
-            assertCurrent?.()
             await operationStore.persistSigned({
               operationId,
               txBlob,
@@ -442,6 +429,21 @@ export function useWallet() {
               lastLedgerSequence,
               at: new Date().toISOString(),
             })
+          },
+          beforeSubmit: async () => {
+            // The signature already proves which account authorized the exact
+            // reviewed fields. Do not make the signed result depend on another
+            // wallet session refresh; only re-run volatile application guards.
+            assertCurrent?.()
+            await assertBusinessGenerationCurrent(normalizedBusiness, activeProfile.profileId)
+            await afterSignatureValidated?.()
+            assertCurrent?.()
+            const latestProfile = await getActiveNetworkProfile()
+            if (!sameProfile(activeProfile, latestProfile)) {
+              throw new Error('NETWORK_PROFILE_CHANGED_AFTER_SIGNATURE')
+            }
+            await getNetworkReadiness(activeProfile.profileId)
+            assertCurrent?.()
           },
         },
       )

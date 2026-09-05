@@ -1,7 +1,5 @@
 import {
-  canonicalize,
   createHttpsPayloadUri,
-  encodeUtf8Hex,
   type CredentialPayload,
   type ResolvedSchema,
 } from '@xcs-protocol/core'
@@ -15,6 +13,7 @@ import {
 } from '../app/utils/credentialReview'
 import { toSanitizedOperationReceipt, type StoredOperation } from '../app/utils/operationJournal'
 import { verifyHttpsPayloadPublication } from '../app/utils/payloadPublication'
+import { canonicalJson, encodeHexUtf8 } from '../app/utils/serialization'
 
 describe('pilot flow without a wallet extension', () => {
   it('proves publication, reviews a pending credential and builds an accept receipt', async () => {
@@ -29,7 +28,7 @@ describe('pilot flow without a wallet extension', () => {
       schema: schemaUid,
       claims: { programId: 'course-1' },
     }
-    const canonical = canonicalize(payload)
+    const canonical = canonicalJson(payload)
     const uri = createHttpsPayloadUri('https://issuer.example/credential.json', canonical)
     const fetchImpl = async () =>
       new Response(canonical, { headers: { 'content-type': 'application/json' } })
@@ -54,7 +53,7 @@ describe('pilot flow without a wallet extension', () => {
         issuer,
         subject,
         schemaUid,
-        uriHex: encodeUtf8Hex(uri),
+        uriHex: encodeHexUtf8(uri),
         expiration: null,
         accepted: false,
         state: 'pending',

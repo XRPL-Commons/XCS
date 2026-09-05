@@ -1,9 +1,4 @@
-import {
-  canonicalize,
-  createHttpsPayloadUri,
-  createIpfsRawPayloadUri,
-  type JsonValue,
-} from '@xcs-protocol/core'
+import { createHttpsPayloadUri, createIpfsPayloadUri } from '@xcs-protocol/core'
 import { describe, expect, it, vi } from 'vitest'
 
 import {
@@ -11,6 +6,7 @@ import {
   readCanonicalHttpsPayload,
   verifyHttpsPayloadPublication,
 } from '../app/utils/payloadPublication'
+import { canonicalJson } from '../app/utils/serialization'
 
 function jsonResponse(content: BodyInit, headers: Record<string, string> = {}): Response {
   return new Response(content, {
@@ -20,7 +16,7 @@ function jsonResponse(content: BodyInit, headers: Record<string, string> = {}): 
 }
 
 describe('browser HTTPS payload publication proof', () => {
-  const canonical = canonicalize({ claims: { programId: 'course-1' } } as JsonValue)
+  const canonical = canonicalJson({ claims: { programId: 'course-1' } })
   const uri = createHttpsPayloadUri('https://issuer.example/credentials/one.json', canonical)
 
   it('fetches exact canonical bytes with browser safety options and returns no content', async () => {
@@ -52,7 +48,7 @@ describe('browser HTTPS payload publication proof', () => {
 
   it('rejects non-HTTPS URIs, redirects, changed final URLs and non-JSON media types', async () => {
     await expect(
-      readCanonicalHttpsPayload({ credentialUri: createIpfsRawPayloadUri(canonical) }),
+      readCanonicalHttpsPayload({ credentialUri: createIpfsPayloadUri(canonical) }),
     ).rejects.toThrow('PILOT_HTTPS_PAYLOAD_REQUIRED')
 
     const redirected = jsonResponse(canonical)
@@ -124,7 +120,7 @@ describe('browser HTTPS payload publication proof', () => {
       }),
     ).rejects.toThrow('PAYLOAD_NOT_CANONICAL_JCS')
 
-    const tampered = canonicalize({ claims: { programId: 'course-2' } } as JsonValue)
+    const tampered = canonicalJson({ claims: { programId: 'course-2' } })
     await expect(
       readCanonicalHttpsPayload({
         credentialUri: uri,
