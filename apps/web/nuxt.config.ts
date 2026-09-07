@@ -58,6 +58,7 @@ export default defineNuxtConfig({
       profileId: '',
       rpcUrl: 'wss://s.altnet.rippletest.net:51233',
       xamanApiKey: '',
+      xamanRedirectUrl: '',
       walletConnectProjectId: '',
       browserE2eMode,
       localPayloadStoreMode,

@@ -19,6 +19,7 @@ export default defineNuxtPlugin(async () => {
 
   const adapters = createXrplConnectAdapters({
     xamanApiKey: config.public.xamanApiKey,
+    xamanRedirectUrl: config.public.xamanRedirectUrl,
     walletConnectProjectId: config.public.walletConnectProjectId,
   })
   const walletManager = new WalletManager({

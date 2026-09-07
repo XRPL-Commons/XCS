@@ -60,7 +60,10 @@ Crossmark, GemWallet, WalletConnect, Ledger, Xyra, Otsu and MetaMask Snap. Cross
 Ledger, Xyra, Otsu and MetaMask Snap are registered without deployment-specific configuration.
 Xaman is added only when `NUXT_PUBLIC_XAMAN_API_KEY` is set, and WalletConnect only when
 `NUXT_PUBLIC_WALLET_CONNECT_PROJECT_ID` is set. Both values identify a public application to its
-wallet provider; they are browser-visible identifiers, not secrets.
+wallet provider; they are browser-visible identifiers, not secrets. One Xaman application key is
+used by every visitor of that XCS deployment. Register the deployment origin with a trailing slash
+as an exact redirect URI in the Xaman Developer Console. XCS uses that stable root callback from
+every page; it never uses the current route as the OAuth callback.
 
 Public deployment is additionally blocked on third-party license review. The RC bundle contains
 WalletConnect code under the WalletConnect Community License, and its GemWallet dependency requires
@@ -247,6 +250,7 @@ NUXT_PUBLIC_API_BASE_URL=https://xcs-api.example
 NUXT_PUBLIC_RPC_URL=wss://s.altnet.rippletest.net:51233
 NUXT_PUBLIC_PROFILE_ID=xrpl-testnet-xcs-v0.1
 NUXT_PUBLIC_XAMAN_API_KEY=optional-public-xaman-application-id
+NUXT_PUBLIC_XAMAN_REDIRECT_URL=https://xcs.example/
 NUXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=optional-public-reown-project-id
 ```
 
@@ -268,8 +272,17 @@ profile must be returned by the API.
 `NUXT_PUBLIC_XAMAN_API_KEY` and `NUXT_PUBLIC_WALLET_CONNECT_PROJECT_ID` are optional public
 application identifiers. Omitting either variable removes only that adapter; it does not prevent the
 other six adapters from loading. Do not put a Xaman secret, WalletConnect relay secret, wallet key or
-other credential in either value. In Compose, set the corresponding operator variables
-`XCS_PUBLIC_XAMAN_API_KEY` and `XCS_PUBLIC_WALLET_CONNECT_PROJECT_ID`.
+other credential in either value. `NUXT_PUBLIC_XAMAN_REDIRECT_URL` is optional and otherwise
+defaults to the current application origin with a trailing slash. When set, it must be that exact
+same-origin root URL; non-loopback deployments require HTTPS. Add the same exact URL to the Xaman
+application's redirect allowlist. In Compose, set the corresponding operator variables
+`XCS_PUBLIC_XAMAN_API_KEY`, `XCS_PUBLIC_XAMAN_REDIRECT_URL` and
+`XCS_PUBLIC_WALLET_CONNECT_PROJECT_ID`.
+
+Each independently hosted XCS deployment needs its own Xaman public application key and registered
+origin. The Commons key is not a universal credential for arbitrary self-hosted domains. Follow
+Xaman's [browser SDK setup](https://docs.xaman.dev/environments/browser-web3); API secrets remain
+server-side and are not used by this browser integration.
 
 `XCS_LOCAL_PAYLOAD_STORE` is a source-time development gate rather than a deployment setting. Do
 not pass it through Compose or expose it as a general Commons storage option.

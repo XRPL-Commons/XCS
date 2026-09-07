@@ -3,8 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   clearMismatchedXamanSession,
+  configureXamanOAuthRequest,
   createXrplConnectAdapters,
   forceXamanOAuthNetwork,
+  resolveXamanRedirectUrl,
   withXamanSignWindow,
 } from '../app/utils/walletAdapters'
 
@@ -75,6 +77,47 @@ describe('XRPL Connect adapter registration', () => {
     expect(forceXamanOAuthNetwork('https://example.com/auth?client_id=other')).toBe(
       'https://example.com/auth?client_id=other',
     )
+  })
+
+  it('uses one stable Xaman redirect for every application route', () => {
+    expect(resolveXamanRedirectUrl(undefined, 'https://xcs.example/studio?draft=1#form')).toBe(
+      'https://xcs.example/',
+    )
+    expect(resolveXamanRedirectUrl(undefined, 'https://xcs.example/verify/credential')).toBe(
+      'https://xcs.example/',
+    )
+    expect(
+      resolveXamanRedirectUrl('  http://127.0.0.1:3000/  ', 'http://127.0.0.1:3000/issue'),
+    ).toBe('http://127.0.0.1:3000/')
+  })
+
+  it('rejects unsafe or route-specific Xaman redirect configuration', () => {
+    expect(() =>
+      resolveXamanRedirectUrl('https://attacker.example/', 'https://xcs.example/studio'),
+    ).toThrow('must use the current application origin')
+    expect(() =>
+      resolveXamanRedirectUrl('https://xcs.example/studio', 'https://xcs.example/studio'),
+    ).toThrow('must be the application origin with a trailing slash')
+    expect(() =>
+      resolveXamanRedirectUrl('http://xcs.example/', 'http://xcs.example/studio'),
+    ).toThrow('requires HTTPS outside local loopback development')
+  })
+
+  it('binds the Xaman Testnet authorization request to the stable redirect', () => {
+    expect(
+      configureXamanOAuthRequest(
+        'https://oauth2.xumm.app/auth?client_id=public-app-id&redirect_uri=https%3A%2F%2Fxcs.example%2Fstudio',
+        'https://xcs.example/',
+      ),
+    ).toBe(
+      'https://oauth2.xumm.app/auth?client_id=public-app-id&redirect_uri=https%3A%2F%2Fxcs.example%2F&force_network=TESTNET',
+    )
+    expect(
+      configureXamanOAuthRequest(
+        'https://example.com/auth?redirect_uri=https%3A%2F%2Fxcs.example%2Fstudio',
+        'https://xcs.example/',
+      ),
+    ).toBe('https://example.com/auth?redirect_uri=https%3A%2F%2Fxcs.example%2Fstudio')
   })
 
   it('evicts only cached Xaman sessions that cannot prove the required network', () => {

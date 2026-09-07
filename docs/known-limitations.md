@@ -105,10 +105,15 @@ integrators.
 - The Nuxt alpha pins the release candidate `xrpl-connect@1.0.0-rc.0`. Its factory covers the eight
   official adapters—Xaman, Crossmark, GemWallet, WalletConnect, Ledger, Xyra, Otsu and MetaMask
   Snap—but only the six self-configuring adapters are registered by default. Xaman requires the
-  public `NUXT_PUBLIC_XAMAN_API_KEY`; WalletConnect requires the public
+  public `NUXT_PUBLIC_XAMAN_API_KEY`; its optional `NUXT_PUBLIC_XAMAN_REDIRECT_URL` is constrained
+  to the same-origin root and otherwise derived from the browser origin. The exact root URL must be
+  registered for that application in Xaman's Developer Console. WalletConnect requires the public
   `NUXT_PUBLIC_WALLET_CONNECT_PROJECT_ID`. Their Compose inputs are
-  `XCS_PUBLIC_XAMAN_API_KEY` and `XCS_PUBLIC_WALLET_CONNECT_PROJECT_ID`. These identifiers are not
-  secrets, and their absence removes the corresponding adapter.
+  `XCS_PUBLIC_XAMAN_API_KEY`, `XCS_PUBLIC_XAMAN_REDIRECT_URL` and
+  `XCS_PUBLIC_WALLET_CONNECT_PROJECT_ID`. These values are not secrets, and absence of an
+  application identifier removes the corresponding adapter. Each self-hosted origin still needs a
+  Xaman application registration; the Commons public application ID cannot authorize arbitrary
+  third-party redirect origins.
 - The public deployment and dependency-policy gates must remain closed until Commons records
   permission from GemWallet for public/beta use and explicitly reviews the WalletConnect Community
   License, including its attribution, network and usage-threshold conditions. The RC bundles both
@@ -138,6 +143,11 @@ integrators.
   combination passes only repository-side compatibility checks until upstream declares or a stable
   release proves support; it remains a release risk. The RC also adds a substantial browser
   dependency tree and bundle cost that must be measured before the public beta.
+- The production dependency audit reports `CVE-2025-14505` in `elliptic@6.6.1`, pulled through
+  XRPL Connect's Crossmark declaration dependency. No patched `elliptic` release exists. The current
+  audit classifies it as low severity, but public release still requires either an upstream removal
+  of that dependency path or a documented security acceptance based on evidence that XCS never
+  executes it for signing.
 - The published RC reports Otsu available without checking the injected provider marker. XCS keeps
   a narrow local availability override equivalent to the adapter's connect-time marker check. Drop
   that workaround only after upgrading to a release containing the upstream correction.

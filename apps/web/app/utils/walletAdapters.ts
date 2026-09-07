@@ -13,10 +13,12 @@ import {
   type SignedTransaction,
   type Transaction,
   type WalletAdapter,
+  type XamanAdapterOptions,
   type XamanConnectOptions,
 } from 'xrpl-connect'
 
 const XAMAN_OAUTH_ORIGIN = 'https://oauth2.xumm.app'
+const XAMAN_OAUTH_PATHS = new Set(['/auth', '/authorize', '/oauth/auth', '/oauth/authorize'])
 const XAMAN_SESSION_STORAGE_KEY = 'XummPkceJwt'
 const XRPL_TESTNET_NETWORK_ID = 1
 
@@ -27,7 +29,12 @@ interface XamanSessionStorage {
 
 export interface XrplConnectAdapterConfig {
   readonly xamanApiKey?: string | undefined
+  readonly xamanRedirectUrl?: string | undefined
   readonly walletConnectProjectId?: string | undefined
+}
+
+interface XcsXamanAdapterOptions extends XamanAdapterOptions {
+  readonly redirectUrl?: string | undefined
 }
 
 function configuredValue(value: string | undefined): string | undefined {
@@ -79,6 +86,13 @@ export function clearMismatchedXamanSession(
 }
 
 export function forceXamanOAuthNetwork(value: string | URL | undefined): string | URL | undefined {
+  return configureXamanOAuthRequest(value)
+}
+
+export function configureXamanOAuthRequest(
+  value: string | URL | undefined,
+  redirectUrl?: string,
+): string | URL | undefined {
   if (value === undefined) return undefined
   try {
     const url = new URL(value)
@@ -86,15 +100,79 @@ export function forceXamanOAuthNetwork(value: string | URL | undefined): string 
       url.origin !== XAMAN_OAUTH_ORIGIN ||
       url.username ||
       url.password ||
-      !['/auth', '/authorize', '/oauth/auth', '/oauth/authorize'].includes(url.pathname)
+      !XAMAN_OAUTH_PATHS.has(url.pathname)
     ) {
       return value
     }
     url.searchParams.set('force_network', 'TESTNET')
+    if (redirectUrl) url.searchParams.set('redirect_uri', redirectUrl)
     return url.href
   } catch {
     return value
   }
+}
+
+function isLoopbackHostname(hostname: string): boolean {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
+}
+
+/**
+ * Xaman requires the exact OAuth redirect URL to be registered for the public
+ * application key. Use one callback per application origin instead of binding
+ * authentication to whichever XCS route happened to open the wallet menu.
+ */
+export function resolveXamanRedirectUrl(
+  configuredRedirectUrl: string | undefined,
+  applicationLocation: string,
+): string {
+  let applicationUrl: URL
+  try {
+    applicationUrl = new URL(applicationLocation)
+  } catch {
+    throw new Error('Xaman requires a valid browser application URL')
+  }
+
+  if (
+    !['http:', 'https:'].includes(applicationUrl.protocol) ||
+    applicationUrl.username ||
+    applicationUrl.password
+  ) {
+    throw new Error('Xaman requires an HTTP(S) browser application URL without credentials')
+  }
+  if (applicationUrl.protocol !== 'https:' && !isLoopbackHostname(applicationUrl.hostname)) {
+    throw new Error('Xaman requires HTTPS outside local loopback development')
+  }
+
+  const configured = configuredValue(configuredRedirectUrl)
+  let redirectUrl: URL
+  try {
+    redirectUrl = configured ? new URL(configured) : new URL('/', applicationUrl.origin)
+  } catch {
+    throw new Error('NUXT_PUBLIC_XAMAN_REDIRECT_URL must be an absolute HTTP(S) URL')
+  }
+
+  if (
+    !['http:', 'https:'].includes(redirectUrl.protocol) ||
+    redirectUrl.username ||
+    redirectUrl.password
+  ) {
+    throw new Error('NUXT_PUBLIC_XAMAN_REDIRECT_URL must be an HTTP(S) URL without credentials')
+  }
+  if (redirectUrl.origin !== applicationUrl.origin) {
+    throw new Error('NUXT_PUBLIC_XAMAN_REDIRECT_URL must use the current application origin')
+  }
+  if (redirectUrl.protocol !== 'https:' && !isLoopbackHostname(redirectUrl.hostname)) {
+    throw new Error(
+      'NUXT_PUBLIC_XAMAN_REDIRECT_URL must use HTTPS outside local loopback development',
+    )
+  }
+  if (redirectUrl.pathname !== '/' || redirectUrl.search || redirectUrl.hash) {
+    throw new Error(
+      'NUXT_PUBLIC_XAMAN_REDIRECT_URL must be the application origin with a trailing slash',
+    )
+  }
+
+  return redirectUrl.href
 }
 
 /**
@@ -140,6 +218,14 @@ function requestsXrplTestnet(network: ConnectOptions<XamanConnectOptions>['netwo
 }
 
 class XcsXamanAdapter extends XamanAdapter {
+  readonly #redirectUrl: string | undefined
+
+  public constructor(options: XcsXamanAdapterOptions = {}) {
+    const { redirectUrl, ...xamanOptions } = options
+    super(xamanOptions)
+    this.#redirectUrl = redirectUrl
+  }
+
   public override async connect(
     options?: ConnectOptions<XamanConnectOptions>,
   ): Promise<AccountInfo> {
@@ -148,9 +234,10 @@ class XcsXamanAdapter extends XamanAdapter {
     }
 
     clearMismatchedXamanSession(window.localStorage, XRPL_TESTNET_NETWORK_ID)
+    const redirectUrl = resolveXamanRedirectUrl(this.#redirectUrl, window.location.href)
     const originalOpen = window.open
     const interceptedOpen: typeof window.open = (url, target, features) =>
-      originalOpen.call(window, forceXamanOAuthNetwork(url), target, features)
+      originalOpen.call(window, configureXamanOAuthRequest(url, redirectUrl), target, features)
     window.open = interceptedOpen
     try {
       return await super.connect(options)
@@ -189,7 +276,9 @@ export function createXrplConnectAdapters(config: XrplConnectAdapterConfig = {})
   const xamanApiKey = configuredValue(config.xamanApiKey)
   const walletConnectProjectId = configuredValue(config.walletConnectProjectId)
   const adapters: WalletAdapter[] = [
-    ...(xamanApiKey ? [new XcsXamanAdapter({ apiKey: xamanApiKey })] : []),
+    ...(xamanApiKey
+      ? [new XcsXamanAdapter({ apiKey: xamanApiKey, redirectUrl: config.xamanRedirectUrl })]
+      : []),
     new CrossmarkAdapter(),
     new GemWalletAdapter(),
     ...(walletConnectProjectId
