@@ -1,7 +1,8 @@
-import { canonicalize, type JsonValue } from '@xcs-protocol/core'
+import type { JsonValue } from '@xcs-protocol/core'
 import { describe, expect, it } from 'vitest'
 
 import { interpretSchemaRegistration } from '../src/registration.js'
+import { canonicalJson } from '../src/serialization.js'
 import { normalizeLedgerResponse } from '../src/xrpl-source.js'
 import type { LedgerTransaction, NetworkProfile, SchemaDefinition } from '../src/types.js'
 
@@ -52,7 +53,7 @@ function payment(
           Memo: {
             MemoType: hex('xcs:schema_register'),
             MemoFormat: hex('application/json'),
-            MemoData: hex(canonicalize(memoJson)),
+            MemoData: hex(canonicalJson(memoJson)),
           },
         },
       ],
@@ -247,7 +248,7 @@ describe('interpretSchemaRegistration', () => {
     const memoDataFields = (
       memoData.transaction.Memos as Array<{ Memo: Record<string, unknown> }>
     )[0]!.Memo
-    memoDataFields.MemoData = hex(`\uFEFF${canonicalize(schema as unknown as JsonValue)}`)
+    memoDataFields.MemoData = hex(`\uFEFF${canonicalJson(schema)}`)
     expect(
       interpretSchemaRegistration(
         memoData,
@@ -255,6 +256,6 @@ describe('interpretSchemaRegistration', () => {
         profile,
         new Map(),
       ),
-    ).toMatchObject({ status: 'rejected', reasonCode: 'JSON_INVALID' })
+    ).toMatchObject({ status: 'rejected', reasonCode: 'INVALID_JSON' })
   })
 })

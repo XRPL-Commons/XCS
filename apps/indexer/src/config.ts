@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises'
 
-import { sha256Hex, validateNetworkProfile, type NetworkProfile } from '@xcs-protocol/core'
+import { parseNetworkProfile, type NetworkProfile } from '@xcs-protocol/core'
 
+import { sha256Hex } from './serialization.js'
 import type { DatabaseScope, RegistryPolicy } from './types.js'
 
 export const CONTROLLED_PILOT_ACKNOWLEDGEMENT = 'DISPOSABLE_PROFILE_AND_DATABASE' as const
@@ -149,7 +150,7 @@ async function loadProfileConfig(environment: NodeJS.ProcessEnv): Promise<Loaded
   const profilePath = required(environment, 'XCS_NETWORK_PROFILE')
   const profileFileBytes = await readFile(profilePath)
   const profileJson: unknown = JSON.parse(profileFileBytes.toString('utf8'))
-  const profile = validateNetworkProfile(profileJson)
+  const profile = parseNetworkProfile(profileJson)
   const registryPolicy = resolveRegistryPolicy(profile, environment)
   return {
     profile,

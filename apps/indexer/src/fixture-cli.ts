@@ -1,11 +1,6 @@
 import { readFile } from 'node:fs/promises'
 
-import {
-  parseJsonStrict,
-  sha256Hex,
-  validateNetworkProfile,
-  type NetworkProfile,
-} from '@xcs-protocol/core'
+import { parseNetworkProfile, type NetworkProfile } from '@xcs-protocol/core'
 
 import { loadLedgerRpcConfig, resolveRegistryPolicy } from './config.js'
 import {
@@ -16,6 +11,7 @@ import {
 } from './fixture-bundle.js'
 import { QuorumLedgerSource } from './quorum-ledger-source.js'
 import { sourceErrorCode } from './source-errors.js'
+import { parseJson, sha256Hex } from './serialization.js'
 import { XrplLedgerSource } from './xrpl-source.js'
 
 type FixtureCommand = 'capture' | 'validate'
@@ -47,9 +43,7 @@ function parseCommand(value: string | undefined): FixtureCommand {
 
 function parseProfileFile(profileFileBytes: Uint8Array): NetworkProfile {
   try {
-    return validateNetworkProfile(
-      parseJsonStrict(new TextDecoder('utf-8', { fatal: true }).decode(profileFileBytes)),
-    )
+    return parseNetworkProfile(parseJson(profileFileBytes))
   } catch (error) {
     throw new LedgerFixtureBundleError(
       'FIXTURE_BUNDLE_INVALID',

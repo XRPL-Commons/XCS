@@ -70,6 +70,12 @@ active lease row with `FOR UPDATE` and writes the projection, checkpoint and sta
 transaction. Losing or expiring the lease therefore fails before a stale writer can persist the
 next ledger.
 
+After the indexer first reaches `ready`, its last agreed checkpoint remains readable within the
+configured freshness window while the next ledger is fetched. The new checkpoint and its `ready`
+status are then persisted atomically, so routine head following does not expose a transient
+`catching_up` state. A genuine multi-ledger backlog still becomes unavailable when an intermediate
+checkpoint is persisted before the observed tip.
+
 Monitor checkpoint age, source RPC errors, invalid registrations, ingestion retries and projection failures. Payload retrieval is not part of indexing and cannot delay ledger progress.
 
 ## Recovery

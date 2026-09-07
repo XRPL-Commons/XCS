@@ -191,14 +191,20 @@ export class IndexerWorker {
     let processed = 0
 
     await repository.renewLease(token, this.leaseDurationMs)
-    await this.persistRuntimeStatus(
-      token,
-      this.replayTarget === undefined &&
-        previous !== undefined &&
-        nextLedgerIndex > validatedLedgerIndex
-        ? 'ready'
-        : 'catching_up',
-    )
+    // A previously agreed checkpoint remains authoritative within the API's
+    // freshness window while the next ledger is fetched. Do not create a
+    // transient catching_up state before that ledger and its ready status can
+    // be persisted atomically.
+    if (previous === undefined || nextLedgerIndex > validatedLedgerIndex) {
+      await this.persistRuntimeStatus(
+        token,
+        this.replayTarget === undefined &&
+          previous !== undefined &&
+          nextLedgerIndex > validatedLedgerIndex
+          ? 'ready'
+          : 'catching_up',
+      )
+    }
 
     const lastLedgerThisRun = Math.min(processingLimit, nextLedgerIndex + this.batchSize - 1)
     while (nextLedgerIndex <= lastLedgerThisRun) {

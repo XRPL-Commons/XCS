@@ -243,6 +243,28 @@ describe('IndexerWorker', () => {
     expect(caughtUp).toBe(true)
   })
 
+  it('does not transiently clear readiness while advancing one ledger from a checkpoint', async () => {
+    const repository = new MemoryRepository()
+    repository.checkpoint = checkpoint(ledger(100))
+    const worker = new IndexerWorker({
+      profile,
+      repository,
+      source: new MemorySource(101),
+      writerId: token.writerId,
+    })
+
+    await expect(worker.runOnce(token)).resolves.toBe(1)
+    expect(repository.persisted).toEqual([101])
+    expect(repository.statuses).toEqual([
+      expect.objectContaining({
+        state: 'ready',
+        lastAgreedLedgerIndex: 101,
+        primarySourceTip: 101,
+        secondarySourceTip: 101,
+      }),
+    ])
+  })
+
   it('preflights, acquires a lease and releases it on a clean stop', async () => {
     const repository = new MemoryRepository()
     const source = new MemorySource(100)

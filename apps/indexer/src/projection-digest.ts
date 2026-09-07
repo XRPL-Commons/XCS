@@ -1,4 +1,4 @@
-import { canonicalize, encodeUtf8, sha256Hex, type JsonValue } from '@xcs-protocol/core'
+import type { JsonValue } from '@xcs-protocol/core'
 import {
   credentialEvents,
   credentialGenerations,
@@ -9,6 +9,8 @@ import {
   type XcsDatabase,
 } from '@xcs-protocol/db'
 import { asc, eq } from 'drizzle-orm'
+
+import { canonicalJson, encodeUtf8, sha256Hex } from './serialization.js'
 
 const PROJECTION_DIGEST_VERSION = 'xcs-projection-v1' as const
 
@@ -48,7 +50,7 @@ function jsonValue(value: unknown): JsonValue {
  * independent replays can be compared across hosts and wall clocks.
  */
 export function digestProjectionSnapshot(snapshot: ProjectionSnapshot): string {
-  return sha256Hex(encodeUtf8(canonicalize(snapshot as unknown as JsonValue)))
+  return sha256Hex(encodeUtf8(canonicalJson(snapshot)))
 }
 
 async function computeProjectionDigestSnapshot(

@@ -3,13 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gunzipSync, gzipSync } from 'node:zlib'
 
-import {
-  canonicalize,
-  encodeUtf8,
-  sha256Hex,
-  type JsonValue,
-  type NetworkProfile,
-} from '@xcs-protocol/core'
+import type { JsonValue, NetworkProfile } from '@xcs-protocol/core'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import {
@@ -22,6 +16,7 @@ import {
   type LedgerFixtureBundleManifest,
 } from '../src/fixture-bundle.js'
 import { prepareFixtureReplay } from '../src/fixture-replay.js'
+import { canonicalJson, encodeUtf8, sha256Hex } from '../src/serialization.js'
 import type {
   LedgerSource,
   LedgerSourcePreflight,
@@ -213,7 +208,7 @@ async function rewriteCanonicalLedger(
     JsonValue
   >
   mutate(ledger)
-  const ledgerContent = encodeUtf8(canonicalize(ledger as unknown as JsonValue))
+  const ledgerContent = encodeUtf8(canonicalJson(ledger))
   const compressedLedger = gzipSync(ledgerContent)
   await writeFile(ledgerPath, compressedLedger)
 
@@ -230,12 +225,12 @@ async function rewriteCanonicalLedger(
   entry.transactionRoot = ledger.transactionRoot!
   entry.contentSha256 = sha256Hex(ledgerContent)
   entry.compressedSha256 = sha256Hex(compressedLedger)
-  const indexContent = encodeUtf8(canonicalize(entries as unknown as JsonValue))
+  const indexContent = encodeUtf8(canonicalJson(entries))
   const compressedIndex = gzipSync(indexContent)
   await writeFile(chunkPath, compressedIndex)
   chunk.contentSha256 = sha256Hex(indexContent)
   chunk.compressedSha256 = sha256Hex(compressedIndex)
-  await writeFile(join(output, 'manifest.json'), canonicalize(manifest as unknown as JsonValue))
+  await writeFile(join(output, 'manifest.json'), canonicalJson(manifest))
   return ledgerFixtureBundleDigest(manifest)
 }
 
@@ -405,7 +400,7 @@ describe('ledger fixture bundles', () => {
       code: 'FIXTURE_BUNDLE_INVALID',
     })
 
-    await writeFile(manifestPath, canonicalize(captured as unknown as JsonValue))
+    await writeFile(manifestPath, canonicalJson(captured))
     const ledgerPath = join(output, 'ledgers', '101.json.gz')
     const ledger = JSON.parse(gunzipSync(await readFile(ledgerPath)).toString('utf8')) as JsonValue
     const nonCanonicalLedger = encodeUtf8(`${JSON.stringify(ledger, null, 2)}\n`)
@@ -417,13 +412,13 @@ describe('ledger fixture bundles', () => {
     >
     entries[1]!.contentSha256 = sha256Hex(nonCanonicalLedger)
     entries[1]!.compressedSha256 = sha256Hex(compressed)
-    const indexContent = encodeUtf8(canonicalize(entries as unknown as JsonValue))
+    const indexContent = encodeUtf8(canonicalJson(entries))
     const compressedIndex = gzipSync(indexContent)
     chunk.contentSha256 = sha256Hex(indexContent)
     chunk.compressedSha256 = sha256Hex(compressedIndex)
     await writeFile(ledgerPath, compressed)
     await writeFile(chunkPath, compressedIndex)
-    await writeFile(manifestPath, canonicalize(captured as unknown as JsonValue))
+    await writeFile(manifestPath, canonicalJson(captured))
 
     await expect(
       validateLedgerFixtureBundle(output, profile, undefined, ledgerFixtureBundleDigest(captured)),
@@ -510,7 +505,7 @@ describe('ledger fixture bundles', () => {
       secondaryOperator: 'Independent Operator',
     })
     captured.profile.networkId = -1
-    await writeFile(join(output, 'manifest.json'), canonicalize(captured as unknown as JsonValue))
+    await writeFile(join(output, 'manifest.json'), canonicalJson(captured))
     await expect(
       validateLedgerFixtureBundle(
         output,
@@ -562,10 +557,7 @@ describe('ledger fixture bundles', () => {
       { ...originalChunk, to: 100 },
       { ...originalChunk, from: 100 },
     ]
-    await writeFile(
-      join(misalignedOutput, 'manifest.json'),
-      canonicalize(misaligned as unknown as JsonValue),
-    )
+    await writeFile(join(misalignedOutput, 'manifest.json'), canonicalJson(misaligned))
     await expect(
       validateLedgerFixtureBundle(
         misalignedOutput,
@@ -596,7 +588,7 @@ describe('ledger fixture bundles', () => {
     await writeFile(chunkPath, compressedIndex)
     chunk.contentSha256 = sha256Hex(nonCanonicalIndex)
     chunk.compressedSha256 = sha256Hex(compressedIndex)
-    await writeFile(join(output, 'manifest.json'), canonicalize(captured as unknown as JsonValue))
+    await writeFile(join(output, 'manifest.json'), canonicalJson(captured))
 
     await expect(
       validateLedgerFixtureBundle(output, profile, undefined, ledgerFixtureBundleDigest(captured)),

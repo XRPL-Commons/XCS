@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 
-import { validateNetworkProfile, type NetworkProfile } from '@xcs-protocol/core'
+import { parseNetworkProfile, type NetworkProfile } from '@xcs-protocol/core'
 import {
   createDatabaseClient,
   credentialEvents,
@@ -54,7 +54,7 @@ function requiredEnvironment(name: string): string {
 async function loadProfile(): Promise<NetworkProfile> {
   const path = requiredEnvironment('XCS_NETWORK_PROFILE')
   const input: unknown = JSON.parse(await readFile(path, 'utf8'))
-  return validateNetworkProfile(input)
+  return parseNetworkProfile(input)
 }
 
 function databaseUrl(): string {

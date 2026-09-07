@@ -1,4 +1,4 @@
-import { isClassicAddress } from '@xcs-protocol/core'
+import { isValidClassicAddress } from 'xrpl'
 
 import type { LedgerRange, NetworkProfile, RegistryPolicy } from './types.js'
 import { sourceFailure } from './source-errors.js'
@@ -151,7 +151,7 @@ function signerLists(result: Record<string, unknown>, accountData: Record<string
 }
 
 function classicAddress(value: unknown, label: string): string {
-  if (typeof value !== 'string' || !isClassicAddress(value)) {
+  if (typeof value !== 'string' || !isValidClassicAddress(value)) {
     return sourceFailure('SOURCE_RESPONSE_INVALID', `${label} must be a classic XRPL address`)
   }
   return value

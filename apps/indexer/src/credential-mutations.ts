@@ -1,4 +1,7 @@
-import { decodeUtf8Hex, inspectPayloadUri, isClassicAddress } from '@xcs-protocol/core'
+import { parsePayloadUri } from '@xcs-protocol/core'
+import { isValidClassicAddress } from 'xrpl'
+
+import { decodeHexUtf8 } from './serialization.js'
 
 import type {
   CredentialDeletionCause,
@@ -109,8 +112,8 @@ export function extractCredentialMutations(
     if (
       typeof issuer !== 'string' ||
       typeof subject !== 'string' ||
-      !isClassicAddress(issuer) ||
-      !isClassicAddress(subject) ||
+      !isValidClassicAddress(issuer) ||
+      !isValidClassicAddress(subject) ||
       typeof credentialType !== 'string' ||
       !/^[0-9a-fA-F]{64}$/.test(credentialType)
     ) {
@@ -136,7 +139,7 @@ export function extractCredentialMutations(
       return
     }
     try {
-      inspectPayloadUri(decodeUtf8Hex(uriHex))
+      parsePayloadUri(decodeHexUtf8(uriHex))
     } catch {
       malformedCredentialNodes += 1
       return
