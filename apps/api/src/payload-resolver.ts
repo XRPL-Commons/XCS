@@ -1,7 +1,7 @@
 import { lookup } from 'node:dns/promises'
 import { isIP, type LookupFunction } from 'node:net'
 
-import { inspectPayloadUri } from '@xcs-protocol/core'
+import { parsePayloadUri } from '@xcs-protocol/core'
 import { Agent, fetch } from 'undici'
 
 import { assertSafeHttpsPayloadUrl, isPublicAddress } from './internal/network-safety.js'
@@ -231,7 +231,7 @@ export class SafePayloadResolver implements PayloadResolver {
   }
 
   async resolve(uri: string): Promise<Uint8Array> {
-    const parsed = inspectPayloadUri(uri)
+    const parsed = parsePayloadUri(uri)
     if (parsed.kind === 'https') {
       return fetchPinned(new URL(parsed.fetchUrl), this.dependencies)
     }

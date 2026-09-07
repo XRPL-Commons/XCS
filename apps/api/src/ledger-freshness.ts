@@ -1,4 +1,4 @@
-import { rippleTimeToUnixSeconds } from '@xcs-protocol/core'
+import { rippleTimeToUnixTime } from 'xrpl'
 
 export const DEFAULT_LEDGER_MAX_AGE_SECONDS = 120
 export const MAX_LEDGER_CLOCK_SKEW_SECONDS = 30
@@ -37,7 +37,7 @@ export function evaluateLedgerCheckpointFreshness(
   if (!Number.isSafeInteger(nowUnixSeconds)) return 'stale'
 
   try {
-    const ageSeconds = nowUnixSeconds - rippleTimeToUnixSeconds(closeTime)
+    const ageSeconds = nowUnixSeconds - Math.floor(rippleTimeToUnixTime(closeTime) / 1_000)
     if (ageSeconds > maxAgeSeconds || ageSeconds < -MAX_LEDGER_CLOCK_SKEW_SECONDS) {
       return 'stale'
     }

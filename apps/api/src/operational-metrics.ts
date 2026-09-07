@@ -1,4 +1,5 @@
-import { rippleTimeToUnixSeconds, XcsError } from '@xcs-protocol/core'
+import { XcsError } from '@xcs-protocol/core'
+import { rippleTimeToUnixTime } from 'xrpl'
 
 import {
   DEFAULT_LEDGER_MAX_AGE_SECONDS,
@@ -187,7 +188,7 @@ function publicProfile(
             closeTime: checkpoint.closeTime,
             ageSeconds:
               Math.floor(observedAt.getTime() / 1_000) -
-              rippleTimeToUnixSeconds(checkpoint.closeTime),
+              Math.floor(rippleTimeToUnixTime(checkpoint.closeTime) / 1_000),
           },
     continuityFailure:
       status?.state === 'halted' &&

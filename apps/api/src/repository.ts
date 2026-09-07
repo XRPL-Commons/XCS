@@ -8,7 +8,6 @@ import {
   schemas,
   type XcsDatabase,
 } from '@xcs-protocol/db'
-import { MAX_SCHEMA_CATALOG_ENTRIES } from '@xcs-protocol/core'
 import {
   and,
   asc,
@@ -26,6 +25,7 @@ import {
 } from 'drizzle-orm'
 
 import type { ApiRepository } from './types.js'
+import { MAX_SCHEMA_CATALOG_ENTRIES } from './schema-catalog.js'
 
 const MAX_UINT32 = 4_294_967_295
 

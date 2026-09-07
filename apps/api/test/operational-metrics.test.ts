@@ -260,7 +260,7 @@ describe('operational metrics', () => {
       new Uint8Array([1]),
       new PayloadUnavailableError('unavailable'),
       new PayloadInvalidError('invalid'),
-      new XcsError('PAYLOAD_URI_INVALID', 'invalid URI'),
+      new XcsError('INVALID_PAYLOAD_URI', 'invalid URI'),
       new Error('unexpected'),
     ]
     const resolver = collector.observePayloadResolver({

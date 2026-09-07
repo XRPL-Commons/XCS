@@ -1,5 +1,5 @@
-import { isClassicAddress } from '@xcs-protocol/core'
 import type { CredentialGenerationRow } from '@xcs-protocol/db'
+import { isValidClassicAddress } from 'xrpl'
 
 import { IndexerUnavailableError } from './ledger-freshness.js'
 
@@ -59,8 +59,8 @@ export function assertCredentialGenerationEvidence(
     !LOWERCASE_HASH.test(generation.generationId) ||
     !LOWERCASE_HASH.test(generation.ledgerObjectId) ||
     !LOWERCASE_HASH.test(generation.schemaUid) ||
-    !isClassicAddress(generation.issuer) ||
-    !isClassicAddress(generation.subject) ||
+    !isValidClassicAddress(generation.issuer) ||
+    !isValidClassicAddress(generation.subject) ||
     (generation.uriHex !== null && !HEX_BYTES.test(generation.uriHex)) ||
     (generation.expiration !== null &&
       (!Number.isInteger(generation.expiration) ||

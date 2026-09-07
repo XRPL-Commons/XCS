@@ -19,7 +19,7 @@ export function credentialGenerationState(
       closeTime,
     })
   } catch (error) {
-    if (error instanceof XcsError && error.code === 'RIPPLE_TIME_INVALID') {
+    if (error instanceof XcsError && error.code === 'INVALID_RIPPLE_TIME') {
       throw new IndexerUnavailableError(
         'INDEXER_EVIDENCE_INVALID',
         'The indexed credential lifecycle evidence is incomplete or inconsistent.',

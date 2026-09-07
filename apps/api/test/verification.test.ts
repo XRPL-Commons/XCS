@@ -1,5 +1,4 @@
 import {
-  canonicalize,
   computeSchemaUid,
   createHttpsPayloadUri,
   type CredentialPayload,
@@ -23,6 +22,7 @@ import {
   PayloadUnavailableError,
 } from '../src/payload-resolver.js'
 import type { ApiRepository, PayloadResolver, SchemaProjectionEvidence } from '../src/types.js'
+import { canonicalJson } from '../src/serialization.js'
 import { StaticTrustPolicy, verifyCredential } from '../src/verification.js'
 
 const ISSUER = 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh'
@@ -117,7 +117,7 @@ const payload: CredentialPayload = {
   schema: UID,
   claims: { programId: 'xrpl-101' },
 }
-const payloadText = canonicalize(payload)
+const payloadText = canonicalJson(payload)
 const uri = createHttpsPayloadUri('https://issuer.example/credential.json', payloadText)
 
 const generation: CredentialGenerationRow = {
@@ -576,7 +576,7 @@ describe('verifyCredential', () => {
       ...payload,
       subject: ISSUER,
     }
-    const resolvedBytes = new TextEncoder().encode(canonicalize(wrongSubject))
+    const resolvedBytes = new TextEncoder().encode(canonicalJson(wrongSubject))
     const repository = new VerificationRepository(generation, schema)
 
     const [direct, resolvedReport] = await Promise.all([

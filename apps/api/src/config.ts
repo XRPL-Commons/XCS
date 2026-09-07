@@ -1,5 +1,5 @@
-import { isClassicAddress } from '@xcs-protocol/core'
 import { isIP } from 'node:net'
+import { isValidClassicAddress } from 'xrpl'
 
 export interface ApiConfig {
   databaseUrl: string
@@ -84,7 +84,7 @@ function addressList(value: string | undefined, name: string): string[] {
               .filter(Boolean),
           ),
         ]
-  const invalid = addresses.find((address) => !isClassicAddress(address))
+  const invalid = addresses.find((address) => !isValidClassicAddress(address))
   if (invalid !== undefined) throw new Error(`${name} contains an invalid classic address`)
   return addresses
 }
