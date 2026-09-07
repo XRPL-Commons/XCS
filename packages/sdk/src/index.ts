@@ -19,10 +19,8 @@ export {
   createHttpsPayloadUri,
   createIpfsPayloadUri,
   encodeCredentialPayload,
-  isoTimeToRippleTime,
   parseCredentialPayload,
   parsePayloadUri,
-  rippleTimeToIso,
   verifyCredentialPayload,
   verifyPayloadIntegrity,
 } from '@xcs-protocol/core'

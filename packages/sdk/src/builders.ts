@@ -1,12 +1,17 @@
 import {
   computeSchemaUid,
   encodeSchema,
-  isoTimeToRippleTime,
   parseSchema,
   type NetworkProfile,
   type SchemaDefinition,
 } from '@xcs-protocol/core'
-import type { CredentialAccept, CredentialCreate, CredentialDelete, Payment } from 'xrpl'
+import {
+  isoTimeToRippleTime,
+  type CredentialAccept,
+  type CredentialCreate,
+  type CredentialDelete,
+  type Payment,
+} from 'xrpl'
 
 import {
   assertMemoFits,
@@ -67,6 +72,32 @@ export interface BuildCredentialDeleteInput {
 
 export type UnsignedXcsTransaction =
   Payment | CredentialCreate | CredentialAccept | CredentialDelete
+
+const WHOLE_SECOND_UTC_ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.000)?Z$/u
+
+function parseCredentialExpiration(value: string): number {
+  const date = new Date(value)
+  const expectedIso = value.includes('.') ? value : value.replace('Z', '.000Z')
+  if (
+    !WHOLE_SECOND_UTC_ISO.test(value) ||
+    !Number.isFinite(date.getTime()) ||
+    date.toISOString() !== expectedIso
+  ) {
+    throw new XcsSdkError(
+      'XCS_SDK_INVALID_EXPIRATION',
+      'Credential expiration must be a valid whole-second UTC ISO timestamp.',
+    )
+  }
+
+  const expiration = isoTimeToRippleTime(value)
+  if (!Number.isInteger(expiration) || expiration < 0 || expiration > 0xffff_ffff) {
+    throw new XcsSdkError(
+      'XCS_SDK_INVALID_EXPIRATION',
+      'Credential expiration is outside the XRPL uint32 range.',
+    )
+  }
+  return expiration
+}
 
 export function buildSchemaRegistrationPayment(
   input: BuildSchemaRegistrationInput,
@@ -136,7 +167,7 @@ export function buildCredentialCreate(input: BuildCredentialCreateInput): Creden
   }
 
   if (input.expiration !== undefined) {
-    transaction.Expiration = isoTimeToRippleTime(input.expiration)
+    transaction.Expiration = parseCredentialExpiration(input.expiration)
   }
 
   return transaction

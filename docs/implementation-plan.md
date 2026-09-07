@@ -27,6 +27,7 @@
 - public documentation matches the deployed endpoints and limitations.
 
 Mainnet is explicitly out of scope until the Testnet beta has durable operational evidence and a separately reviewed network profile.
+
 - XCS v0.1 normative semantics are frozen. Product/API work must not alter historical schema
   validity, UID bytes, payload interpretation or lifecycle projection.
 - EAS and EASScan are UX references only; the protocol remains native XRPL Credentials plus XCS.
