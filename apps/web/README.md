@@ -60,7 +60,10 @@ Crossmark, GemWallet, WalletConnect, Ledger, Xyra, Otsu and MetaMask Snap. Cross
 Ledger, Xyra, Otsu and MetaMask Snap are registered without deployment-specific configuration.
 Xaman is added only when `NUXT_PUBLIC_XAMAN_API_KEY` is set, and WalletConnect only when
 `NUXT_PUBLIC_WALLET_CONNECT_PROJECT_ID` is set. Both values identify a public application to its
-wallet provider; they are browser-visible identifiers, not secrets.
+wallet provider; they are browser-visible identifiers, not secrets. One Xaman application key is
+used by every visitor of that XCS deployment. Register the deployment origin with a trailing slash
+as an exact redirect URI in the Xaman Developer Console. XCS uses that stable root callback from
+every page; it never uses the current route as the OAuth callback.
 
 Public deployment is additionally blocked on third-party license review. The RC bundle contains
 WalletConnect code under the WalletConnect Community License, and its GemWallet dependency requires
@@ -69,6 +72,24 @@ required notices before enabling a public build. Returning to `0.8.2` or deletin
 dependencies would only hide the same bundled code from the license scanner; it is not a compliant
 workaround. The upstream adapter packages are not yet published separately, so there is currently no
 npm-supported way to retain all eight adapters while excluding only those two integrations.
+
+The workspace applies `patches/xrpl-connect@1.0.0-rc.0.patch` while that release candidate is
+pinned. Xaman's OAuth provider serializes `network_id` as a decimal string and may omit optional
+network metadata from a later `ping()`, whereas the published adapter requires a complete
+string/number pair. The patch accepts only canonical safe-integer IDs, preserves missing optional
+metadata and rejects a network that contradicts the explicit transaction target. Because Xaman's
+public browser SDK does not expose its supported OAuth `force_network` parameter, the XCS adapter
+adds `force_network=TESTNET` only to the official Xaman authorization URL and evicts an older cached
+XCS OAuth session when it cannot prove Testnet. The patch also accepts an absent or empty
+`multisign_account` in a valid single-signature response: Xaman uses both forms for that
+inapplicable field, while the release candidate incorrectly requires an explicit `null`. Every
+signing payload separately carries `force_network: TESTNET`, and the adapter validates the resolved
+signing network. The patch also retries the authoritative resolved-payload read for sign-only
+requests: Xaman can report the signature before that payload is immediately readable, and the RC
+otherwise abandons the operation before XCS can validate and submit the blob. Remove these
+compatibility measures only after equivalent behavior ships in the pinned dependency.
+After a sign request resolves, the XCS adapter closes the script-opened Xaman window when browser
+policy allows it and restores focus to the application so submission progress remains visible.
 
 XCS filters this surface to adapters that expose `sign()` and never calls `signAndSubmit`. A wallet
 may return a `tx_blob` or signed `tx_json`; the application normalizes the artifact, derives and
@@ -103,10 +124,11 @@ removes the resulting active generation through the subject wallet, opens its ex
 permalink and exports the sanitized `subject_removed` receipt. A separate case proves that rejecting
 an unaccepted pending generation contacts neither the payload host nor `/v1/verify`. Two negative
 cases prove that unavailable readiness prevents the wallet call and that readiness disappearing
-while the wallet is open prevents both blob persistence and XRPL submission. Recovery cases seed a
-syntactically valid signed operation in IndexedDB, reload the application, and prove both that a
-ready indexer allows validation without a second wallet signature and that an unavailable indexer
-prevents retransmission while preserving the blob for a later retry. A corrupted recovery record is
+while the wallet is open prevents XRPL submission while retaining the already validated signature
+for a later retry. Recovery cases seed a syntactically valid signed operation in IndexedDB, reload
+the application, and prove both that a ready indexer allows validation without a second wallet
+signature and that an unavailable indexer prevents retransmission while preserving the blob for a
+later retry. A corrupted recovery record is
 also rejected before status reconciliation, readiness or submission without deleting its blob. The
 suite also exercises the Developers quickstart against the deterministic exact-generation API,
 checks that local-payload verification never sets `resolvePayload`, and proves that a replaced
@@ -228,6 +250,7 @@ NUXT_PUBLIC_API_BASE_URL=https://xcs-api.example
 NUXT_PUBLIC_RPC_URL=wss://s.altnet.rippletest.net:51233
 NUXT_PUBLIC_PROFILE_ID=xrpl-testnet-xcs-v0.1
 NUXT_PUBLIC_XAMAN_API_KEY=optional-public-xaman-application-id
+NUXT_PUBLIC_XAMAN_REDIRECT_URL=https://xcs.example/
 NUXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=optional-public-reown-project-id
 ```
 
@@ -249,8 +272,17 @@ profile must be returned by the API.
 `NUXT_PUBLIC_XAMAN_API_KEY` and `NUXT_PUBLIC_WALLET_CONNECT_PROJECT_ID` are optional public
 application identifiers. Omitting either variable removes only that adapter; it does not prevent the
 other six adapters from loading. Do not put a Xaman secret, WalletConnect relay secret, wallet key or
-other credential in either value. In Compose, set the corresponding operator variables
-`XCS_PUBLIC_XAMAN_API_KEY` and `XCS_PUBLIC_WALLET_CONNECT_PROJECT_ID`.
+other credential in either value. `NUXT_PUBLIC_XAMAN_REDIRECT_URL` is optional and otherwise
+defaults to the current application origin with a trailing slash. When set, it must be that exact
+same-origin root URL; non-loopback deployments require HTTPS. Add the same exact URL to the Xaman
+application's redirect allowlist. In Compose, set the corresponding operator variables
+`XCS_PUBLIC_XAMAN_API_KEY`, `XCS_PUBLIC_XAMAN_REDIRECT_URL` and
+`XCS_PUBLIC_WALLET_CONNECT_PROJECT_ID`.
+
+Each independently hosted XCS deployment needs its own Xaman public application key and registered
+origin. The Commons key is not a universal credential for arbitrary self-hosted domains. Follow
+Xaman's [browser SDK setup](https://docs.xaman.dev/environments/browser-web3); API secrets remain
+server-side and are not used by this browser integration.
 
 `XCS_LOCAL_PAYLOAD_STORE` is a source-time development gate rather than a deployment setting. Do
 not pass it through Compose or expose it as a general Commons storage option.
@@ -351,12 +383,12 @@ wallet returns the signed blob and before submission. Only a `prepared` draft th
 nor signed blob may be abandoned to release its key.
 
 The profile-bound readiness endpoint is checked just before the wallet call and again after the
-wallet response. If either check fails, SDK pre-submission validation records the local operation as
-failed and does not submit; the post-wallet failure path never persists the signed blob. Recovery
-first reconciles the stored hash without creating an XRPL side effect. If it is still unvalidated,
-retransmission requires a new readiness proof and a second ownership check on the business lock.
-Failure preserves the signed blob and recoverable stage for a later retry; it never asks the wallet
-to sign again.
+wallet response. Once the SDK has validated the wallet artifact, the application immediately
+persists it before running volatile profile, readiness and generation guards. If a final guard fails,
+the operation remains `signed` and is not submitted. Recovery first reconciles the stored hash
+without creating an XRPL side effect. If it is still unvalidated, retransmission requires a new
+readiness proof and a second ownership check on the business lock. It never asks the wallet to sign
+again.
 
 Native `CredentialAccept` and `CredentialDelete` transactions contain only issuer, subject and
 credential type; they cannot cryptographically bind an XCS generation ID. An issuer could therefore
@@ -385,5 +417,8 @@ Subject removal requires `deleted` plus `subject_removed`; for a self-issued Cre
 protocol-required projected cause is `issuer_revoked`. Rejection requires `subject_rejected` for a
 distinct issuer/subject tuple. A confirmed issuance produces an acceptance link
 bound to profile, issuer, schema and generation (the subject still comes from the connected wallet),
-plus a full verification link. Reconfirmation never reads a signed blob, connects to XRPL or
-rebroadcasts the transaction.
+plus a profile-bound permalink to the exact immutable generation. Confirmed acceptance, rejection,
+removal and issuer revocation return to that same generation page so its updated indexed lifecycle
+can be reviewed. A generation-bound subject action resolves that generation before the tuple lookup
+and rejects a connected wallet that is not its subject, instead of surfacing a misleading tuple 404.
+Reconfirmation never reads a signed blob, connects to XRPL or rebroadcasts the transaction.

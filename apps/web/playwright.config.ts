@@ -26,6 +26,7 @@ export default defineConfig({
     stdout: 'pipe',
     stderr: 'pipe',
     env: {
+      NUXT_IGNORE_LOCK: '1',
       XCS_BROWSER_E2E: '1',
       XCS_LOCAL_PAYLOAD_STORE: '1',
       NUXT_API_BASE_URL: `${baseURL}/__e2e-api`,

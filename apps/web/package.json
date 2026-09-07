@@ -4,16 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "nuxt build",
+    "build": "XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt build",
     "clean": "rm -rf .nuxt .output coverage",
     "dev": "nuxt dev",
-    "lint": "nuxt typecheck",
+    "lint": "NODE_ENV=development XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt typecheck",
     "start": "node .output/server/index.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:security": "playwright test --config playwright.security.config.ts",
-    "typecheck": "nuxt typecheck"
+    "typecheck": "NODE_ENV=development XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt typecheck"
   },
   "dependencies": {
     "@nuxtjs/i18n": "^10.0.6",

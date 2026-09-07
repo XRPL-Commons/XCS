@@ -47,13 +47,17 @@ To enable the two adapters that require public application registration, optiona
 
 ```dotenv
 XCS_PUBLIC_XAMAN_API_KEY=public-xaman-application-id
+XCS_PUBLIC_XAMAN_REDIRECT_URL=https://xcs.example/
 XCS_PUBLIC_WALLET_CONNECT_PROJECT_ID=public-reown-project-id
 ```
 
-Compose exposes these as `NUXT_PUBLIC_XAMAN_API_KEY` and
+Compose exposes these as `NUXT_PUBLIC_XAMAN_API_KEY`, `NUXT_PUBLIC_XAMAN_REDIRECT_URL` and
 `NUXT_PUBLIC_WALLET_CONNECT_PROJECT_ID`. They are intentionally visible in browser JavaScript and
-must contain public identifiers only, never signing keys, relay secrets or private RPC credentials.
-Omitting them leaves the other six XRPL Connect adapters registered.
+must contain public identifiers or URLs only, never signing keys, API secrets, relay secrets or
+private RPC credentials. Register the exact redirect URL in the Xaman Developer Console. It must be
+the deployment's HTTPS origin with a trailing slash; loopback HTTP is accepted only for local
+development. If the redirect variable is omitted, XCS derives that same root URL from the browser
+origin. Omitting the application identifiers leaves the other six XRPL Connect adapters registered.
 
 Put the Commons primary WSS URL in the ignored file selected by `XCS_RPC_URL_PRIMARY_FILE`, supplying
 it out of band without logging or embedding its credentials. Put
@@ -311,9 +315,13 @@ rollback plans.
    query parameter is a provider secret.
 8. Optionally set `XCS_PUBLIC_XAMAN_API_KEY` and
    `XCS_PUBLIC_WALLET_CONNECT_PROJECT_ID` to the public application identifiers provisioned by
-   Xaman and Reown/WalletConnect. Compose maps them to the corresponding `NUXT_PUBLIC_*` runtime
-   values. They are public client configuration, not secret files. Leave either value empty to
-   remove that adapter while retaining the six self-configuring XRPL Connect adapters.
+   Xaman and Reown/WalletConnect. For Xaman, also set `XCS_PUBLIC_XAMAN_REDIRECT_URL` to the exact
+   HTTPS deployment origin with a trailing slash and register that URL in the Xaman Developer
+   Console. The same application key serves every visitor of that deployment, but a self-hosted
+   deployment on another origin needs its own Xaman application. Compose maps these values to the
+   corresponding `NUXT_PUBLIC_*` runtime values. They are public client configuration, not secret
+   files. Leave either application identifier empty to remove that adapter while retaining the six
+   self-configuring XRPL Connect adapters.
 9. Keep `XCS_INDEXER_LEASE_DURATION_MS` between 10 seconds and 5 minutes and at least three times the
    polling interval. Run `pnpm --filter @xcs-protocol/indexer preflight` before enabling the service.
 

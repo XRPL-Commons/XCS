@@ -1,0 +1,79 @@
+diff --git a/xrpl-connect.mjs b/xrpl-connect.mjs
+index 09fbcfd0f8ef85d2b0d3960777e7a1819bb0e563..d5585eb7864d5891b2669b6698c4245772307115 100644
+--- a/xrpl-connect.mjs
++++ b/xrpl-connect.mjs
+@@ -8369,9 +8369,18 @@ var mn = se("[Xaman]"), hn = class {
+ 			if (!this.currentAccount) return null;
+ 			let i = r?.jwtData, a = typeof i?.sub == "string" ? i.sub : "";
+ 			if (!a) return this.currentAccount = null, null;
+-			let o = i?.network_endpoint, s = i?.network_id, c = this.currentAccount.network;
+-			if (typeof o == "string" && typeof s == "number") c = this.parseNetwork(o, s);
+-			else if (o !== void 0 || s !== void 0) throw Error("Xaman ping returned incomplete network information");
++			let o = i?.network_endpoint, s = i?.network_id, c = this.currentAccount.network, l;
++			if (typeof s == "number" && Number.isSafeInteger(s)) l = s;
++			else if (typeof s == "string" && /^(0|[1-9]\d*)$/.test(s)) {
++				let e = Number(s);
++				Number.isSafeInteger(e) && (l = e);
++			}
++			if (o != null && (typeof o != "string" || o.length === 0) || s != null && l === void 0) throw Error("Xaman ping returned invalid network information");
++			if (l !== void 0) {
++				let e = this.parseNetwork(typeof o == "string" ? o : c.wss, l);
++				if (e.id !== c.id) throw Error("Xaman ping returned inconsistent network information");
++				typeof o == "string" && (c = e);
++			}
+ 			return this.currentAccount = {
+ 				address: a,
+ 				publicKey: void 0,
+@@ -8439,7 +8448,7 @@ var mn = se("[Xaman]"), hn = class {
+ 			let v, y;
+ 			try {
+-				v = p(_.hex), y = g.hashSignedTx(_.hex), this.validateSignedTransaction(v, _.hex, i, o, _.account, _.multisign_account, a), this.validateRequestedTransaction(e, v);
++				v = p(_.hex), y = g.hashSignedTx(_.hex), this.validateSignedTransaction(v, _.hex, i, o, _.account, _.multisign_account, a), this.validateSignedTransactionRequest(e, v);
+ 			} catch (e) {
+ 				let t = e instanceof Error ? e.message : String(e);
+ 				throw Error(`Xaman returned an invalid signed transaction blob: ${t}`);
+ 			}
+@@ -8535,7 +8544,7 @@ var mn = se("[Xaman]"), hn = class {
+ 		if (!r) {
+ 			if (Array.isArray(s) && s.length > 0) throw Error("Xaman returned unexpected multi-signatures");
+ 			if (e.Account !== n || i !== n) throw Error("Xaman signed with an account other than the connected account");
+-			if (a !== null) throw Error("Xaman returned unexpected multi-signing account data");
++			if (a != null && a !== "") throw Error("Xaman returned unexpected multi-signing account data");
+ 			if (!y(t)) throw Error("Xaman returned an invalid transaction signature");
+ 			return;
+ 		}
+@@ -8553,6 +8562,23 @@ var mn = se("[Xaman]"), hn = class {
+ 	validateRequestedTransaction(e, t) {
+ 		if (!t || !this.containsRequestedValue(e, t)) throw Error("Xaman returned a transaction that did not match the signing request");
+ 	}
++	validateSignedTransactionRequest(e, t) {
++		let n = [];
++		if (t) {
++			let r = { ...e }, i = { ...t };
++			for (let e of ["LastLedgerSequence", "Signers", "SigningPubKey", "TxnSignature"]) delete r[e], delete i[e];
++			try {
++				if (m(r) === m(i)) return;
++			} catch {
++				// Fall through to the same request-mismatch error as non-equivalent transactions.
++			}
++			n = [...new Set([...Object.keys(r), ...Object.keys(i)])]
++				.filter((e) => JSON.stringify(r[e]) !== JSON.stringify(i[e]))
++				.sort();
++		}
++		let r = n.length > 0 ? ` (different fields: ${n.join(", ")})` : "";
++		throw Error(`Xaman returned a transaction that did not match the signing request${r}`);
++	}
+ 	containsRequestedValue(e, t, n) {
+ 		if (n && un.has(n)) return !0;
+ 		if (n === "Signers") return this.containsRequestedSigners(e, t);
+@@ -8631,8 +8657,8 @@ var mn = se("[Xaman]"), hn = class {
+ 			if (!i) throw Error("Failed to retrieve the resolved Xaman payload");
+ 			return i;
+ 		} catch (e) {
+-			if (!n || r.aborted || Date.now() >= a) throw e;
+-			mn.debug("Unable to retrieve submitted Xaman payload; retrying", e);
++			if (r.aborted || Date.now() >= a) throw e;
++			mn.debug("Unable to retrieve resolved Xaman payload; retrying", e);
+ 			let t = Math.min(i, a - Date.now());
+ 			await this.waitForOperation(new Promise((e) => setTimeout(e, t)), r), i = Math.min(i * 2, cn);
+ 		}

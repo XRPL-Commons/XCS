@@ -1,7 +1,5 @@
 import {
-  canonicalize,
   createHttpsPayloadUri,
-  encodeUtf8Hex,
   type CredentialPayload,
   type ResolvedSchema,
 } from '@xcs-protocol/core'
@@ -22,6 +20,7 @@ import {
   parseApiCredentialDetail,
   waitForCredentialOperationEvent,
 } from '../app/utils/credentialReview'
+import { canonicalJson, encodeHexUtf8 } from '../app/utils/serialization'
 
 const ISSUER = 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh'
 const SUBJECT = 'r9cZA1mLK5R5Am25ArfXFmqgNwjZgnfk59'
@@ -44,14 +43,14 @@ const payload: CredentialPayload = {
   schema: UID,
   claims: { programId: 'course-1' },
 }
-const canonical = canonicalize(payload)
+const canonical = canonicalJson(payload)
 const uri = createHttpsPayloadUri('https://issuer.example/credentials/one.json', canonical)
 const credential = {
   generationId: GENERATION,
   issuer: ISSUER,
   subject: SUBJECT,
   schemaUid: UID,
-  uriHex: encodeUtf8Hex(uri),
+  uriHex: encodeHexUtf8(uri),
   expiration: null,
   accepted: false,
   state: 'pending',
@@ -278,7 +277,7 @@ describe('exact credential review', () => {
       schema,
     })
     const consent = createPayloadFetchConsentToken(metadataReview)
-    const replacementCanonical = canonicalize({
+    const replacementCanonical = canonicalJson({
       ...payload,
       claims: { programId: 'replacement' },
     })
@@ -297,7 +296,7 @@ describe('exact credential review', () => {
         credential: {
           ...credential,
           generationId: '56'.repeat(32),
-          uriHex: encodeUtf8Hex(replacementUri),
+          uriHex: encodeHexUtf8(replacementUri),
         },
         report: {
           ...report,

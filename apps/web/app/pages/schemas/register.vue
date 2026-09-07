@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { encodeUtf8, parseJsonStrict, sha256Hex } from '@xcs-protocol/core'
 import { buildSchemaRegistrationPayment } from '@xcs-protocol/sdk'
 import type { Payment } from 'xrpl'
 import type { WalletSubmissionResult } from '~/composables/useWallet'
@@ -12,6 +11,7 @@ import {
   schemaDefinitionToGuidedDraft,
   type GuidedSchemaDraft,
 } from '~/utils/schemaAuthoring'
+import { encodeUtf8, parseJson, sha256Hex } from '~/utils/serialization'
 
 const { account, busy, prepare, signAndSubmit } = useWallet()
 const { getActiveNetworkProfile } = useXcsApi()
@@ -89,7 +89,7 @@ function selectEditorMode(mode: 'guided' | 'json') {
   }
 
   try {
-    guidedDraft.value = schemaDefinitionToGuidedDraft(parseJsonStrict(schemaText.value))
+    guidedDraft.value = schemaDefinitionToGuidedDraft(parseJson(schemaText.value))
     editorMode.value = mode
     guidedError.value = ''
   } catch (error) {
@@ -117,7 +117,7 @@ async function buildPreview() {
     const built = buildSchemaRegistrationPayment({
       publisher,
       profile,
-      schema: parseJsonStrict(schemaInput),
+      schema: parseJson(schemaInput),
     })
     const prepared = (await prepare(built.transaction, profile)) as Payment
     if (revision !== previewRevision) throw new Error('SCHEMA_PREVIEW_CHANGED_DURING_BUILD')

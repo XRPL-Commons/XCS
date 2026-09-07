@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { decodeUtf8Hex, rippleTimeToIso8601 } from '@xcs-protocol/core'
+import { rippleTimeToIso } from '@xcs-protocol/core'
 import { buildCredentialDelete } from '@xcs-protocol/sdk'
 import type { CredentialDelete } from 'xrpl'
 import type { WalletSubmissionResult } from '~/composables/useWallet'
@@ -13,9 +13,11 @@ import {
 import {
   assertLinkGeneration,
   assertLinkProfile,
+  buildCredentialPermalink,
   singleRouteQueryValue,
 } from '~/utils/operationLinks'
 import { parseWalletCredentialTransactionError } from '~/utils/walletCompatibility'
+import { decodeHexUtf8 } from '~/utils/serialization'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -28,6 +30,7 @@ const linkedGenerationId = ref(singleRouteQueryValue(route.query.generation))
 const transaction = shallowRef<CredentialDelete | null>(null)
 const credential = shallowRef<ApiCredentialDetail | null>(null)
 const report = shallowRef<VerificationDimensions | null>(null)
+const reviewProfileId = ref<string | null>(null)
 const reviewBusy = ref(false)
 const message = ref('')
 const result = shallowRef<WalletSubmissionResult | null>(null)
@@ -44,10 +47,24 @@ const messageDisplay = computed(() => {
 const messageIsLocalized = computed(
   () => message.value.length > 0 && messageDisplay.value !== message.value,
 )
+const resultCredentialLink = computed(() => {
+  const generationId = result.value?.businessEvidence?.generationId
+  if (
+    result.value?.businessConfirmation !== 'confirmed' ||
+    !generationId ||
+    !reviewProfileId.value
+  ) {
+    return null
+  }
+  return buildCredentialPermalink({
+    profileId: reviewProfileId.value,
+    generationId,
+  })
+})
 const decodedUri = computed(() => {
   if (!credential.value?.uriHex) return null
   try {
-    return decodeUtf8Hex(credential.value.uriHex)
+    return decodeHexUtf8(credential.value.uriHex)
   } catch {
     return null
   }
@@ -55,7 +72,7 @@ const decodedUri = computed(() => {
 const expiration = computed(() =>
   credential.value?.expiration === null || credential.value?.expiration === undefined
     ? null
-    : rippleTimeToIso8601(credential.value.expiration),
+    : rippleTimeToIso(credential.value.expiration),
 )
 let previewRevision = 0
 
@@ -64,6 +81,7 @@ function invalidatePreview() {
   transaction.value = null
   credential.value = null
   report.value = null
+  reviewProfileId.value = null
   result.value = null
 }
 
@@ -138,6 +156,7 @@ async function buildPreview() {
     if (revision !== previewRevision) throw new Error('CREDENTIAL_REVIEW_CHANGED_DURING_LOAD')
     credential.value = loaded.exactCredential
     report.value = loaded.dimensions
+    reviewProfileId.value = profile.profileId
     const raw = buildCredentialDelete({
       account: issuerAddress,
       issuer: issuerAddress,
@@ -163,6 +182,7 @@ async function submit() {
   const expectedSchemaUid = schemaUid.value.toLowerCase()
   const expectedLinkedProfileId = linkedProfileId.value
   const expectedLinkedGenerationId = linkedGenerationId.value
+  const expectedReviewProfileId = reviewProfileId.value
   const expectedRevision = previewRevision
   if (!preparedTransaction || !expectedCredential || !expectedIssuer) {
     message.value = 'TRANSACTION_PREVIEW_REQUIRED'
@@ -180,7 +200,8 @@ async function submit() {
         subject.value !== expectedSubject ||
         schemaUid.value.toLowerCase() !== expectedSchemaUid ||
         linkedProfileId.value !== expectedLinkedProfileId ||
-        linkedGenerationId.value !== expectedLinkedGenerationId
+        linkedGenerationId.value !== expectedLinkedGenerationId ||
+        reviewProfileId.value !== expectedReviewProfileId
       ) {
         throw new Error('CREDENTIAL_REVIEW_CHANGED_BEFORE_SIGNATURE')
       }
@@ -188,6 +209,7 @@ async function submit() {
     assertCurrent()
     const profile = await getActiveNetworkProfile()
     assertLinkProfile(expectedLinkedProfileId || undefined, profile.profileId)
+    assertLinkProfile(expectedReviewProfileId ?? undefined, profile.profileId)
     const loaded = await fetchExactCredential({
       issuer: expectedIssuer,
       subject: expectedSubject,
@@ -293,5 +315,13 @@ async function submit() {
       :business-confirmation="result.businessConfirmation"
       :business-evidence="result.businessEvidence"
     />
+    <NuxtLinkLocale
+      v-if="resultCredentialLink"
+      class="button secondary"
+      data-testid="revoke-result-permalink"
+      :to="resultCredentialLink"
+    >
+      {{ $t('revoke.openPermalink') }}
+    </NuxtLinkLocale>
   </section>
 </template>

@@ -1,4 +1,6 @@
-import { parseJsonStrict, type JsonValue } from '@xcs-protocol/core'
+import type { JsonValue } from '@xcs-protocol/core'
+
+import { parseJson } from './serialization'
 
 const GENERATION_ID_PATTERN = /^[0-9a-f]{64}$/u
 const PROFILE_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,127}$/u
@@ -72,11 +74,11 @@ export function assertDeveloperProfileId(value: string): string {
 }
 
 export function parseDeveloperLocalPayload(value: string): JsonValue {
-  const parsed = parseJsonStrict(value)
+  const parsed = parseJson(value)
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     throw new Error('DEVELOPER_PAYLOAD_OBJECT_REQUIRED')
   }
-  return parsed
+  return parsed as JsonValue
 }
 
 export function assertDeveloperExactGeneration(
@@ -253,9 +255,9 @@ const payload = parseCredentialPayload(payloadText, {
   issuer,
   subject,
   schemaUid,
-  schema: schema.resolvedDefinition,
+  fields: schema.resolvedDefinition.fields,
 })
-if (verifyPayloadIntegrity(payloadText, payloadUri).status !== 'valid') {
+if (!verifyPayloadIntegrity(payloadText, payloadUri).valid) {
   throw new Error('PAYLOAD_INTEGRITY_INVALID')
 }
 

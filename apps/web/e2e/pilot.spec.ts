@@ -1,13 +1,13 @@
 import { expect, test, type Download, type Page } from '@playwright/test'
 import {
-  canonicalize,
+  canonicalJson,
   computeSchemaUid,
   createHttpsPayloadUri,
-  createIpfsRawPayloadUri,
+  createIpfsPayloadUri,
   encodeUtf8,
-  encodeUtf8Hex,
+  encodeHexUtf8,
   sha256Hex,
-  validateSchema,
+  parseSchema,
   type JsonValue,
   type NetworkProfile,
   type SchemaDefinition,
@@ -36,7 +36,7 @@ const SCHEMA: SchemaDefinition = {
   },
 }
 const SCHEMA_UID = computeSchemaUid({
-  schema: validateSchema(SCHEMA),
+  schema: parseSchema(SCHEMA),
   networkId: 1,
   ledgerHash: LEDGER_HASH,
   ledgerIndex: 100_001,
@@ -55,7 +55,7 @@ const PAYLOAD_URL = 'https://issuer.xcs.invalid/diploma.json'
 const PERMALINK_GENERATION_ID = '34'.repeat(32)
 const PERMALINK_ACCEPTED_TRANSACTION_HASH = '78'.repeat(32)
 const HISTORICAL_GENERATION_ID = '56'.repeat(32)
-const CANONICAL_PAYLOAD = canonicalize({
+const CANONICAL_PAYLOAD = canonicalJson({
   xcsVersion: '0.1',
   issuer: ISSUER,
   subject: SUBJECT,
@@ -97,6 +97,7 @@ interface ApiMockOptions {
   readonly credentialUri?: string
   readonly networksUnavailable?: boolean
   readonly pendingCredentialRejection?: boolean
+  readonly credentialDeletionCause?: 'issuer_revoked' | 'subject_rejected' | 'subject_removed'
   readonly signingReadiness?: () => 'ready' | 'unavailable' | 'malformed'
 }
 
@@ -159,7 +160,7 @@ async function installApiMock(page: Page, options: ApiMockOptions = {}): Promise
       }
       if (
         Object.hasOwn(body, 'payload') &&
-        canonicalize(body.payload as JsonValue) !== CANONICAL_PAYLOAD
+        canonicalJson(body.payload as JsonValue) !== CANONICAL_PAYLOAD
       ) {
         await route.fulfill({ status: 400, json: { error: 'BROWSER_E2E_VERIFY_PAYLOAD_INVALID' } })
         return
@@ -333,7 +334,9 @@ async function installApiMock(page: Page, options: ApiMockOptions = {}): Promise
         subject: SUBJECT,
         schemaUid: SCHEMA_UID,
         accepted: lifecycle.accepted,
-        deletionCause: lifecycle.accepted ? 'subject_removed' : 'subject_rejected',
+        deletionCause:
+          options.credentialDeletionCause ??
+          (lifecycle.accepted ? 'subject_removed' : 'subject_rejected'),
       }
       await route.fulfill({
         json: {
@@ -343,7 +346,7 @@ async function installApiMock(page: Page, options: ApiMockOptions = {}): Promise
             issuer: ISSUER,
             subject: SUBJECT,
             schemaUid: SCHEMA_UID,
-            uriHex: encodeUtf8Hex(options.credentialUri),
+            uriHex: encodeHexUtf8(options.credentialUri),
             expiration: null,
             accepted: lifecycle.accepted,
             createdLedgerIndex: 100_001,
@@ -357,9 +360,8 @@ async function installApiMock(page: Page, options: ApiMockOptions = {}): Promise
             deletedLedgerIndex: lifecycle.state === 'deleted' ? 100_003 : null,
             deletionCause:
               lifecycle.state === 'deleted'
-                ? lifecycle.accepted
-                  ? 'subject_removed'
-                  : 'subject_rejected'
+                ? (options.credentialDeletionCause ??
+                  (lifecycle.accepted ? 'subject_removed' : 'subject_rejected'))
                 : null,
           },
           state: lifecycle.state,
@@ -410,7 +412,7 @@ async function installApiMock(page: Page, options: ApiMockOptions = {}): Promise
           issuer: ISSUER,
           subject: SUBJECT,
           schemaUid: SCHEMA_UID,
-          uriHex: encodeUtf8Hex(options.credentialUri),
+          uriHex: encodeHexUtf8(options.credentialUri),
           expiration: null,
           accepted: lifecycle.accepted,
           state: lifecycle.state,
@@ -468,9 +470,8 @@ async function installApiMock(page: Page, options: ApiMockOptions = {}): Promise
             eventType: deletionEvent ? 'deleted' : acceptanceEvent ? 'accepted' : 'created',
             accepted: lifecycle?.accepted ?? false,
             deletionCause: deletionEvent
-              ? lifecycle?.accepted
-                ? 'subject_removed'
-                : 'subject_rejected'
+              ? (options.credentialDeletionCause ??
+                (lifecycle?.accepted ? 'subject_removed' : 'subject_rejected'))
               : null,
           },
         },
@@ -570,6 +571,7 @@ async function browserOperationPersistence(page: Page): Promise<
                 stage: row.stage,
                 hasTxBlob: typeof row.txBlob === 'string' && row.txBlob.length > 0,
                 hasTxHash: typeof row.txHash === 'string' && row.txHash.length > 0,
+                ...(typeof row.message === 'string' ? { message: row.message } : {}),
               })),
             )
           }
@@ -787,6 +789,26 @@ test('opens an exact credential verification from its generation ID', async ({ p
   await expect(page.getByTestId('credential-dimension-on-chain')).toContainText('active')
 })
 
+test('fails closed when an exact generation permalink targets another network profile', async ({
+  page,
+}) => {
+  await installApiMock(page, {
+    credentialLifecycle: {
+      generationId: PERMALINK_GENERATION_ID,
+      state: 'active',
+      accepted: true,
+      acceptedTransactionHash: PERMALINK_ACCEPTED_TRANSACTION_HASH,
+    },
+    credentialUri: CREDENTIAL_URI,
+  })
+
+  await page.goto(`/credentials/${PERMALINK_GENERATION_ID}?profile=another-network`)
+  await page.locator('[data-client-ready="true"]').waitFor()
+
+  await expect(page.locator('.explorer-error')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: SCHEMA.name })).toHaveCount(0)
+})
+
 test('fails closed when an exact credential generation does not exist', async ({ page }) => {
   await installApiMock(page)
   const unknownGenerationId = '99'.repeat(32)
@@ -827,8 +849,8 @@ test('fails closed when the exact credential projection is unavailable', async (
 test('registers a schema through XRPL validation and exact indexed XCS finality', async ({
   page,
 }) => {
-  const validatedSchema = validateSchema(SCHEMA)
-  const canonicalSchema = canonicalize(validatedSchema as unknown as JsonValue)
+  const validatedSchema = parseSchema(SCHEMA)
+  const canonicalSchema = canonicalJson(validatedSchema as unknown as JsonValue)
   const schemaDigestHex = sha256Hex(encodeUtf8(canonicalSchema))
   await installApiMock(page, { schemaDigestHex })
 
@@ -874,7 +896,7 @@ test('does not open the wallet when profile readiness is unavailable', async ({ 
   expect(await browserE2eEffects(page)).toEqual({ walletSignatures: 0, ledgerSubmissions: 0 })
 })
 
-test('does not persist or submit a signature when readiness disappears in the wallet', async ({
+test('retains but does not submit a signature when readiness disappears after signing', async ({
   page,
 }) => {
   let readinessRequests = 0
@@ -900,7 +922,12 @@ test('does not persist or submit a signature when readiness disappears in the wa
   expect(readinessRequests).toBe(2)
   expect(await browserE2eEffects(page)).toEqual({ walletSignatures: 1, ledgerSubmissions: 0 })
   expect(await browserOperationPersistence(page)).toEqual([
-    { stage: 'failed', hasTxBlob: false, hasTxHash: false },
+    {
+      stage: 'signed',
+      hasTxBlob: true,
+      hasTxHash: true,
+      message: 'Final pre-submission validation failed; signed transaction retained for retry.',
+    },
   ])
 })
 
@@ -1038,14 +1065,14 @@ test('blocks issuance before the wallet when the published payload cannot be fet
 test('stores, issues and reviews an IPFS-addressed payload in the local test browser', async ({
   page,
 }) => {
-  const canonicalPayload = canonicalize({
+  const canonicalPayload = canonicalJson({
     xcsVersion: '0.1',
     issuer: ISSUER,
     subject: SUBJECT,
     schema: SCHEMA_UID,
     claims: CLAIMS,
   } as JsonValue)
-  const credentialUri = createIpfsRawPayloadUri(canonicalPayload)
+  const credentialUri = createIpfsPayloadUri(canonicalPayload)
   const credentialLifecycle: BrowserCredentialLifecycle = {
     generationId: null,
     state: 'pending',
@@ -1105,6 +1132,13 @@ test('stores, issues and reviews an IPFS-addressed payload in the local test bro
   await expect(page.getByTestId('xcs-confirmed')).toBeVisible()
   expect(await browserE2eEffects(page)).toEqual({ walletSignatures: 1, ledgerSubmissions: 1 })
 
+  const generationId = credentialLifecycle.generationId
+  if (!generationId) throw new Error('BROWSER_E2E_GENERATION_ID_MISSING')
+  await expect(page.getByTestId('issue-credential-link')).toHaveAttribute(
+    'href',
+    `/credentials/${generationId}?profile=${PROFILE_ID}`,
+  )
+
   const acceptHref = await page
     .getByRole('link', { name: /acceptation du sujet|subject acceptance/iu })
     .getAttribute('href')
@@ -1131,29 +1165,20 @@ test('stores, issues and reviews an IPFS-addressed payload in the local test bro
   expect(credentialLifecycle.accepted).toBe(true)
   expect(await browserE2eEffects(page)).toEqual({ walletSignatures: 1, ledgerSubmissions: 1 })
 
-  const generationId = credentialLifecycle.generationId
-  if (!generationId) throw new Error('BROWSER_E2E_GENERATION_ID_MISSING')
-  const verifyQuery = new URLSearchParams({
-    profile: PROFILE_ID,
-    issuer: ISSUER,
-    subject: SUBJECT,
-    schema: SCHEMA_UID,
-    generation: generationId,
-  })
-  await page.goto(`/verify?${verifyQuery.toString()}`)
+  await page.getByTestId('subject-result-permalink').click()
+  await expect(page).toHaveURL(`/credentials/${generationId}?profile=${PROFILE_ID}`)
   await page.locator('[data-client-ready="true"]').waitFor()
-  await page
-    .getByRole('button', { name: /Charger les métadonnées indexées|Load indexed metadata/u })
-    .click()
-  await expect(page.getByText(/stockage de démonstration de ce navigateur/u)).toBeVisible()
-  await page.getByTestId('payload-consent').check()
-  await page.getByTestId('payload-fetch').click()
-  await expect(page.locator('.verification-grid')).toContainText('valid')
-  await expect(page.locator('.success-box')).toContainText(sha256Hex(encodeUtf8(canonicalPayload)))
+  await expect(page.getByTestId('credential-consent')).toBeVisible()
+  await page.getByTestId('credential-consent').getByRole('checkbox').check()
+  await page.getByTestId('credential-consent').getByRole('button').click()
+  await expect(page.getByTestId('credential-dimension-payload')).toContainText('valid')
+  await expect(page.getByTestId('credential-payload-checked')).toContainText(
+    sha256Hex(encodeUtf8(canonicalPayload)),
+  )
 })
 
 test('does not mislabel an unavailable external IPFS CID as browser-local', async ({ page }) => {
-  const canonicalPayload = canonicalize({
+  const canonicalPayload = canonicalJson({
     xcsVersion: '0.1',
     issuer: ISSUER,
     subject: SUBJECT,
@@ -1168,7 +1193,7 @@ test('does not mislabel an unavailable external IPFS CID as browser-local', asyn
   }
   await installApiMock(page, {
     credentialLifecycle,
-    credentialUri: createIpfsRawPayloadUri(canonicalPayload),
+    credentialUri: createIpfsPayloadUri(canonicalPayload),
   })
 
   await page.goto(
@@ -1188,11 +1213,46 @@ test('does not mislabel an unavailable external IPFS CID as browser-local', asyn
   expect(await browserE2eEffects(page)).toEqual({ walletSignatures: 0, ledgerSubmissions: 0 })
 })
 
+test('rejects the issuer wallet before looking up a subject-owned credential', async ({ page }) => {
+  const credentialLifecycle: BrowserCredentialLifecycle = {
+    generationId: PERMALINK_GENERATION_ID,
+    state: 'pending',
+    accepted: false,
+    acceptedTransactionHash: null,
+  }
+  await installApiMock(page, {
+    credentialLifecycle,
+    credentialUri: CREDENTIAL_URI,
+  })
+  let wrongTupleRequests = 0
+  page.on('request', (request) => {
+    if (
+      new URL(request.url()).pathname.includes(`/credentials/${ISSUER}/${ISSUER}/${SCHEMA_UID}`)
+    ) {
+      wrongTupleRequests += 1
+    }
+  })
+
+  await page.goto(
+    `/accept?profile=${PROFILE_ID}&issuer=${ISSUER}&schema=${SCHEMA_UID}&generation=${PERMALINK_GENERATION_ID}&action=accept`,
+  )
+  await connectSyntheticWallet(page, 'issuer')
+  await page
+    .getByRole('button', { name: /Charger, relire et préparer|Load, review and prepare/u })
+    .click()
+
+  await expect(page.getByTestId('accept-error')).toContainText(
+    /wallet connecté n’est pas le sujet|connected wallet is not the subject/u,
+  )
+  expect(wrongTupleRequests).toBe(0)
+  expect(await browserE2eEffects(page)).toEqual({ walletSignatures: 0, ledgerSubmissions: 0 })
+})
+
 test('issues, reconfirms, then accepts a credential with exact indexed evidence', async ({
   page,
 }) => {
   let evidence: 'confirmed' | 'mismatch' = 'mismatch'
-  const canonicalPayload = canonicalize({
+  const canonicalPayload = canonicalJson({
     xcsVersion: '0.1',
     issuer: ISSUER,
     subject: SUBJECT,
@@ -1347,7 +1407,9 @@ test('issues, reconfirms, then accepts a credential with exact indexed evidence'
   })
 
   await acceptanceOperation.getByTestId('operation-credential-link').click()
-  await expect(page).toHaveURL(`/credentials/${credentialLifecycle.generationId}`)
+  await expect(page).toHaveURL(
+    `/credentials/${credentialLifecycle.generationId}?profile=${PROFILE_ID}`,
+  )
   await page.locator('[data-client-ready="true"]').waitFor()
   const removeLink = page.getByTestId('credential-subject-action')
   await expect(removeLink).toContainText(/Retirer cette génération|Remove this generation/u)
@@ -1391,7 +1453,9 @@ test('issues, reconfirms, then accepts a credential with exact indexed evidence'
   expect(credentialLifecycle.removedTransactionHash).toMatch(/^[0-9a-f]{64}$/u)
 
   await page.getByTestId('subject-result-permalink').click()
-  await expect(page).toHaveURL(`/credentials/${credentialLifecycle.generationId}`)
+  await expect(page).toHaveURL(
+    `/credentials/${credentialLifecycle.generationId}?profile=${PROFILE_ID}`,
+  )
   await expect(page.getByText('deleted', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('subject_removed', { exact: true })).toBeVisible()
   await expect(page.getByTestId('credential-subject-action')).toHaveCount(0)
@@ -1484,6 +1548,44 @@ test('rejects a pending credential without loading payload or trust', async ({ p
   expect(payloadRequestCount).toBe(0)
   expect(verifyRequestCount).toBe(0)
   expect(credentialLifecycle.state).toBe('deleted')
+})
+
+test('returns an issuer revocation to the exact deleted generation', async ({ page }) => {
+  const credentialLifecycle: BrowserCredentialLifecycle = {
+    generationId: PERMALINK_GENERATION_ID,
+    state: 'active',
+    accepted: true,
+    acceptedTransactionHash: PERMALINK_ACCEPTED_TRANSACTION_HASH,
+  }
+  await installApiMock(page, {
+    credentialLifecycle,
+    credentialUri: CREDENTIAL_URI,
+    credentialDeletionCause: 'issuer_revoked',
+  })
+
+  await page.goto(
+    `/revoke?profile=${PROFILE_ID}&subject=${SUBJECT}&schema=${SCHEMA_UID}&generation=${PERMALINK_GENERATION_ID}`,
+  )
+  await connectSyntheticWallet(page)
+  await page
+    .getByRole('button', { name: /Charger et préparer la révocation|Load and prepare revocation/u })
+    .click()
+  await expect(page.getByTestId('transaction-preview')).toContainText('CredentialDelete')
+
+  await page.getByTestId('transaction-sign').click()
+  await expect(page.getByTestId('xcs-confirmed')).toBeVisible()
+  await expect(page.getByTestId('business-finality')).toContainText('issuer_revoked')
+  expect(credentialLifecycle.state).toBe('deleted')
+
+  const permalink = page.getByTestId('revoke-result-permalink')
+  await expect(permalink).toHaveAttribute(
+    'href',
+    `/credentials/${PERMALINK_GENERATION_ID}?profile=${PROFILE_ID}`,
+  )
+  await permalink.click()
+  await expect(page).toHaveURL(`/credentials/${PERMALINK_GENERATION_ID}?profile=${PROFILE_ID}`)
+  await expect(page.getByText('deleted', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('issuer_revoked', { exact: true })).toBeVisible()
 })
 
 test('reveals an exact diploma permalink only after bound payload consent', async ({ page }) => {

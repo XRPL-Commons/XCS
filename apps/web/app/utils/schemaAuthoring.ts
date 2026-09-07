@@ -1,4 +1,4 @@
-import { validateSchema, type ScalarFieldType, type SchemaDefinition } from '@xcs-protocol/core'
+import { parseSchema, type ScalarFieldType, type SchemaDefinition } from '@xcs-protocol/core'
 
 export const GUIDED_SCHEMA_FIELD_TYPES = [
   'string',
@@ -76,7 +76,7 @@ export function guidedSchemaToDefinition(draft: GuidedSchemaDraft): SchemaDefini
     }
   }
 
-  return validateSchema({
+  return parseSchema({
     xcsVersion: '0.1',
     name: draft.name,
     description: draft.description,
@@ -89,7 +89,7 @@ export function guidedSchemaToJson(draft: GuidedSchemaDraft): string {
 }
 
 export function schemaDefinitionToGuidedDraft(input: unknown): GuidedSchemaDraft {
-  const schema = validateSchema(input)
+  const schema = parseSchema(input)
   if (schema.extends !== undefined || schema.supersedes !== undefined) {
     throw new Error('GUIDED_EDITOR_ADVANCED_SCHEMA')
   }

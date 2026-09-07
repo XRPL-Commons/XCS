@@ -1,4 +1,3 @@
-import { canonicalize, type JsonValue } from '@xcs-protocol/core'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -12,6 +11,7 @@ import {
   storeLocalTestPayload,
   type LocalPayloadStorage,
 } from '../app/utils/localPayloadStore'
+import { canonicalJson } from '../app/utils/serialization'
 
 class MemoryStorage implements LocalPayloadStorage {
   private readonly values = new Map<string, string>()
@@ -38,7 +38,7 @@ class MemoryStorage implements LocalPayloadStorage {
 }
 
 function payload(index = 1): string {
-  return canonicalize({
+  return canonicalJson({
     xcsVersion: '0.1',
     issuer: 'rIssuer',
     subject: 'rSubject',
@@ -89,19 +89,19 @@ describe('local Testnet payload store', () => {
     expect(() =>
       storeLocalTestPayload({
         storage,
-        content: canonicalize({ value: 'a'.repeat(LOCAL_PAYLOAD_STORE_MAX_BYTES) } as JsonValue),
+        content: canonicalJson({ value: 'a'.repeat(LOCAL_PAYLOAD_STORE_MAX_BYTES) }),
       }),
     ).toThrow('LOCAL_PAYLOAD_SIZE_INVALID')
     expect(() =>
       storeLocalTestPayload({
         storage,
-        content: canonicalize({ claims: { email: 'public@example.test' } } as JsonValue),
+        content: canonicalJson({ claims: { email: 'public@example.test' } }),
       }),
     ).toThrow('LOCAL_PAYLOAD_PII_FIELD_REJECTED')
     try {
       storeLocalTestPayload({
         storage,
-        content: canonicalize({ claims: { email: 'public@example.test' } } as JsonValue),
+        content: canonicalJson({ claims: { email: 'public@example.test' } }),
       })
       throw new Error('expected the PII-shaped field to be rejected')
     } catch (error) {
@@ -111,13 +111,13 @@ describe('local Testnet payload store', () => {
     expect(() =>
       storeLocalTestPayload({
         storage,
-        content: canonicalize({ claims: { 'full name': 'Test Person' } } as JsonValue),
+        content: canonicalJson({ claims: { 'full name': 'Test Person' } }),
       }),
     ).toThrow('LOCAL_PAYLOAD_PII_FIELD_REJECTED')
     expect(() =>
       storeLocalTestPayload({
         storage,
-        content: canonicalize({ claims: { phoneNumber: '+33000000000' } } as JsonValue),
+        content: canonicalJson({ claims: { phoneNumber: '+33000000000' } }),
       }),
     ).toThrow('LOCAL_PAYLOAD_PII_FIELD_REJECTED')
     expect(() =>
@@ -134,7 +134,7 @@ describe('local Testnet payload store', () => {
 
   it('accepts generic labels and allows fictitious person-shaped fields only after acknowledgement', () => {
     const storage = new MemoryStorage()
-    const content = canonicalize({
+    const content = canonicalJson({
       claims: {
         name: 'Course Completion',
         nom: 'Course test',
@@ -143,7 +143,7 @@ describe('local Testnet payload store', () => {
     } as JsonValue)
 
     expect(() => storeLocalTestPayload({ storage, content })).not.toThrow()
-    const fictitiousPersonContent = canonicalize({
+    const fictitiousPersonContent = canonicalJson({
       claims: { prenom: 'Personne Test' },
     } as JsonValue)
     expect(() =>

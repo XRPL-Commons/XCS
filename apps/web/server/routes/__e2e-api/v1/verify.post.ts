@@ -1,6 +1,7 @@
-import { canonicalize, type JsonValue } from '@xcs-protocol/core'
+import type { JsonValue } from '@xcs-protocol/core'
 
 import { assertBrowserE2eServerMode } from '../../../../app/utils/browserE2eMode'
+import { canonicalJson } from '../../../../app/utils/serialization'
 
 const PROFILE_ID = 'xrpl-testnet-xcs-browser-e2e'
 const ISSUER = 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh'
@@ -10,7 +11,7 @@ const NO_URI_GENERATION_ID = '9a'.repeat(32)
 
 function payloadMatches(input: unknown, expected: JsonValue): boolean {
   try {
-    return canonicalize(input as JsonValue) === canonicalize(expected)
+    return canonicalJson(input) === canonicalJson(expected)
   } catch {
     return false
   }

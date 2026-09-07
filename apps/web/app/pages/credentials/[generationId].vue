@@ -14,7 +14,12 @@ import {
   type PayloadFetchConsentToken,
 } from '~/utils/credentialReview'
 import { decodeUtf8HexForDisplay, displayXrplTime } from '~/utils/explorer'
-import { buildCredentialAcceptLink, credentialPermalinkSubjectAction } from '~/utils/operationLinks'
+import {
+  assertLinkProfile,
+  buildCredentialAcceptLink,
+  credentialPermalinkSubjectAction,
+  singleRouteQueryValue,
+} from '~/utils/operationLinks'
 import { LOCAL_PAYLOAD_LOCATION } from '~/utils/localPayloadStore'
 
 interface ExactCredentialEvidence {
@@ -29,6 +34,7 @@ interface ExactCredentialEvidence {
 
 const route = useRoute()
 const generationId = computed(() => String(route.params.generationId).toLowerCase())
+const linkedProfileId = computed(() => singleRouteQueryValue(route.query.profile))
 const { locale, t } = useI18n()
 const { getActiveNetworkProfile, getCredential, getCredentialGeneration, getSchema, verify } =
   useXcsApi()
@@ -46,8 +52,10 @@ function credentialReviewInput(detail: ApiCredentialGenerationDetail) {
 
 async function loadExactCredentialEvidence(
   expectedGenerationId: string,
+  expectedProfileId = linkedProfileId.value,
 ): Promise<ExactCredentialEvidence> {
   const profile = await getActiveNetworkProfile()
+  assertLinkProfile(expectedProfileId || undefined, profile.profileId)
   const detail = await getCredentialGeneration(expectedGenerationId, profile.profileId)
   const generation = detail.generation
   if (generation.generationId.toLowerCase() !== expectedGenerationId) {
@@ -133,8 +141,8 @@ async function loadExactCredentialEvidence(
 }
 
 const { data, pending, error, refresh } = await useAsyncData(
-  () => `credential-generation:${generationId.value}`,
-  () => loadExactCredentialEvidence(generationId.value),
+  () => `credential-generation:${generationId.value}:${linkedProfileId.value}`,
+  () => loadExactCredentialEvidence(generationId.value, linkedProfileId.value),
 )
 
 const activeReview = computed(() => verifiedReview.value ?? data.value?.review ?? null)
@@ -199,7 +207,7 @@ function clearPayloadReview(): void {
   copyState.value = 'idle'
 }
 
-watch(generationId, clearPayloadReview)
+watch([generationId, linkedProfileId], clearPayloadReview)
 watch(
   () => data.value,
   (next, previous) => {
@@ -227,12 +235,14 @@ function setPayloadConsent(granted: boolean): void {
 function assertVerificationFlowCurrent(input: {
   readonly revision: number
   readonly generationId: string
+  readonly profileId: string
   readonly displayed: ExactCredentialEvidence
   readonly consent: PayloadFetchConsentToken
 }): void {
   if (
     verificationRevision !== input.revision ||
     generationId.value !== input.generationId ||
+    linkedProfileId.value !== input.profileId ||
     data.value !== input.displayed ||
     payloadConsentToken.value !== input.consent
   ) {
@@ -251,16 +261,18 @@ async function verifyPayload(): Promise<void> {
   verificationRevision += 1
   const revision = verificationRevision
   const expectedGenerationId = generationId.value
+  const expectedProfileId = linkedProfileId.value
   verificationBusy.value = true
   verificationError.value = ''
   verifiedReview.value = null
   try {
     // Re-read the active profile, exact generation, tuple, URI, schema and metadata report.
     // None of these requests contact the issuer payload host.
-    const latest = await loadExactCredentialEvidence(expectedGenerationId)
+    const latest = await loadExactCredentialEvidence(expectedGenerationId, expectedProfileId)
     assertVerificationFlowCurrent({
       revision,
       generationId: expectedGenerationId,
+      profileId: expectedProfileId,
       displayed,
       consent,
     })
@@ -287,6 +299,7 @@ async function verifyPayload(): Promise<void> {
     assertVerificationFlowCurrent({
       revision,
       generationId: expectedGenerationId,
+      profileId: expectedProfileId,
       displayed,
       consent,
     })
@@ -315,6 +328,7 @@ async function verifyPayload(): Promise<void> {
     assertVerificationFlowCurrent({
       revision,
       generationId: expectedGenerationId,
+      profileId: expectedProfileId,
       displayed,
       consent,
     })
@@ -417,7 +431,10 @@ useSeoMeta({
         </dd>
         <dt>{{ $t('credential.schema') }}</dt>
         <dd>
-          <NuxtLinkLocale :to="`/schemas/${data.detail.generation.schemaUid}`">
+          <NuxtLinkLocale
+            class="credential-schema-reference"
+            :to="`/schemas/${data.detail.generation.schemaUid}`"
+          >
             <strong>{{ data.schema.name }}</strong>
             <code>{{ data.detail.generation.schemaUid }}</code>
           </NuxtLinkLocale>
@@ -607,6 +624,11 @@ useSeoMeta({
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+}
+
+.credential-schema-reference {
+  display: grid;
+  gap: 0.25rem;
 }
 
 .credential-consent {

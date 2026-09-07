@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import {
-  canonicalize,
+  canonicalJson,
   computeSchemaUid,
   type JsonValue,
   type SchemaDefinition,
@@ -35,7 +35,7 @@ const SCHEMA_UID = computeSchemaUid({
   transactionIndex: 1,
   publisher: ISSUER,
 })
-const PAYLOAD = canonicalize({
+const PAYLOAD = canonicalJson({
   xcsVersion: '0.1',
   issuer: ISSUER,
   subject: SUBJECT,

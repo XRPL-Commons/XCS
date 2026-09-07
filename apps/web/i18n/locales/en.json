@@ -178,7 +178,7 @@
     "submitted": "Validated CredentialCreate: ",
     "links": "Share the confirmed credential",
     "acceptLink": "Open the subject acceptance link",
-    "verifyLink": "Open the verification link",
+    "credentialLink": "View and verify the exact credential",
     "guidedClaims": "Guided form",
     "jsonClaims": "JSON mode",
     "loadSchema": "Load schema",
@@ -453,6 +453,7 @@
     "issuerAcknowledgementRequired": "Confirm your own trust decision for this exact unknown issuer generation before accepting.",
     "issuerAcknowledgementStale": "The issuer trust context changed. Review it and confirm your decision again.",
     "issuerUntrusted": "This verifier's local policy marks the issuer as untrusted. Acceptance is blocked.",
+    "subjectWalletMismatch": "The connected wallet is not the subject of this credential. Disconnect it and connect the recipient wallet before accepting, rejecting or removing this generation.",
     "rejectSafety": "Rejecting deletes this unaccepted pending or expired object without endorsing its issuer or claims. This action loads neither payload nor trust status.",
     "removeSafety": "Removing deletes this accepted active or expired generation from the subject account. No payload or trust status is loaded; XCS success then requires indexed deleted evidence with subject_removed (issuer_revoked for a self-issued credential).",
     "openPermalink": "Open this generation’s exact evidence",
@@ -468,6 +469,7 @@
     "expiration": "Expiration",
     "noExpiration": "No expiration",
     "generation": "Generation ID",
+    "openPermalink": "Open this generation’s exact evidence",
     "submitted": "Validated issuer revocation: "
   },
   "verify": {
@@ -523,8 +525,7 @@
     "proofTransactionIndex": "Indexed proof transaction index",
     "reason": "Protocol reason",
     "acceptLink": "Subject acceptance",
-    "credentialLink": "Exact generation evidence",
-    "verifyLink": "Verification"
+    "credentialLink": "Exact generation evidence"
   },
   "footer": {
     "summary": "XCS v0.1 — open standard and MIT reference implementation.",

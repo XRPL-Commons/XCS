@@ -1,11 +1,12 @@
 import {
-  decodeUtf8Hex,
-  inspectPayloadUri,
   parseCredentialPayload,
-  rippleTimeToIso8601,
+  parsePayloadUri,
+  rippleTimeToIso,
   type CredentialPayload,
   type ResolvedSchema,
 } from '@xcs-protocol/core'
+
+import { decodeHexUtf8 } from './serialization'
 
 import {
   inspectPilotHttpsPayloadHost,
@@ -202,8 +203,8 @@ export function loadCredentialMutationReview(
     issuer: credential.issuer,
     subject: credential.subject,
     schemaUid: credential.schemaUid,
-    uri: credential.uriHex === null ? null : decodeUtf8Hex(credential.uriHex),
-    expiration: credential.expiration === null ? null : rippleTimeToIso8601(credential.expiration),
+    uri: credential.uriHex === null ? null : decodeHexUtf8(credential.uriHex),
+    expiration: credential.expiration === null ? null : rippleTimeToIso(credential.expiration),
     accepted: credential.accepted,
     state: credential.state,
   }
@@ -247,7 +248,7 @@ export async function loadCredentialReview(
     throw new Error('CREDENTIAL_REVIEW_GENERATION_MISMATCH')
   }
 
-  const uri = credential.uriHex === null ? null : decodeUtf8Hex(credential.uriHex)
+  const uri = credential.uriHex === null ? null : decodeHexUtf8(credential.uriHex)
   let payloadRead: HttpsPayloadRead | undefined
   let payload: CredentialPayload | undefined
   if (options.fetchPayload === true) {
@@ -264,7 +265,7 @@ export async function loadCredentialReview(
       issuer: credential.issuer,
       subject: credential.subject,
       schemaUid: credential.schemaUid,
-      schema: options.schema,
+      fields: options.schema.fields,
     })
   }
 
@@ -274,7 +275,7 @@ export async function loadCredentialReview(
     subject: credential.subject,
     schemaUid: credential.schemaUid,
     uri,
-    expiration: credential.expiration === null ? null : rippleTimeToIso8601(credential.expiration),
+    expiration: credential.expiration === null ? null : rippleTimeToIso(credential.expiration),
     accepted: credential.accepted,
     state: credential.state,
     ...(payload ? { payload } : {}),
@@ -294,7 +295,7 @@ export function createPayloadFetchConsentToken(
   review: Pick<CredentialReview, 'generationId' | 'uri'>,
 ): PayloadFetchConsentToken {
   if (review.uri === null) throw new Error('CREDENTIAL_URI_REQUIRED')
-  const parsedUri = inspectPayloadUri(review.uri)
+  const parsedUri = parsePayloadUri(review.uri)
   return {
     generationId: review.generationId.toLowerCase(),
     credentialUri: review.uri,
@@ -422,7 +423,7 @@ export function assertPayloadFetchConsentCurrent(
   if (review.uri === null) throw new Error('CREDENTIAL_PAYLOAD_CONSENT_STALE')
   let hostname: string
   try {
-    const parsedUri = inspectPayloadUri(review.uri)
+    const parsedUri = parsePayloadUri(review.uri)
     hostname =
       parsedUri.kind === 'https'
         ? inspectPilotHttpsPayloadHost(review.uri)

@@ -1,10 +1,6 @@
-import {
-  canonicalize,
-  decodeUtf8,
-  inspectPayloadUri,
-  parseJsonStrict,
-  verifyPayloadIntegrity,
-} from '@xcs-protocol/core'
+import { parsePayloadUri, verifyPayloadIntegrity } from '@xcs-protocol/core'
+
+import { canonicalJson, decodeUtf8, parseJson } from './serialization'
 
 export const MAX_PILOT_PAYLOAD_BYTES = 1024 * 1024
 export const DEFAULT_PAYLOAD_FETCH_TIMEOUT_MS = 10_000
@@ -70,7 +66,7 @@ export function assertPilotPublicPayloadHostname(hostname: string): void {
 
 /** Validates and returns the displayed host without performing a request. */
 export function inspectPilotHttpsPayloadHost(credentialUri: string): string {
-  const parsedUri = inspectPayloadUri(credentialUri)
+  const parsedUri = parsePayloadUri(credentialUri)
   if (parsedUri.kind !== 'https') throw new Error('PILOT_HTTPS_PAYLOAD_REQUIRED')
   const hostname = new URL(parsedUri.fetchUrl).hostname
   assertPilotPublicPayloadHostname(hostname)
@@ -125,7 +121,7 @@ async function readResponseBytes(response: Response, maxBytes: number): Promise<
 export async function readCanonicalHttpsPayload(
   options: ReadPayloadOptions,
 ): Promise<HttpsPayloadRead> {
-  const parsedUri = inspectPayloadUri(options.credentialUri)
+  const parsedUri = parsePayloadUri(options.credentialUri)
   if (parsedUri.kind !== 'https') throw new Error('PILOT_HTTPS_PAYLOAD_REQUIRED')
   inspectPilotHttpsPayloadHost(options.credentialUri)
 
@@ -183,15 +179,11 @@ export async function readCanonicalHttpsPayload(
       throw error
     }
     const content = decodeUtf8(bytes)
-    const parsed = parseJsonStrict(content)
-    if (canonicalize(parsed) !== content) throw new Error('PAYLOAD_NOT_CANONICAL_JCS')
+    const parsed = parseJson(content)
+    if (canonicalJson(parsed) !== content) throw new Error('PAYLOAD_NOT_CANONICAL_JCS')
 
     const integrity = verifyPayloadIntegrity(bytes, options.credentialUri)
-    if (integrity.status !== 'valid') {
-      throw new Error(
-        integrity.status === 'tampered' ? 'PAYLOAD_DIGEST_MISMATCH' : 'PAYLOAD_URI_INVALID',
-      )
-    }
+    if (!integrity.valid) throw new Error('PAYLOAD_DIGEST_MISMATCH')
 
     return {
       content,
