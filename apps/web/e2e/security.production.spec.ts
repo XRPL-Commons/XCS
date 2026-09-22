@@ -42,7 +42,7 @@ test('serves the production page and error document with canonical fresh nonces'
   const navigation = await page.goto('/learn')
   expect(navigation?.status()).toBe(200)
   await page.locator('[data-client-ready="true"]').waitFor()
-  await expect(page.locator('.testnet-banner, .controlled-pilot-banner')).toHaveCount(0)
+  await expect(page.getByTestId('testnet-banner')).toHaveCount(0)
   expect(browserFailures).toEqual([])
 })
 

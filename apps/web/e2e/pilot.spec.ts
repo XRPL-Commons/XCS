@@ -686,12 +686,14 @@ test('discovers a schema from aggregate stats and global search', async ({ page 
   await expect(page.getByText(/schémas valides|valid schemas/u)).toBeVisible()
 
   await page.locator('[data-client-ready="true"]').waitFor()
-  const search = page.locator('.explorer-search').filter({ has: page.locator('#explorer-search') })
+  const search = page
+    .getByTestId('explorer-search')
+    .filter({ has: page.locator('#explorer-search') })
   await search.getByRole('searchbox').fill('Diploma')
   await expect(search.getByRole('button')).toBeEnabled()
   await search.getByRole('button').click()
   await expect(page).toHaveURL(/\/(?:en\/)?search\?q=Diploma$/u)
-  const result = page.locator('.result-card').filter({ hasText: SCHEMA.name })
+  const result = page.getByTestId('result-card').filter({ hasText: SCHEMA.name })
   await expect(result).toContainText(SCHEMA_UID)
   await result.click()
   await expect(page.getByRole('heading', { level: 1, name: SCHEMA.name })).toBeVisible()
@@ -708,7 +710,7 @@ test('exposes the simplified create, verify and docs navigation', async ({ page 
     }),
   ).toBeVisible()
 
-  const navigation = page.locator('.primary-nav')
+  const navigation = page.getByTestId('primary-nav')
   await expect(navigation.getByRole('link', { name: 'Explorer', exact: true })).toHaveAttribute(
     'href',
     /^\/(?:en\/)?schemas$/u,
@@ -726,8 +728,10 @@ test('exposes the simplified create, verify and docs navigation', async ({ page 
 
   await page.getByRole('link', { name: /Commencer à créer|Start building/u }).click()
   await expect(page).toHaveURL(/\/(?:en\/)?studio$/u)
-  await expect(page.locator('.create-primary-card[href$="/schemas/register"]')).toBeVisible()
-  await expect(page.locator('.create-primary-card[href$="/issue"]')).toBeVisible()
+  await expect(
+    page.locator('[data-testid="create-primary-card"][href$="/schemas/register"]'),
+  ).toBeVisible()
+  await expect(page.locator('[data-testid="create-primary-card"][href$="/issue"]')).toBeVisible()
 })
 
 test('keeps the complete landing hero inside a desktop viewport', async ({ page }) => {
@@ -736,16 +740,19 @@ test('keeps the complete landing hero inside a desktop viewport', async ({ page 
 
   await page.goto('/')
   await page.locator('[data-client-ready="true"]').waitFor()
-  await page.locator('.landing-art img').evaluate(async (image) => {
-    await (image as HTMLImageElement).decode()
-  })
+  await page
+    .getByTestId('landing-art')
+    .locator('img')
+    .evaluate(async (image) => {
+      await (image as HTMLImageElement).decode()
+    })
 
   const viewport = page.viewportSize()
-  const hero = await page.locator('.landing-hero').boundingBox()
+  const hero = await page.getByTestId('landing-hero').boundingBox()
   const primaryAction = await page
     .getByRole('link', { name: /Commencer à créer|Start building/u })
     .boundingBox()
-  const installCommand = await page.locator('.install-command').boundingBox()
+  const installCommand = await page.getByTestId('install-command').boundingBox()
 
   expect(viewport).not.toBeNull()
   expect(hero).not.toBeNull()
@@ -805,7 +812,7 @@ test('fails closed when an exact generation permalink targets another network pr
   await page.goto(`/credentials/${PERMALINK_GENERATION_ID}?profile=another-network`)
   await page.locator('[data-client-ready="true"]').waitFor()
 
-  await expect(page.locator('.explorer-error')).toBeVisible()
+  await expect(page.getByTestId('explorer-error')).toBeVisible()
   await expect(page.getByRole('heading', { level: 1, name: SCHEMA.name })).toHaveCount(0)
 })
 
@@ -821,7 +828,7 @@ test('fails closed when an exact credential generation does not exist', async ({
   await page.getByRole('button', { name: /Ouvrir la vérification|Open verification/u }).click()
 
   await expect(page).toHaveURL(new RegExp(`/(?:en/)?credentials/${unknownGenerationId}$`, 'u'))
-  await expect(page.locator('.explorer-error')).toContainText(
+  await expect(page.getByTestId('explorer-error')).toContainText(
     /ressource XCS est introuvable|XCS resource could not be found/u,
   )
   consumeExpectedHttpFailure(page, '404 (Not Found)')
@@ -837,10 +844,10 @@ test('fails closed when the exact credential projection is unavailable', async (
   await page.getByRole('button', { name: /Ouvrir la vérification|Open verification/u }).click()
 
   await expect(page).toHaveURL(new RegExp(`/(?:en/)?credentials/${generationId}$`, 'u'))
-  await expect(page.locator('.explorer-error')).toContainText(
+  await expect(page.getByTestId('explorer-error')).toContainText(
     /ne peut pas répondre de façon fiable|cannot answer reliably/u,
   )
-  await expect(page.locator('.explorer-error')).toContainText(
+  await expect(page.getByTestId('explorer-error')).toContainText(
     /échoue volontairement en mode fermé|deliberately fails closed/u,
   )
   consumeExpectedHttpFailure(page, '503 (Service Unavailable)')
@@ -889,7 +896,9 @@ test('does not open the wallet when profile readiness is unavailable', async ({ 
 
   await page.getByTestId('transaction-sign').click()
 
-  await expect(page.locator('.error-box')).toContainText('INDEXER_SIGNING_READINESS_UNAVAILABLE')
+  await expect(page.getByTestId('status-error')).toContainText(
+    'INDEXER_SIGNING_READINESS_UNAVAILABLE',
+  )
   await expect(page.getByTestId('xrpl-finality')).toHaveCount(0)
   consumeExpectedReadiness503(page)
   expect(readinessRequests).toBe(1)
@@ -916,7 +925,9 @@ test('retains but does not submit a signature when readiness disappears after si
 
   await page.getByTestId('transaction-sign').click()
 
-  await expect(page.locator('.error-box')).toContainText('INDEXER_SIGNING_READINESS_UNAVAILABLE')
+  await expect(page.getByTestId('status-error')).toContainText(
+    'INDEXER_SIGNING_READINESS_UNAVAILABLE',
+  )
   await expect(page.getByTestId('xrpl-finality')).toHaveCount(0)
   consumeExpectedReadiness503(page)
   expect(readinessRequests).toBe(2)
@@ -972,7 +983,9 @@ test('keeps a signed recovery operation when readiness is unavailable after relo
   await expect(operation).toContainText('signed')
   await operation.getByRole('button', { name: /Reprendre|Resume/u }).click()
 
-  await expect(page.locator('.error-box')).toContainText('INDEXER_SIGNING_READINESS_UNAVAILABLE')
+  await expect(page.getByTestId('status-error')).toContainText(
+    'INDEXER_SIGNING_READINESS_UNAVAILABLE',
+  )
   consumeExpectedReadiness503(page)
   expect(readinessRequests).toBe(1)
   expect(await browserE2eEffects(page)).toEqual({ walletSignatures: 0, ledgerSubmissions: 0 })
@@ -998,7 +1011,7 @@ test('rejects inconsistent signed recovery metadata without losing the blob', as
   await expect(operation).toContainText('signed')
   await operation.getByRole('button', { name: /Reprendre|Resume/u }).click()
 
-  await expect(page.locator('.error-box')).toContainText(
+  await expect(page.getByTestId('status-error')).toContainText(
     'OPERATION_RECOVERY_LAST_LEDGER_SEQUENCE_MISMATCH',
   )
   expect(readinessRequests).toBe(0)
@@ -1722,7 +1735,7 @@ test('keeps a replaced historical generation readable without payload consent', 
   await page.locator('[data-client-ready="true"]').waitFor()
   await expect(page.getByRole('heading', { level: 1, name: SCHEMA.name })).toBeVisible()
   await expect(
-    page.locator('.explorer-metadata').getByText(HISTORICAL_GENERATION_ID, { exact: true }),
+    page.getByTestId('explorer-metadata').getByText(HISTORICAL_GENERATION_ID, { exact: true }),
   ).toBeVisible()
   await expect(page.getByTestId('credential-verification-unavailable')).toBeVisible()
   await expect(page.getByTestId('credential-consent')).toHaveCount(0)
