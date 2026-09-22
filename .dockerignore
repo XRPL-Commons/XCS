@@ -2,9 +2,11 @@
 .env
 .env.*
 !.env.example
+!.env.compose.example
 **/.env
 **/.env.*
 !**/.env.example
+!**/.env.compose.example
 node_modules
 **/node_modules
 **/dist

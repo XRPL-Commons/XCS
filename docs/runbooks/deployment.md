@@ -248,7 +248,7 @@ rollback plans.
 
 ### Deployment configuration
 
-1. Copy `.env.example` to `.env`. Direct password/token values support local Compose and host-side
+1. Copy `.env.compose.example` to `.env`. Direct password/token values support local Compose and host-side
    `pnpm` commands only. A hosted deployment must set the following eight `_FILE` variables and put
    one non-empty, single-line value in each ignored file:
 
@@ -500,6 +500,47 @@ If one adapter regresses before promotion, remove its public identifier where ap
 restrict the XRPL Connect factory in a reviewed web rollback. This changes no XCS protocol rule or
 PostgreSQL schema and requires no database rollback. Never route around an adapter failure by
 calling `signAndSubmit`: XCS must retain normalization, persistence and sole submission control.
+
+## DigitalOcean App Platform for the web app
+
+The `gh deploy-setup` extension deploys a single Nuxt service from the repository root: the root
+`Dockerfile` builds `@xcs-protocol/web`, and the root `.env.example` is that service's environment
+contract (names only; values live in Passbolt). The Compose stack contract is
+`.env.compose.example`. Run `gh deploy-setup` from the repository root; accept port `3000`.
+
+The App Platform service hosts only the web app. PostgreSQL, the indexer and the read API keep
+running from the Compose stack (or another host) in the same region and VPC:
+
+| App Platform variable                   | Compose counterpart                               |
+| --------------------------------------- | ------------------------------------------------- |
+| `NUXT_API_BASE_URL`                     | `http://api:3001` → the API's private VPC address |
+| `NUXT_API_INTERNAL_TOKEN`               | `XCS_INTERNAL_API_TOKEN_FILE` (same value)        |
+| `NUXT_PUBLIC_API_BASE_URL`              | `XCS_PUBLIC_API_BASE_URL`                         |
+| `NUXT_PUBLIC_PROFILE_ID`                | `XCS_PUBLIC_PROFILE_ID`                           |
+| `NUXT_PUBLIC_RPC_URL`                   | `XCS_PUBLIC_RPC_URL`                              |
+| `NUXT_PUBLIC_XAMAN_API_KEY`             | `XCS_PUBLIC_XAMAN_API_KEY`                        |
+| `NUXT_PUBLIC_XAMAN_REDIRECT_URL`        | `XCS_PUBLIC_XAMAN_REDIRECT_URL`                   |
+| `NUXT_PUBLIC_WALLET_CONNECT_PROJECT_ID` | `XCS_PUBLIC_WALLET_CONNECT_PROJECT_ID`            |
+| `NUXT_TRUSTED_PROXY_CIDRS`              | `XCS_TRUSTED_PROXY_CIDRS`                         |
+
+Before the first deploy:
+
+1. Expose the read API over HTTPS on its own hostname for browsers and add the App Platform domain
+   to `XCS_ALLOWED_ORIGINS`. Give the web service the API's private VPC address in
+   `NUXT_API_BASE_URL`; never reuse the public URL for the SSR hop.
+2. Generate `NUXT_API_INTERNAL_TOKEN` through the tool (`# generate shared`) and place the same
+   value in `XCS_INTERNAL_API_TOKEN_FILE` on the Compose host.
+3. Register the App Platform origin with a trailing slash in the Xaman Developer Console when
+   `NUXT_PUBLIC_XAMAN_API_KEY` is set.
+4. Determine the address the platform ingress presents to the container (log one request) and set
+   `NUXT_TRUSTED_PROXY_CIDRS` to that exact range; leaving it empty collapses every visitor into one
+   SSR rate-limit budget behind the ingress.
+5. After the first deploy, run the header checks from "Browser security-header rollout" against the
+   App Platform domain: exactly one report-only CSP, one HSTS value, `private, no-store` on HTML,
+   immutable caching on `/_nuxt/` assets.
+
+The Compose `web` service and the Dockerfile in `docker/` are unchanged; App Platform builds the
+root `Dockerfile` on every deploy from the configured branch.
 
 ## Optional Testnet demo pinning
 

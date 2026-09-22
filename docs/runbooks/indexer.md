@@ -2,7 +2,7 @@
 
 ## Before starting
 
-1. Copy `.env.example` to `.env`, set PostgreSQL, and configure distinct
+1. Copy `.env.compose.example` to `.env`, set PostgreSQL, and configure distinct
    `XCS_RPC_URL_PRIMARY`/`XCS_RPC_URL_SECONDARY` WSS endpoints operated independently.
    `XCS_INDEXER_DATABASE_URL` must authenticate as the least-privilege `xcs_indexer` role; keep
    `XCS_BOOTSTRAP_DATABASE_URL` confined to the bootstrap command.
