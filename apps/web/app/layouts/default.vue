@@ -59,21 +59,34 @@ onMounted(() => {
 
       <template #right>
         <ExplorerSearch compact class="hidden md:flex" />
-        <label class="sr-only" for="locale">{{ $t('nav.language') }}</label>
-        <USelect
-          id="locale"
-          :model-value="locale"
-          :items="localeItems"
-          size="sm"
-          class="w-28"
-          @update:model-value="setLocale($event as 'fr' | 'en')"
-        />
+        <div class="hidden md:block">
+          <label class="sr-only" for="locale">{{ $t('nav.language') }}</label>
+          <USelect
+            id="locale"
+            :model-value="locale"
+            :items="localeItems"
+            size="sm"
+            class="w-28"
+            @update:model-value="setLocale($event as 'fr' | 'en')"
+          />
+        </div>
         <WalletButton />
       </template>
 
       <template #body>
         <UNavigationMenu :items="navigation" orientation="vertical" class="-mx-2.5" />
         <ExplorerSearch compact class="mt-4" />
+        <div class="mt-4 md:hidden">
+          <label class="sr-only" for="locale-mobile">{{ $t('nav.language') }}</label>
+          <USelect
+            id="locale-mobile"
+            :model-value="locale"
+            :items="localeItems"
+            size="sm"
+            class="w-28"
+            @update:model-value="setLocale($event as 'fr' | 'en')"
+          />
+        </div>
       </template>
     </UHeader>
 

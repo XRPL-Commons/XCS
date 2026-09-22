@@ -51,7 +51,10 @@ export default defineNuxtConfig({
       // pre-bundle on each server start so rebuilt package code cannot be
       // replaced by Nuxt's persistent dependency cache.
       force: true,
-      include: ['@xcs-protocol/core', '@xcs-protocol/sdk'],
+      // `xrpl` and `xrpl-connect` are pulled in lazily by the wallet adapters, so
+      // Vite only discovers them after the first page load and re-optimizes mid-run,
+      // which 504s the in-flight module requests. Pre-bundle them up front.
+      include: ['@xcs-protocol/core', '@xcs-protocol/sdk', 'xrpl', 'xrpl-connect'],
     },
   },
   i18n: {
