@@ -55,9 +55,13 @@ export default defineNuxtConfig({
         // created even though nothing here renders a drawer: `UHeader` imports
         // `UDrawer` statically. Strip the prelude instead of weakening `style-src`.
         // Using `UDrawer`, or `UHeader` in `mode="drawer"`, would need its CSS back.
+        // The strip is fail-closed: it matches the dist entry by exact path suffix and
+        // throws if that module still builds a <style> element after the known prelude
+        // regex failed, so an upstream change cannot silently restore the unnonced tag.
         name: 'xcs:strip-vaul-css-injection',
         transform(code: string, id: string) {
-          if (!id.includes('vaul-vue') || !code.includes('vite-plugin-css-injected-by-js')) {
+          const modulePath = id.split('?', 1)[0] ?? id
+          if (!modulePath.endsWith('/vaul-vue/dist/index.js')) {
             return null
           }
           const stripped = code.replace(
@@ -65,7 +69,17 @@ export default defineNuxtConfig({
             '',
           )
           if (stripped === code) {
-            throw new Error('vaul-vue CSS injection prelude no longer matches; update the strip.')
+            if (/createElement\(\s*['"]style['"]\s*\)/u.test(code)) {
+              throw new Error(
+                `vaul-vue still injects a runtime <style> tag but the CSS injection prelude no longer matches; update the strip in nuxt.config.ts (module: ${modulePath}).`,
+              )
+            }
+            return null
+          }
+          if (/createElement\(\s*['"]style['"]\s*\)/u.test(stripped)) {
+            throw new Error(
+              `vaul-vue still injects a runtime <style> tag after the CSS injection prelude was stripped; update the strip in nuxt.config.ts (module: ${modulePath}).`,
+            )
           }
           return { code: stripped, map: null }
         },
