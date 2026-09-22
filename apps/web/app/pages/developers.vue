@@ -24,6 +24,7 @@ interface DeveloperEvidence {
 }
 
 const config = useRuntimeConfig()
+const localePath = useLocalePath()
 const { t } = useI18n()
 const { getActiveNetworkProfile, getCredentialGeneration, getSchema, verify } = useXcsApi()
 const apiBaseUrl = normalizeDeveloperApiBaseUrl(String(config.public.apiBaseUrl))
@@ -266,17 +267,21 @@ useSeoMeta({
 </script>
 
 <template>
-  <section class="section-wrap prose-page developers-page">
-    <p class="eyebrow">{{ $t('nav.docs') }}</p>
-    <h1>{{ $t('developers.title') }}</h1>
-    <p class="lead">{{ $t('developers.description') }}</p>
+  <UContainer class="py-10 sm:py-14">
+    <PageHeader
+      :eyebrow="$t('nav.docs')"
+      :title="$t('developers.title')"
+      :lead="$t('developers.description')"
+    />
 
-    <section class="developer-runtime" aria-labelledby="developer-runtime-title">
-      <div>
-        <p class="eyebrow">Runtime</p>
-        <h2 id="developer-runtime-title">{{ $t('developers.runtime.title') }}</h2>
-      </div>
-      <dl class="compact-metadata">
+    <UCard class="mb-6" aria-labelledby="developer-runtime-title">
+      <template #header>
+        <p class="text-xs font-semibold tracking-wide text-muted uppercase">Runtime</p>
+        <h2 id="developer-runtime-title" class="text-xl font-semibold">
+          {{ $t('developers.runtime.title') }}
+        </h2>
+      </template>
+      <MetadataList compact>
         <dt>API</dt>
         <dd>
           <code data-testid="developer-api-base">{{ apiBaseUrl }}</code>
@@ -287,82 +292,109 @@ useSeoMeta({
           <code v-else-if="activeProfile" data-testid="developer-profile-id">
             {{ activeProfile.profileId }}
           </code>
-          <button v-else class="text-button" type="button" @click="retryActiveProfile">
+          <UButton
+            v-else
+            color="neutral"
+            variant="link"
+            class="px-0"
+            type="button"
+            @click="retryActiveProfile"
+          >
             {{ $t('common.retry') }}
-          </button>
+          </UButton>
         </dd>
         <dt>XRPL</dt>
         <dd>{{ $t('developers.runtime.testnet') }}</dd>
-      </dl>
-      <p v-if="profileError" class="error-box" role="alert">
+      </MetadataList>
+      <StatusBox v-if="profileError" tone="error" class="mt-4">
         {{ $t('developers.runtime.unavailable') }}
-      </p>
-    </section>
+      </StatusBox>
+    </UCard>
 
-    <div class="definition-grid developer-tools">
-      <section>
-        <h2>REST API</h2>
-        <p>{{ $t('developers.rest') }}</p>
-        <a class="button secondary compact" :href="apiDocumentationUrl" rel="noreferrer">
+    <div class="mb-6 grid gap-4 sm:grid-cols-3">
+      <UCard>
+        <h2 class="mb-2 text-lg font-semibold">REST API</h2>
+        <p class="mb-3 text-sm">{{ $t('developers.rest') }}</p>
+        <UButton
+          size="sm"
+          color="neutral"
+          variant="outline"
+          :href="apiDocumentationUrl"
+          rel="noreferrer"
+        >
           OpenAPI
-        </a>
-      </section>
-      <section>
-        <h2>SDK</h2>
-        <p>{{ $t('developers.sdk') }}</p>
-        <code>@xcs-protocol/sdk</code>
-      </section>
-      <section>
-        <h2>CLI</h2>
-        <p>{{ $t('developers.cli') }}</p>
-        <code>@xcs-protocol/cli</code>
-      </section>
+        </UButton>
+      </UCard>
+      <UCard>
+        <h2 class="mb-2 text-lg font-semibold">SDK</h2>
+        <p class="mb-3 text-sm">{{ $t('developers.sdk') }}</p>
+        <code class="text-sm break-all">@xcs-protocol/sdk</code>
+      </UCard>
+      <UCard>
+        <h2 class="mb-2 text-lg font-semibold">CLI</h2>
+        <p class="mb-3 text-sm">{{ $t('developers.cli') }}</p>
+        <code class="text-sm break-all">@xcs-protocol/cli</code>
+      </UCard>
     </div>
 
-    <section class="developer-quickstart" aria-labelledby="developer-quickstart-title">
-      <p class="eyebrow">Quickstart</p>
-      <h2 id="developer-quickstart-title">{{ $t('developers.quickstart.title') }}</h2>
-      <p>{{ $t('developers.quickstart.intro') }}</p>
-      <ol class="quickstart-steps">
+    <section class="mb-6" aria-labelledby="developer-quickstart-title">
+      <p class="text-xs font-semibold tracking-wide text-muted uppercase">Quickstart</p>
+      <h2 id="developer-quickstart-title" class="mb-2 text-2xl font-semibold">
+        {{ $t('developers.quickstart.title') }}
+      </h2>
+      <p class="mb-3">{{ $t('developers.quickstart.intro') }}</p>
+      <ol class="mb-5 grid list-decimal gap-1 pl-5">
         <li>{{ $t('developers.quickstart.stepGeneration') }}</li>
         <li>{{ $t('developers.quickstart.stepSchema') }}</li>
         <li>{{ $t('developers.quickstart.stepMetadata') }}</li>
         <li>{{ $t('developers.quickstart.stepPayload') }}</li>
       </ol>
 
-      <form class="form-card form-grid" @submit.prevent="loadGeneration">
-        <label for="developer-generation-id">Generation ID</label>
-        <input
-          id="developer-generation-id"
-          v-model.trim="generationInput"
-          name="generationId"
-          inputmode="text"
-          autocomplete="off"
-          pattern="[0-9a-fA-F]{64}"
-          :placeholder="$t('developers.quickstart.generationPlaceholder')"
-          :disabled="busy"
-          data-testid="developer-generation-input"
-        />
-        <p class="form-hint">{{ $t('developers.quickstart.exactOnly') }}</p>
-        <button
-          class="button"
-          type="submit"
-          :disabled="busy || profilePending || !activeProfile"
-          data-testid="developer-load-generation"
-        >
-          {{ busy ? $t('common.working') : $t('developers.quickstart.load') }}
-        </button>
-      </form>
+      <UCard as="form" class="mb-6" @submit.prevent="loadGeneration">
+        <div class="grid gap-5">
+          <UFormField label="Generation ID" :help="$t('developers.quickstart.exactOnly')">
+            <UInput
+              id="developer-generation-id"
+              v-model.trim="generationInput"
+              name="generationId"
+              inputmode="text"
+              autocomplete="off"
+              pattern="[0-9a-fA-F]{64}"
+              :placeholder="$t('developers.quickstart.generationPlaceholder')"
+              :disabled="busy"
+              data-testid="developer-generation-input"
+            />
+          </UFormField>
+          <div>
+            <UButton
+              type="submit"
+              :disabled="busy || profilePending || !activeProfile"
+              data-testid="developer-load-generation"
+            >
+              {{ busy ? $t('common.working') : $t('developers.quickstart.load') }}
+            </UButton>
+          </div>
+        </div>
+      </UCard>
 
-      <div v-if="errorCode" class="error-box" role="alert" data-testid="developer-error">
-        <strong>{{ developerError }}</strong>
+      <StatusBox
+        v-if="errorCode"
+        tone="error"
+        role="alert"
+        data-testid="developer-error"
+        :title="developerError"
+      >
         <code>{{ errorCode }}</code>
-      </div>
+      </StatusBox>
 
       <template v-if="evidence">
-        <section class="evidence-card" data-testid="developer-evidence">
-          <h3>{{ $t('developers.quickstart.evidenceTitle') }}</h3>
-          <dl class="compact-metadata">
+        <UCard class="mb-6" data-testid="developer-evidence">
+          <template #header>
+            <h3 class="text-lg font-semibold">
+              {{ $t('developers.quickstart.evidenceTitle') }}
+            </h3>
+          </template>
+          <MetadataList compact>
             <dt>Generation ID</dt>
             <dd>
               <code>{{ evidence.review.generationId }}</code>
@@ -382,42 +414,54 @@ useSeoMeta({
             </dd>
             <dt>{{ $t('developers.quickstart.metadataPayload') }}</dt>
             <dd><StatusPill :value="evidence.review.report.payload" /></dd>
-          </dl>
-          <p class="neutrality-note">{{ $t('developers.quickstart.generationGuard') }}</p>
-        </section>
+          </MetadataList>
+          <p class="mt-4 border-l-2 border-accented pl-3 text-sm text-toned">
+            {{ $t('developers.quickstart.generationGuard') }}
+          </p>
+        </UCard>
 
-        <form
+        <UCard
           v-if="evidence.review.uri !== null"
-          class="form-card form-grid"
+          as="form"
+          class="mb-6"
           @submit.prevent="verifyLocalPayload"
         >
-          <label for="developer-local-payload">credential.json</label>
-          <textarea
-            id="developer-local-payload"
-            v-model="payloadInput"
-            name="payload"
-            rows="12"
-            spellcheck="false"
-            :placeholder="$t('developers.quickstart.payloadPlaceholder')"
-            :disabled="busy"
-            data-testid="developer-payload-input"
-          />
-          <p class="form-hint">{{ $t('developers.quickstart.canonicalPayload') }}</p>
-          <div class="warning-box developer-transmission-warning">
-            <strong>{{ $t('developers.quickstart.transmissionTitle') }}</strong>
-            <p>{{ $t('developers.quickstart.transmission') }}</p>
-            <p>{{ $t('developers.quickstart.localAlternative') }}</p>
+          <div class="grid gap-5">
+            <UFormField
+              label="credential.json"
+              :help="$t('developers.quickstart.canonicalPayload')"
+            >
+              <UTextarea
+                id="developer-local-payload"
+                v-model="payloadInput"
+                name="payload"
+                :rows="12"
+                spellcheck="false"
+                :placeholder="$t('developers.quickstart.payloadPlaceholder')"
+                :disabled="busy"
+                data-testid="developer-payload-input"
+              />
+            </UFormField>
+            <StatusBox tone="warning" :title="$t('developers.quickstart.transmissionTitle')">
+              <p>{{ $t('developers.quickstart.transmission') }}</p>
+              <p>{{ $t('developers.quickstart.localAlternative') }}</p>
+            </StatusBox>
+            <div>
+              <UButton
+                type="submit"
+                :disabled="busy || payloadInput.length === 0"
+                data-testid="developer-verify-payload"
+              >
+                {{ busy ? $t('common.working') : $t('developers.quickstart.verify') }}
+              </UButton>
+            </div>
           </div>
-          <button
-            class="button"
-            type="submit"
-            :disabled="busy || payloadInput.length === 0"
-            data-testid="developer-verify-payload"
-          >
-            {{ busy ? $t('common.working') : $t('developers.quickstart.verify') }}
-          </button>
-        </form>
-        <p v-else class="neutrality-note" data-testid="developer-no-payload-uri">
+        </UCard>
+        <p
+          v-else
+          class="border-l-2 border-accented pl-3 text-sm text-toned"
+          data-testid="developer-no-payload-uri"
+        >
           {{ $t('developers.quickstart.noPayloadUri') }}
         </p>
 
@@ -426,33 +470,19 @@ useSeoMeta({
           aria-labelledby="developer-dimensions-title"
           data-testid="developer-dimensions"
         >
-          <h3 id="developer-dimensions-title">{{ $t('developers.quickstart.resultTitle') }}</h3>
-          <div class="verification-grid">
-            <article data-testid="developer-dimension-on-chain">
-              <span>{{ $t('verify.onChain') }}</span>
-              <StatusPill :value="payloadReport.onChain" />
-            </article>
-            <article data-testid="developer-dimension-schema">
-              <span>{{ $t('verify.schema') }}</span>
-              <StatusPill :value="payloadReport.schema" />
-            </article>
-            <article data-testid="developer-dimension-payload">
-              <span>{{ $t('verify.payload') }}</span>
-              <StatusPill :value="payloadReport.payload" />
-            </article>
-            <article data-testid="developer-dimension-trust">
-              <span>{{ $t('verify.trust') }}</span>
-              <StatusPill :value="payloadReport.issuerTrust" />
-            </article>
-            <p class="verification-note">{{ $t('verify.trustNote') }}</p>
-          </div>
+          <h3 id="developer-dimensions-title" class="text-lg font-semibold">
+            {{ $t('developers.quickstart.resultTitle') }}
+          </h3>
+          <VerificationGrid :report="payloadReport" test-id-prefix="developer-dimension" />
         </section>
       </template>
     </section>
 
-    <section v-if="snippets" class="developer-snippets" aria-labelledby="developer-code-title">
-      <h2 id="developer-code-title">{{ $t('developers.code.title') }}</h2>
-      <p>{{ $t('developers.code.intro') }}</p>
+    <section v-if="snippets" class="mb-6" aria-labelledby="developer-code-title">
+      <h2 id="developer-code-title" class="mb-2 text-2xl font-semibold">
+        {{ $t('developers.code.title') }}
+      </h2>
+      <p class="mb-3">{{ $t('developers.code.intro') }}</p>
       <CodeSnippet
         :title="$t('developers.code.curl')"
         :code="snippets.curl"
@@ -460,7 +490,9 @@ useSeoMeta({
         :copied-label="$t('developers.code.copied')"
         :copy-error-label="$t('developers.code.copyError')"
       />
-      <p class="neutrality-note">{{ $t('developers.code.curlScope') }}</p>
+      <p class="my-3 border-l-2 border-accented pl-3 text-sm text-toned">
+        {{ $t('developers.code.curlScope') }}
+      </p>
       <CodeSnippet
         :title="$t('developers.code.typescript')"
         :code="snippets.typescript"
@@ -476,12 +508,11 @@ useSeoMeta({
         :copied-label="$t('developers.code.copied')"
         :copy-error-label="$t('developers.code.copyError')"
       />
-      <div class="warning-box">
-        <strong>{{ $t('developers.code.alphaTitle') }}</strong>
+      <StatusBox tone="warning" :title="$t('developers.code.alphaTitle')">
         <p>{{ $t('developers.code.alpha') }}</p>
-      </div>
-      <h3>{{ $t('developers.code.signerTitle') }}</h3>
-      <p>{{ $t('developers.code.signer') }}</p>
+      </StatusBox>
+      <h3 class="mt-6 mb-2 text-lg font-semibold">{{ $t('developers.code.signerTitle') }}</h3>
+      <p class="mb-3">{{ $t('developers.code.signer') }}</p>
       <CodeSnippet
         :title="$t('developers.code.signerExample')"
         :code="snippets.signer"
@@ -491,14 +522,16 @@ useSeoMeta({
       />
     </section>
 
-    <section class="developer-catalog" aria-labelledby="developer-catalog-title">
-      <h2 id="developer-catalog-title">{{ $t('developers.endpoints') }}</h2>
-      <p>{{ $t('developers.catalog.intro') }}</p>
-      <div class="endpoint-groups">
-        <section>
-          <h3>{{ $t('developers.catalog.aggregateTitle') }}</h3>
-          <p>{{ $t('developers.catalog.aggregateIntro') }}</p>
-          <ul>
+    <section class="mb-6" aria-labelledby="developer-catalog-title">
+      <h2 id="developer-catalog-title" class="mb-2 text-2xl font-semibold">
+        {{ $t('developers.endpoints') }}
+      </h2>
+      <p class="mb-4">{{ $t('developers.catalog.intro') }}</p>
+      <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <UCard>
+          <h3 class="mb-2 text-lg font-semibold">{{ $t('developers.catalog.aggregateTitle') }}</h3>
+          <p class="mb-3 text-sm">{{ $t('developers.catalog.aggregateIntro') }}</p>
+          <ul class="grid gap-1 text-sm [&_code]:break-all">
             <li><code>GET /v1/networks</code></li>
             <li><code>GET /v1/networks/:network/status</code></li>
             <li><code>GET /v1/networks/:network/stats</code></li>
@@ -506,11 +539,11 @@ useSeoMeta({
             <li><code>GET /v1/networks/:network/search?q=</code></li>
             <li><code>GET /v1/networks/:network/activity</code></li>
           </ul>
-        </section>
-        <section>
-          <h3>{{ $t('developers.catalog.exactTitle') }}</h3>
-          <p>{{ $t('developers.catalog.exactIntro') }}</p>
-          <ul>
+        </UCard>
+        <UCard>
+          <h3 class="mb-2 text-lg font-semibold">{{ $t('developers.catalog.exactTitle') }}</h3>
+          <p class="mb-3 text-sm">{{ $t('developers.catalog.exactIntro') }}</p>
+          <ul class="grid gap-1 text-sm [&_code]:break-all">
             <li><code>GET /v1/networks/:network/schemas/:uid</code></li>
             <li>
               <code>GET /v1/networks/:network/schema-registrations/:transactionHash</code>
@@ -533,19 +566,21 @@ useSeoMeta({
             </li>
             <li><code>POST /v1/verify</code></li>
           </ul>
-        </section>
-        <section>
-          <h3>{{ $t('developers.catalog.optionalTitle') }}</h3>
-          <p>{{ $t('developers.catalog.optionalIntro') }}</p>
-          <ul>
+        </UCard>
+        <UCard>
+          <h3 class="mb-2 text-lg font-semibold">{{ $t('developers.catalog.optionalTitle') }}</h3>
+          <p class="mb-3 text-sm">{{ $t('developers.catalog.optionalIntro') }}</p>
+          <ul class="grid gap-1 text-sm [&_code]:break-all">
             <li><code>POST /v1/pinning/challenges</code></li>
             <li><code>POST /v1/pinning/pins</code></li>
           </ul>
-        </section>
+        </UCard>
       </div>
-      <p class="privacy-panel">{{ $t('developers.catalog.privacy') }}</p>
+      <p class="mt-4 border-l-2 border-accented pl-3 text-sm text-toned">
+        {{ $t('developers.catalog.privacy') }}
+      </p>
     </section>
 
-    <NuxtLinkLocale class="button" to="/learn">{{ $t('developers.learn') }}</NuxtLinkLocale>
-  </section>
+    <UButton :to="localePath('/learn')">{{ $t('developers.learn') }}</UButton>
+  </UContainer>
 </template>

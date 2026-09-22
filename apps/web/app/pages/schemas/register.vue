@@ -189,130 +189,160 @@ async function submit() {
 </script>
 
 <template>
-  <section class="section-wrap form-page">
-    <p class="eyebrow">Schema publisher</p>
-    <h1>{{ $t('register.title') }}</h1>
-    <p class="lead">{{ $t('register.description') }}</p>
+  <UContainer class="py-10 sm:py-14">
+    <PageHeader
+      eyebrow="Schema publisher"
+      :title="$t('register.title')"
+      :lead="$t('register.description')"
+    />
 
-    <div class="form-card">
-      <div class="editor-tabs" role="group" :aria-label="$t('register.schema')">
-        <button
-          class="button compact"
-          :class="{ secondary: editorMode !== 'guided' }"
-          type="button"
-          :aria-pressed="editorMode === 'guided'"
-          :disabled="pageBusy"
-          @click="selectEditorMode('guided')"
-        >
-          {{ $t('register.guidedMode') }}
-        </button>
-        <button
-          class="button compact"
-          :class="{ secondary: editorMode !== 'json' }"
-          type="button"
-          :aria-pressed="editorMode === 'json'"
-          :disabled="pageBusy"
-          @click="selectEditorMode('json')"
-        >
-          {{ $t('register.jsonMode') }}
-        </button>
-      </div>
-
-      <template v-if="editorMode === 'guided'">
-        <div class="template-row">
-          <button
-            class="text-button"
+    <UCard class="mb-6">
+      <div class="grid gap-5">
+        <div class="flex flex-wrap gap-3" role="group" :aria-label="$t('register.schema')">
+          <UButton
+            size="sm"
+            color="neutral"
+            :variant="editorMode === 'guided' ? 'solid' : 'outline'"
             type="button"
+            :aria-pressed="editorMode === 'guided'"
             :disabled="pageBusy"
-            @click="applyTemplate(createCourseCompletionDraft)"
+            @click="selectEditorMode('guided')"
           >
-            {{ $t('register.courseTemplate') }}
-          </button>
-          <button
-            class="text-button"
+            {{ $t('register.guidedMode') }}
+          </UButton>
+          <UButton
+            size="sm"
+            color="neutral"
+            :variant="editorMode === 'json' ? 'solid' : 'outline'"
             type="button"
+            :aria-pressed="editorMode === 'json'"
             :disabled="pageBusy"
-            @click="applyTemplate(createDiplomaDraft)"
+            @click="selectEditorMode('json')"
           >
-            {{ $t('register.diplomaTemplate') }}
-          </button>
+            {{ $t('register.jsonMode') }}
+          </UButton>
         </div>
 
-        <label for="schema-name">{{ $t('register.schemaName') }}</label>
-        <input id="schema-name" v-model="guidedDraft.name" :disabled="pageBusy" />
-        <label for="schema-description">{{ $t('register.schemaDescription') }}</label>
-        <textarea
-          id="schema-description"
-          v-model="guidedDraft.description"
-          rows="3"
-          :disabled="pageBusy"
-        />
-
-        <fieldset class="guided-fields">
-          <legend>{{ $t('register.fields') }}</legend>
-          <div v-for="(field, index) in guidedDraft.fields" :key="index" class="guided-field-row">
-            <label>
-              <span>{{ $t('register.fieldName') }}</span>
-              <input v-model="field.name" :disabled="pageBusy" autocomplete="off" />
-            </label>
-            <label>
-              <span>{{ $t('register.fieldType') }}</span>
-              <select v-model="field.type" :disabled="pageBusy">
-                <option v-for="type in GUIDED_SCHEMA_FIELD_TYPES" :key="type" :value="type">
-                  {{ type }}
-                </option>
-              </select>
-            </label>
-            <label class="optional-field">
-              <input v-model="field.optional" type="checkbox" :disabled="pageBusy" />
-              {{ $t('register.optional') }}
-            </label>
-            <button
-              class="text-button"
+        <template v-if="editorMode === 'guided'">
+          <div class="flex flex-wrap gap-3">
+            <UButton
+              color="neutral"
+              variant="link"
+              class="px-0"
               type="button"
               :disabled="pageBusy"
-              @click="removeField(index)"
+              @click="applyTemplate(createCourseCompletionDraft)"
             >
-              {{ $t('register.removeField') }}
-            </button>
+              {{ $t('register.courseTemplate') }}
+            </UButton>
+            <UButton
+              color="neutral"
+              variant="link"
+              class="px-0"
+              type="button"
+              :disabled="pageBusy"
+              @click="applyTemplate(createDiplomaDraft)"
+            >
+              {{ $t('register.diplomaTemplate') }}
+            </UButton>
           </div>
-          <button
-            class="button secondary compact"
-            type="button"
-            :disabled="pageBusy"
-            @click="addField"
-          >
-            {{ $t('register.addField') }}
-          </button>
-        </fieldset>
-        <p class="muted">{{ $t('register.advancedHint') }}</p>
-        <div v-if="guidedError" class="error-box">{{ guidedError }}</div>
-      </template>
 
-      <template v-else>
-        <label for="schema-json">{{ $t('register.schema') }}</label>
-        <textarea
-          id="schema-json"
-          v-model="schemaText"
-          rows="18"
-          spellcheck="false"
-          :disabled="pageBusy"
-        />
-      </template>
-      <div class="warning-box">{{ $t('register.irreversible') }}</div>
-      <button class="button" type="button" :disabled="pageBusy" @click="buildPreview">
-        {{ $t('register.prepare') }}
-      </button>
-    </div>
+          <UFormField :label="$t('register.schemaName')">
+            <UInput id="schema-name" v-model="guidedDraft.name" :disabled="pageBusy" />
+          </UFormField>
+          <UFormField :label="$t('register.schemaDescription')">
+            <UTextarea
+              id="schema-description"
+              v-model="guidedDraft.description"
+              :rows="3"
+              :disabled="pageBusy"
+            />
+          </UFormField>
 
-    <div v-if="formError" class="error-box">{{ formError }}</div>
-    <div v-if="canonicalSchema" class="form-card">
-      <h2>{{ $t('register.canonical') }}</h2>
-      <pre>{{ canonicalSchema }}</pre>
-      <p class="muted">
+          <fieldset class="grid gap-3 rounded-[0.8rem] p-4 ring-1 ring-default">
+            <legend class="px-1 font-semibold">{{ $t('register.fields') }}</legend>
+            <div
+              v-for="(field, index) in guidedDraft.fields"
+              :key="index"
+              class="grid gap-3 border-b border-default pb-3 sm:grid-cols-[1fr_10rem_auto_auto] sm:items-end"
+            >
+              <UFormField :label="$t('register.fieldName')">
+                <UInput v-model="field.name" :disabled="pageBusy" autocomplete="off" />
+              </UFormField>
+              <UFormField :label="$t('register.fieldType')">
+                <USelect
+                  v-model="field.type"
+                  :items="GUIDED_SCHEMA_FIELD_TYPES.map((type) => ({ label: type, value: type }))"
+                  :disabled="pageBusy"
+                />
+              </UFormField>
+              <UCheckbox
+                v-model="field.optional"
+                class="sm:pb-2"
+                :disabled="pageBusy"
+                :label="$t('register.optional')"
+              />
+              <UButton
+                color="neutral"
+                variant="link"
+                class="px-0 sm:pb-2"
+                type="button"
+                :disabled="pageBusy"
+                @click="removeField(index)"
+              >
+                {{ $t('register.removeField') }}
+              </UButton>
+            </div>
+            <div>
+              <UButton
+                size="sm"
+                color="neutral"
+                variant="outline"
+                type="button"
+                :disabled="pageBusy"
+                @click="addField"
+              >
+                {{ $t('register.addField') }}
+              </UButton>
+            </div>
+          </fieldset>
+          <p class="text-sm text-muted">{{ $t('register.advancedHint') }}</p>
+          <StatusBox v-if="guidedError" tone="error">{{ guidedError }}</StatusBox>
+        </template>
+
+        <template v-else>
+          <UFormField :label="$t('register.schema')">
+            <UTextarea
+              id="schema-json"
+              v-model="schemaText"
+              :rows="18"
+              spellcheck="false"
+              :disabled="pageBusy"
+            />
+          </UFormField>
+        </template>
+
+        <StatusBox tone="warning">{{ $t('register.irreversible') }}</StatusBox>
+        <div>
+          <UButton type="button" :disabled="pageBusy" @click="buildPreview">
+            {{ $t('register.prepare') }}
+          </UButton>
+        </div>
+      </div>
+    </UCard>
+
+    <StatusBox v-if="formError" tone="error">{{ formError }}</StatusBox>
+
+    <UCard v-if="canonicalSchema" class="mb-6">
+      <template #header>
+        <h2 class="text-xl font-semibold">{{ $t('register.canonical') }}</h2>
+      </template>
+      <JsonBlock :code="canonicalSchema" />
+      <p class="text-sm break-all text-muted">
         {{ memoByteLength }} bytes · <code>{{ schemaDigestHex }}</code>
       </p>
-    </div>
+    </UCard>
+
     <TransactionPreview :transaction="transaction" :busy="pageBusy" @confirm="submit" />
     <BusinessFinality
       v-if="result"
@@ -322,69 +352,13 @@ async function submit() {
       :business-confirmation="result.businessConfirmation"
       :business-evidence="result.businessEvidence"
     />
-    <div
+    <StatusBox
       v-if="result?.businessConfirmation === 'confirmed' && result.businessEvidence?.schemaUid"
-      class="success-box"
+      tone="success"
     >
       <NuxtLinkLocale :to="`/schemas/${result.businessEvidence.schemaUid}`">
         {{ $t('register.openSchema') }}
       </NuxtLinkLocale>
-    </div>
-  </section>
+    </StatusBox>
+  </UContainer>
 </template>
-
-<style scoped>
-.editor-tabs,
-.template-row {
-  display: flex;
-  gap: 0.65rem;
-  flex-wrap: wrap;
-}
-
-.template-row {
-  margin: 1.25rem 0;
-}
-
-.guided-fields {
-  margin: 1.25rem 0;
-  border: 1px solid var(--line);
-  border-radius: 0.8rem;
-  padding: 1rem;
-}
-
-.guided-field-row {
-  display: grid;
-  grid-template-columns: minmax(12rem, 1.5fr) minmax(8rem, 1fr) auto auto;
-  align-items: end;
-  gap: 0.75rem;
-  padding: 0.8rem 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.guided-field-row:last-of-type {
-  margin-bottom: 1rem;
-}
-
-.guided-field-row label:not(.optional-field) {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.optional-field {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding-bottom: 0.65rem;
-}
-
-@media (max-width: 760px) {
-  .guided-field-row {
-    grid-template-columns: 1fr;
-    align-items: start;
-  }
-
-  .optional-field {
-    padding-bottom: 0;
-  }
-}
-</style>

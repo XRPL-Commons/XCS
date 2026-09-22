@@ -24,6 +24,7 @@ import { parseWalletCredentialTransactionError } from '~/utils/walletCompatibili
 import { parseJson } from '~/utils/serialization'
 
 const route = useRoute()
+const localePath = useLocalePath()
 const { t } = useI18n()
 const { account, busy, prepare, signAndSubmit } = useWallet()
 const { getActiveNetworkProfile, getSchema } = useXcsApi()
@@ -460,197 +461,242 @@ const credentialLink = computed(() => {
 </script>
 
 <template>
-  <section class="section-wrap form-page">
-    <p class="eyebrow">Credential issuer</p>
-    <h1>{{ $t('issue.title') }}</h1>
-    <p class="lead">{{ $t('issue.description') }}</p>
-    <div class="warning-box">{{ $t('issue.noPii') }}</div>
+  <UContainer class="py-10 sm:py-14">
+    <PageHeader
+      eyebrow="Credential issuer"
+      :title="$t('issue.title')"
+      :lead="$t('issue.description')"
+    />
+    <StatusBox tone="warning">{{ $t('issue.noPii') }}</StatusBox>
 
-    <div class="form-card form-grid">
-      <label for="schema-uid">Schema UID</label>
-      <input
-        id="schema-uid"
-        v-model.trim="schemaUid"
-        required
-        pattern="[0-9a-fA-F]{64}"
-        :disabled="submissionBusy"
-      />
-      <label for="subject">Subject</label>
-      <input
-        id="subject"
-        v-model.trim="subject"
-        required
-        placeholder="r…"
-        :disabled="submissionBusy"
-      />
-      <div class="claims-toolbar">
-        <button
-          class="button compact"
-          :class="{ secondary: claimsEditorMode !== 'guided' }"
-          type="button"
-          :aria-pressed="claimsEditorMode === 'guided'"
-          :disabled="submissionBusy"
-          @click="selectClaimsEditorMode('guided')"
-        >
-          {{ $t('issue.guidedClaims') }}
-        </button>
-        <button
-          class="button compact"
-          :class="{ secondary: claimsEditorMode !== 'json' }"
-          type="button"
-          :aria-pressed="claimsEditorMode === 'json'"
-          :disabled="submissionBusy"
-          @click="selectClaimsEditorMode('json')"
-        >
-          {{ $t('issue.jsonClaims') }}
-        </button>
-        <button
-          class="button secondary compact"
-          type="button"
-          :disabled="submissionBusy || schemaLoadBusy"
-          @click="loadGuidedClaimForm"
-        >
-          {{ $t('issue.loadSchema') }}
-        </button>
-      </div>
-
-      <template v-if="claimsEditorMode === 'guided'">
-        <p v-if="loadedSchemaName" class="form-hint">
-          {{ $t('issue.loadedSchema', { name: loadedSchemaName }) }}
-        </p>
-        <div v-if="guidedClaims.length" class="guided-claims">
-          <label v-for="field in guidedClaims" :key="field.name" :for="`claim-${field.name}`">
-            <span>
-              {{ field.name }}
-              <small>
-                · {{ field.type }} ·
-                {{ $t(field.optional ? 'issue.optionalField' : 'issue.requiredField') }}
-              </small>
-            </span>
-            <select
-              v-if="field.type === 'bool'"
-              :id="`claim-${field.name}`"
-              v-model="field.value"
-              :required="!field.optional"
-              :disabled="submissionBusy"
-            >
-              <option :value="undefined">—</option>
-              <option value="true">true</option>
-              <option value="false">false</option>
-            </select>
-            <input
-              v-else
-              :id="`claim-${field.name}`"
-              v-model="field.value"
-              :required="!field.optional"
-              :inputmode="field.type === 'uint' || field.type === 'int' ? 'numeric' : 'text'"
-              :disabled="submissionBusy"
-              autocomplete="off"
-            />
-          </label>
-        </div>
-        <p v-else class="form-hint">{{ $t('issue.advancedClaimsHint') }}</p>
-        <div v-if="guidedClaimsError && guidedClaims.length" class="error-box">
-          {{ guidedClaimsError }}
-        </div>
-      </template>
-      <template v-else>
-        <label for="claims">Claims JSON</label>
-        <textarea
-          id="claims"
-          v-model="claimsText"
-          rows="12"
-          spellcheck="false"
-          :disabled="submissionBusy"
-        />
-      </template>
-      <template v-if="localPayloadStoreEnabled">
-        <label for="payload-storage-mode">{{ $t('issue.storage') }}</label>
-        <select id="payload-storage-mode" v-model="storageMode" :disabled="submissionBusy">
-          <option value="https">{{ $t('issue.localStore.httpsMode') }}</option>
-          <option value="local-test">{{ $t('issue.localStore.mode') }}</option>
-        </select>
-        <div
-          v-if="storageMode === 'local-test'"
-          class="warning-box local-store-controls"
-          data-testid="local-payload-store-controls"
-        >
-          <strong>{{ $t('issue.localStore.title') }}</strong>
-          <p>{{ $t('issue.localStore.warning') }}</p>
-          <label>
-            <input v-model="localStoreAcknowledged" type="checkbox" :disabled="submissionBusy" />
-            {{ $t('issue.localStore.acknowledgement') }}
-          </label>
-          <button
-            class="button secondary compact"
-            type="button"
+    <UCard class="mb-6">
+      <div class="grid gap-5">
+        <UFormField label="Schema UID">
+          <UInput
+            id="schema-uid"
+            v-model.trim="schemaUid"
+            required
+            pattern="[0-9a-fA-F]{64}"
             :disabled="submissionBusy"
-            @click="clearLocalPayloadStore"
-          >
-            {{ $t('issue.localStore.clear') }}
-          </button>
-          <p v-if="localStoreNotice" class="form-hint" data-testid="local-store-notice">
-            {{ localStoreNotice }}
-          </p>
-        </div>
-      </template>
-      <template v-if="storageMode === 'https'">
-        <label for="https-url">{{ $t('issue.httpsUrlLabel') }}</label>
-        <input
-          id="https-url"
-          v-model.trim="httpsUrl"
-          type="url"
-          required
-          autocomplete="off"
-          :placeholder="$t('issue.httpsUrlPlaceholder')"
-          :disabled="submissionBusy"
-        />
-        <p class="form-hint">{{ $t('issue.httpsProof') }}</p>
-      </template>
-      <p v-else class="form-hint">{{ $t('issue.localStore.flow') }}</p>
-      <label for="expiration">{{ $t('issue.expiration') }}</label>
-      <input
-        id="expiration"
-        v-model="expiration"
-        type="datetime-local"
-        :disabled="submissionBusy"
-      />
-      <button class="button" type="button" :disabled="submissionBusy" @click="buildPreview">
-        {{ $t('issue.prepare') }}
-      </button>
-    </div>
+          />
+        </UFormField>
+        <UFormField label="Subject">
+          <UInput
+            id="subject"
+            v-model.trim="subject"
+            required
+            placeholder="r…"
+            :disabled="submissionBusy"
+          />
+        </UFormField>
 
-    <div v-if="formError" class="error-box" role="alert" data-testid="issue-error">
-      <strong>{{ formErrorMessage }}</strong>
+        <div class="flex flex-wrap gap-3">
+          <UButton
+            size="sm"
+            color="neutral"
+            :variant="claimsEditorMode === 'guided' ? 'solid' : 'outline'"
+            type="button"
+            :aria-pressed="claimsEditorMode === 'guided'"
+            :disabled="submissionBusy"
+            @click="selectClaimsEditorMode('guided')"
+          >
+            {{ $t('issue.guidedClaims') }}
+          </UButton>
+          <UButton
+            size="sm"
+            color="neutral"
+            :variant="claimsEditorMode === 'json' ? 'solid' : 'outline'"
+            type="button"
+            :aria-pressed="claimsEditorMode === 'json'"
+            :disabled="submissionBusy"
+            @click="selectClaimsEditorMode('json')"
+          >
+            {{ $t('issue.jsonClaims') }}
+          </UButton>
+          <UButton
+            size="sm"
+            color="neutral"
+            variant="outline"
+            type="button"
+            :disabled="submissionBusy || schemaLoadBusy"
+            @click="loadGuidedClaimForm"
+          >
+            {{ $t('issue.loadSchema') }}
+          </UButton>
+        </div>
+
+        <template v-if="claimsEditorMode === 'guided'">
+          <p v-if="loadedSchemaName" class="text-sm text-muted">
+            {{ $t('issue.loadedSchema', { name: loadedSchemaName }) }}
+          </p>
+          <div v-if="guidedClaims.length" class="grid gap-4">
+            <UFormField
+              v-for="field in guidedClaims"
+              :key="field.name"
+              :for="`claim-${field.name}`"
+              :label="field.name"
+              :hint="`${field.type} · ${$t(field.optional ? 'issue.optionalField' : 'issue.requiredField')}`"
+            >
+              <USelect
+                v-if="field.type === 'bool'"
+                :id="`claim-${field.name}`"
+                v-model="field.value"
+                :items="[
+                  { label: '—', value: undefined },
+                  { label: 'true', value: 'true' },
+                  { label: 'false', value: 'false' },
+                ]"
+                :required="!field.optional"
+                :disabled="submissionBusy"
+              />
+              <UInput
+                v-else
+                :id="`claim-${field.name}`"
+                v-model="field.value"
+                :required="!field.optional"
+                :inputmode="field.type === 'uint' || field.type === 'int' ? 'numeric' : 'text'"
+                :disabled="submissionBusy"
+                autocomplete="off"
+              />
+            </UFormField>
+          </div>
+          <p v-else class="text-sm text-muted">{{ $t('issue.advancedClaimsHint') }}</p>
+          <StatusBox v-if="guidedClaimsError && guidedClaims.length" tone="error">
+            {{ guidedClaimsError }}
+          </StatusBox>
+        </template>
+        <template v-else>
+          <UFormField label="Claims JSON">
+            <UTextarea
+              id="claims"
+              v-model="claimsText"
+              :rows="12"
+              spellcheck="false"
+              :disabled="submissionBusy"
+            />
+          </UFormField>
+        </template>
+
+        <template v-if="localPayloadStoreEnabled">
+          <!-- Native select: the pilot suite drives this control with selectOption(). -->
+          <UFormField :label="$t('issue.storage')" for="payload-storage-mode">
+            <select
+              id="payload-storage-mode"
+              v-model="storageMode"
+              :disabled="submissionBusy"
+              class="w-full rounded-[0.5rem] bg-default px-3 py-2 text-sm ring-1 ring-accented focus:outline-2 focus:outline-offset-2 focus:outline-primary disabled:opacity-60"
+            >
+              <option value="https">{{ $t('issue.localStore.httpsMode') }}</option>
+              <option value="local-test">{{ $t('issue.localStore.mode') }}</option>
+            </select>
+          </UFormField>
+          <StatusBox
+            v-if="storageMode === 'local-test'"
+            tone="warning"
+            data-testid="local-payload-store-controls"
+            :title="$t('issue.localStore.title')"
+          >
+            <p>{{ $t('issue.localStore.warning') }}</p>
+            <UCheckbox
+              v-model="localStoreAcknowledged"
+              :disabled="submissionBusy"
+              :label="$t('issue.localStore.acknowledgement')"
+            />
+            <div>
+              <UButton
+                size="sm"
+                color="neutral"
+                variant="outline"
+                type="button"
+                :disabled="submissionBusy"
+                @click="clearLocalPayloadStore"
+              >
+                {{ $t('issue.localStore.clear') }}
+              </UButton>
+            </div>
+            <p v-if="localStoreNotice" class="text-sm text-muted" data-testid="local-store-notice">
+              {{ localStoreNotice }}
+            </p>
+          </StatusBox>
+        </template>
+
+        <UFormField
+          v-if="storageMode === 'https'"
+          :label="$t('issue.httpsUrlLabel')"
+          :help="$t('issue.httpsProof')"
+        >
+          <UInput
+            id="https-url"
+            v-model.trim="httpsUrl"
+            type="url"
+            required
+            autocomplete="off"
+            :placeholder="$t('issue.httpsUrlPlaceholder')"
+            :disabled="submissionBusy"
+          />
+        </UFormField>
+        <p v-else class="text-sm text-muted">{{ $t('issue.localStore.flow') }}</p>
+
+        <UFormField :label="$t('issue.expiration')">
+          <UInput
+            id="expiration"
+            v-model="expiration"
+            type="datetime-local"
+            :disabled="submissionBusy"
+          />
+        </UFormField>
+        <div>
+          <UButton type="button" :disabled="submissionBusy" @click="buildPreview">
+            {{ $t('issue.prepare') }}
+          </UButton>
+        </div>
+      </div>
+    </UCard>
+
+    <StatusBox
+      v-if="formError"
+      tone="error"
+      data-testid="issue-error"
+      :title="formErrorMessage"
+      role="alert"
+    >
       <p v-if="formErrorIsLocalized">
         <code>{{ formError }}</code>
       </p>
-    </div>
-    <div v-if="canonicalPayload" class="form-card">
-      <h2>{{ $t('issue.payload') }}</h2>
-      <pre>{{ canonicalPayload }}</pre>
-      <p>
+    </StatusBox>
+
+    <UCard v-if="canonicalPayload" class="mb-6">
+      <template #header>
+        <h2 class="text-xl font-semibold">{{ $t('issue.payload') }}</h2>
+      </template>
+      <JsonBlock :code="canonicalPayload" />
+      <p class="text-sm break-all">
         <code>{{ credentialUri }}</code>
       </p>
-      <button class="button secondary" type="button" @click="downloadPayload">
-        {{ $t('issue.download') }}
-      </button>
-      <p v-if="storageMode === 'https'" class="form-hint">
+      <div class="my-4">
+        <UButton color="neutral" variant="outline" type="button" @click="downloadPayload">
+          {{ $t('issue.download') }}
+        </UButton>
+      </div>
+      <p v-if="storageMode === 'https'" class="text-sm break-words text-muted">
         {{ $t('issue.publishBeforeSigning', { url: httpsUrl }) }}
       </p>
-      <div v-else-if="localPublication" class="success-box" data-testid="local-payload-stored">
+      <StatusBox v-else-if="localPublication" tone="success" data-testid="local-payload-stored">
         {{ $t('issue.localStore.stored', { expiresAt: localPublication.expiresAt }) }}
-      </div>
-      <div v-if="publicationCheckBusy" class="notice-box">{{ $t('issue.checking') }}</div>
-      <div v-else-if="publicationProof" class="success-box">
-        {{
-          $t(storageMode === 'local-test' ? 'issue.localStore.checked' : 'issue.checked', {
-            bytes: publicationProof.byteLength,
-          })
-        }}
-        <code>{{ publicationProof.digestHex }}</code>
-      </div>
-    </div>
+      </StatusBox>
+      <StatusBox v-if="publicationCheckBusy" tone="notice">{{ $t('issue.checking') }}</StatusBox>
+      <StatusBox v-else-if="publicationProof" tone="success">
+        <p class="break-all">
+          {{
+            $t(storageMode === 'local-test' ? 'issue.localStore.checked' : 'issue.checked', {
+              bytes: publicationProof.byteLength,
+            })
+          }}
+          <code>{{ publicationProof.digestHex }}</code>
+        </p>
+      </StatusBox>
+    </UCard>
+
     <TransactionPreview :transaction="transaction" :busy="submissionBusy" @confirm="submit" />
     <BusinessFinality
       v-if="result"
@@ -660,50 +706,23 @@ const credentialLink = computed(() => {
       :business-confirmation="result.businessConfirmation"
       :business-evidence="result.businessEvidence"
     />
-    <div v-if="acceptLink && credentialLink" class="form-card">
-      <h2>{{ $t('issue.links') }}</h2>
-      <p>
-        <NuxtLinkLocale data-testid="issue-credential-link" :to="credentialLink">
+    <UCard v-if="acceptLink && credentialLink" class="mb-6">
+      <template #header>
+        <h2 class="text-xl font-semibold">{{ $t('issue.links') }}</h2>
+      </template>
+      <div class="flex flex-wrap gap-3">
+        <UButton
+          color="neutral"
+          variant="outline"
+          data-testid="issue-credential-link"
+          :to="localePath(credentialLink)"
+        >
           {{ $t('issue.credentialLink') }}
-        </NuxtLinkLocale>
-      </p>
-      <p>
-        <NuxtLinkLocale :to="acceptLink">{{ $t('issue.acceptLink') }}</NuxtLinkLocale>
-      </p>
-    </div>
-  </section>
+        </UButton>
+        <UButton color="neutral" variant="outline" :to="localePath(acceptLink)">
+          {{ $t('issue.acceptLink') }}
+        </UButton>
+      </div>
+    </UCard>
+  </UContainer>
 </template>
-
-<style scoped>
-.claims-toolbar {
-  display: flex;
-  gap: 0.65rem;
-  flex-wrap: wrap;
-}
-
-.guided-claims {
-  display: grid;
-  gap: 0.85rem;
-}
-
-.guided-claims label {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.guided-claims small {
-  color: var(--muted);
-  font-weight: 500;
-}
-
-.local-store-controls {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.local-store-controls label {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.55rem;
-}
-</style>
