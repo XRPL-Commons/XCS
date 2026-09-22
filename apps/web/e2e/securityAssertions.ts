@@ -12,7 +12,7 @@ const STRICT_DIRECTIVES = {
   'media-src': ["'none'"],
   'object-src': ["'none'"],
   'script-src-attr': ["'none'"],
-  'style-src-attr': ["'none'"],
+  'style-src-attr': ["'unsafe-inline'"],
   'worker-src': ["'self'"],
 } as const
 
@@ -79,12 +79,16 @@ export function expectStrictReportOnlyPolicy(
   expect(headers['content-security-policy']).toBeUndefined()
 
   const rawPolicy = requiredHeader(response, 'content-security-policy-report-only')
-  expect(rawPolicy).not.toContain("'unsafe-inline'")
   expect(rawPolicy).not.toContain("'unsafe-eval'")
   expect(rawPolicy).not.toContain('upgrade-insecure-requests')
 
   const policy = parseCsp(rawPolicy)
   expect([...policy.keys()].sort()).toEqual(COMPLETE_DIRECTIVE_SET)
+  // 'unsafe-inline' is allowed for style attributes only; Nuxt UI overlays position through them.
+  for (const [directive, sources] of policy) {
+    if (directive === 'style-src-attr') continue
+    expect(sources, directive).not.toContain("'unsafe-inline'")
+  }
   for (const [directive, sources] of Object.entries(STRICT_DIRECTIVES)) {
     expect(policy.get(directive), directive).toEqual(sources)
   }

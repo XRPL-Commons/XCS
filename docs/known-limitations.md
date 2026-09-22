@@ -89,6 +89,9 @@ integrators.
   tooling but blocks nothing, so it is not yet an XSS or signed-blob exfiltration control. Enforcement
   remains gated on the real XRPL Connect wallet matrix, including qualification of WalletConnect
   modal styles and images; the ingress must preserve one policy instead of appending its own.
+  Inline `style` attributes are allowed (`style-src-attr 'unsafe-inline'`) because the Nuxt UI
+  component library positions menus, popovers and toasts through them; script execution remains
+  nonce-gated with `'strict-dynamic'`, which is the XSS control.
 - The policy's `connect-src https:` allowance is intentional: permissionless issuer-hosted payload
   domains cannot be known at deployment time. Host display, explicit consent, exact-generation
   revalidation and payload integrity checks remain the application boundary. Narrowing this to a

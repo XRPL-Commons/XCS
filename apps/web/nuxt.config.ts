@@ -46,6 +46,31 @@ export default defineNuxtConfig({
     },
   },
   vite: {
+    plugins: [
+      {
+        // `vaul-vue` ships its drawer CSS as a `vite-plugin-css-injected-by-js`
+        // prelude that appends a runtime <style> tag. It nonces that tag from a
+        // `meta[property="csp-nonce"]`, which production deliberately does not
+        // expose, so the tag lands unnonced and violates `style-src`. The tag is
+        // created even though nothing here renders a drawer: `UHeader` imports
+        // `UDrawer` statically. Strip the prelude instead of weakening `style-src`.
+        // Using `UDrawer`, or `UHeader` in `mode="drawer"`, would need its CSS back.
+        name: 'xcs:strip-vaul-css-injection',
+        transform(code: string, id: string) {
+          if (!id.includes('vaul-vue') || !code.includes('vite-plugin-css-injected-by-js')) {
+            return null
+          }
+          const stripped = code.replace(
+            /^\(function\(\)\{[\s\S]*?vite-plugin-css-injected-by-js[\s\S]*?\}\)\(\);/u,
+            '',
+          )
+          if (stripped === code) {
+            throw new Error('vaul-vue CSS injection prelude no longer matches; update the strip.')
+          }
+          return { code: stripped, map: null }
+        },
+      },
+    ],
     optimizeDeps: {
       // These linked workspace packages publish from dist. Force a fresh
       // pre-bundle on each server start so rebuilt package code cannot be
@@ -55,6 +80,8 @@ export default defineNuxtConfig({
       // Vite only discovers them after the first page load and re-optimizes mid-run,
       // which 504s the in-flight module requests. Pre-bundle them up front.
       include: ['@xcs-protocol/core', '@xcs-protocol/sdk', 'xrpl', 'xrpl-connect'],
+      // Served unbundled so the CSS-injection strip above also runs in dev.
+      exclude: ['vaul-vue'],
     },
   },
   i18n: {
@@ -106,7 +133,9 @@ export default defineNuxtConfig({
         'script-src': ["'self'", "'strict-dynamic'", "'nonce-{{nonce}}'"],
         'script-src-attr': ["'none'"],
         'style-src': ["'self'", "'nonce-{{nonce}}'"],
-        'style-src-attr': ["'none'"],
+        // Reka UI and Floating UI position overlays through inline style attributes.
+        // Script execution stays nonce-gated with 'strict-dynamic'.
+        'style-src-attr': ["'unsafe-inline'"],
         'worker-src': ["'self'"],
         'upgrade-insecure-requests': false,
       },

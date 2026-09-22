@@ -5,6 +5,15 @@ keeps four entries—Explorer, Create, Verify and Docs—while preserving the sc
 lifecycle and developer workflows in one deployment. EAS and EASScan are interaction-design
 references only; the site constructs native XRPL transactions under the frozen XCS v0.1 protocol.
 
+## UI stack
+
+The site is built on Nuxt UI 4 and Tailwind CSS 4. The XCS identity lives in
+`app/assets/css/main.css` (theme tokens and Nuxt UI semantic variables) and `app/app.config.ts`
+(component defaults). Repeated XCS patterns are the small kit in `app/components/` (`PageHeader`,
+`StatusBox`, `StatusPill`, `MetadataList`, `VerificationGrid`, `JsonBlock`, `Pagination`,
+`EmptyState`); pages compose Nuxt UI primitives with it and keep their workflow logic in
+`composables/` and `utils/`.
+
 For every write, the application constructs and autofills an XRPL transaction, shows those exact
 final fields to the user, then asks an external wallet to sign without submitting. The private key
 or seed never enters the application. There is no XCS user or organization account, server session,
