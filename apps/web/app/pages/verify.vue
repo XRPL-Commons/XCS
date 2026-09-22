@@ -267,64 +267,90 @@ useSeoMeta({
 </script>
 
 <template>
-  <section class="section-wrap form-page verify-page">
-    <p class="eyebrow">{{ $t('nav.verify') }}</p>
-    <h1>{{ $t('verify.title') }}</h1>
-    <p class="lead">{{ $t('verify.description') }}</p>
+  <UContainer class="py-10 sm:py-14">
+    <PageHeader
+      :eyebrow="$t('nav.verify')"
+      :title="$t('verify.title')"
+      :lead="$t('verify.description')"
+    />
 
-    <form class="verification-lookup-card" novalidate @submit.prevent="openGeneration">
-      <label for="verify-generation">{{ $t('verify.generationLabel') }}</label>
-      <div class="verification-lookup-control">
-        <input
-          id="verify-generation"
-          v-model.trim="generationLookup"
-          name="generation"
-          inputmode="text"
-          autocomplete="off"
-          pattern="[0-9a-fA-F]{64}"
-          :placeholder="$t('verify.generationPlaceholder')"
-          :aria-describedby="generationLookupError ? 'verify-generation-error' : undefined"
-        />
-        <button class="button" type="submit">{{ $t('verify.openGeneration') }}</button>
-      </div>
-      <p class="form-hint">{{ $t('verify.generationHint') }}</p>
-      <p
-        v-if="generationLookupError"
-        id="verify-generation-error"
-        class="inline-form-error"
-        role="alert"
+    <UCard as="form" class="mb-6" novalidate @submit.prevent="openGeneration">
+      <UFormField
+        :label="$t('verify.generationLabel')"
+        :help="$t('verify.generationHint')"
+        :error="generationLookupError || undefined"
       >
-        {{ generationLookupError }}
-      </p>
-    </form>
+        <div class="flex flex-wrap items-center gap-2">
+          <UInput
+            id="verify-generation"
+            v-model.trim="generationLookup"
+            name="generation"
+            inputmode="text"
+            autocomplete="off"
+            pattern="[0-9a-fA-F]{64}"
+            class="min-w-0 flex-1"
+            :placeholder="$t('verify.generationPlaceholder')"
+            :aria-describedby="generationLookupError ? 'verify-generation-error' : undefined"
+          />
+          <UButton type="submit">{{ $t('verify.openGeneration') }}</UButton>
+        </div>
+        <p
+          v-if="generationLookupError"
+          id="verify-generation-error"
+          role="alert"
+          class="mt-2 text-sm text-error"
+        >
+          {{ generationLookupError }}
+        </p>
+      </UFormField>
+    </UCard>
 
-    <details class="advanced-verification" :open="Boolean(issuer || subject || schemaUid)">
-      <summary>
-        <span>{{ $t('verify.advancedTitle') }}</span>
-        <small>{{ $t('verify.advancedDescription') }}</small>
-      </summary>
-      <div class="form-card form-grid">
-        <label for="verify-issuer">Issuer</label>
-        <input id="verify-issuer" v-model.trim="issuer" placeholder="r…" :disabled="busy" />
-        <label for="verify-subject">Subject</label>
-        <input id="verify-subject" v-model.trim="subject" placeholder="r…" :disabled="busy" />
-        <label for="verify-schema">Schema UID</label>
-        <input
-          id="verify-schema"
-          v-model.trim="schemaUid"
-          pattern="[0-9a-fA-F]{64}"
-          :disabled="busy"
-        />
-        <button class="button" type="button" :disabled="busy" @click="loadMetadata">
-          {{ busy ? $t('common.working') : $t('verify.loadMetadata') }}
-        </button>
-      </div>
-    </details>
-    <div v-if="error" class="error-box">{{ error }}</div>
+    <UCollapsible :default-open="Boolean(issuer || subject || schemaUid)" class="mb-6">
+      <UButton color="neutral" variant="ghost" trailing-icon="i-lucide-chevron-down" block>
+        <span class="min-w-0 text-left">
+          {{ $t('verify.advancedTitle') }}
+          <small class="text-muted">{{ $t('verify.advancedDescription') }}</small>
+        </span>
+      </UButton>
+      <template #content>
+        <UCard class="mt-3">
+          <div class="grid gap-5">
+            <UFormField label="Issuer">
+              <UInput id="verify-issuer" v-model.trim="issuer" placeholder="r…" :disabled="busy" />
+            </UFormField>
+            <UFormField label="Subject">
+              <UInput
+                id="verify-subject"
+                v-model.trim="subject"
+                placeholder="r…"
+                :disabled="busy"
+              />
+            </UFormField>
+            <UFormField label="Schema UID">
+              <UInput
+                id="verify-schema"
+                v-model.trim="schemaUid"
+                pattern="[0-9a-fA-F]{64}"
+                :disabled="busy"
+              />
+            </UFormField>
+            <div>
+              <UButton :disabled="busy" @click="loadMetadata">
+                {{ busy ? $t('common.working') : $t('verify.loadMetadata') }}
+              </UButton>
+            </div>
+          </div>
+        </UCard>
+      </template>
+    </UCollapsible>
 
-    <article v-if="review" class="form-card">
-      <h2>{{ $t('verify.metadata') }}</h2>
-      <dl class="metadata-list">
+    <StatusBox v-if="error" tone="error">{{ error }}</StatusBox>
+
+    <UCard v-if="review" class="mb-6">
+      <template #header>
+        <h2 class="text-xl font-semibold">{{ $t('verify.metadata') }}</h2>
+      </template>
+      <MetadataList>
         <dt>Issuer</dt>
         <dd>
           <code>{{ review.issuer }}</code>
@@ -346,29 +372,11 @@ useSeoMeta({
         <dd>
           <code>{{ review.uri ?? '—' }}</code>
         </dd>
-      </dl>
+      </MetadataList>
 
-      <div class="verification-grid">
-        <article>
-          <span>{{ $t('verify.onChain') }}</span
-          ><StatusPill :value="review.report.onChain" />
-        </article>
-        <article>
-          <span>{{ $t('verify.schema') }}</span
-          ><StatusPill :value="review.report.schema" />
-        </article>
-        <article>
-          <span>{{ $t('verify.payload') }}</span
-          ><StatusPill :value="review.report.payload" />
-        </article>
-        <article>
-          <span>{{ $t('verify.trust') }}</span
-          ><StatusPill :value="review.report.issuerTrust" />
-        </article>
-        <p class="verification-note">{{ $t('verify.trustNote') }}</p>
-      </div>
+      <VerificationGrid :report="review.report" />
 
-      <div v-if="!review.payload" class="warning-box">
+      <StatusBox v-if="!review.payload" tone="warning">
         <p>
           {{
             $t(
@@ -379,31 +387,31 @@ useSeoMeta({
             )
           }}
         </p>
-        <div v-if="payloadHostError" class="error-box">{{ payloadHostErrorMessage }}</div>
-        <label v-else-if="payloadHost">
-          <input
-            data-testid="payload-consent"
-            type="checkbox"
-            :checked="payloadConsent"
-            :disabled="busy"
-            @change="setPayloadConsent(($event.target as HTMLInputElement).checked)"
-          />
-          {{ $t(payloadUsesLocalStore ? 'verify.localPayloadConsent' : 'verify.payloadConsent') }}
-        </label>
-        <button
+        <StatusBox v-if="payloadHostError" tone="error">{{ payloadHostErrorMessage }}</StatusBox>
+        <UCheckbox
+          v-else-if="payloadHost"
+          data-testid="payload-consent"
+          :model-value="payloadConsent"
+          :disabled="busy"
+          :label="
+            $t(payloadUsesLocalStore ? 'verify.localPayloadConsent' : 'verify.payloadConsent')
+          "
+          @update:model-value="setPayloadConsent(Boolean($event))"
+        />
+        <UButton
           data-testid="payload-fetch"
-          class="button secondary"
-          type="button"
+          color="neutral"
+          variant="outline"
           :disabled="busy || !payloadConsent"
           @click="verifyPayload"
         >
           {{ $t(payloadUsesLocalStore ? 'verify.localFetch' : 'verify.fetch') }}
-        </button>
-      </div>
-      <div v-else class="success-box">
+        </UButton>
+      </StatusBox>
+      <StatusBox v-else tone="success">
         {{ $t('verify.payloadChecked', { bytes: review.payloadByteLength ?? 0 }) }}
         <code>{{ review.payloadDigestHex }}</code>
-      </div>
-    </article>
-  </section>
+      </StatusBox>
+    </UCard>
+  </UContainer>
 </template>

@@ -28,6 +28,7 @@ import { LOCAL_PAYLOAD_LOCATION } from '~/utils/localPayloadStore'
 import { parseWalletCredentialTransactionError } from '~/utils/walletCompatibility'
 
 const route = useRoute()
+const localePath = useLocalePath()
 const { t } = useI18n()
 const { account, busy: walletBusy, prepare, signAndSubmit } = useWallet()
 const { getActiveNetworkProfile, getCredential, getCredentialGeneration, getSchema, verify } =
@@ -652,48 +653,64 @@ async function submit() {
 </script>
 
 <template>
-  <section class="section-wrap form-page">
-    <p class="eyebrow">Credential subject</p>
-    <h1>{{ $t('accept.title') }}</h1>
-    <p class="lead">{{ $t('accept.description') }}</p>
-    <div class="warning-box">{{ $t('accept.notTruth') }}</div>
+  <UContainer class="py-10 sm:py-14">
+    <PageHeader
+      eyebrow="Credential subject"
+      :title="$t('accept.title')"
+      :lead="$t('accept.description')"
+    />
+    <StatusBox tone="warning">{{ $t('accept.notTruth') }}</StatusBox>
 
-    <div class="form-card form-grid">
-      <label for="subject-action">{{ $t('accept.action') }}</label>
-      <select id="subject-action" v-model="action" :disabled="busy">
-        <option value="accept">{{ $t('accept.acceptAction') }}</option>
-        <option value="reject">{{ $t('accept.rejectAction') }}</option>
-        <option value="remove">{{ $t('accept.removeAction') }}</option>
-      </select>
-      <label for="issuer">Issuer</label>
-      <input id="issuer" v-model.trim="issuer" placeholder="r…" :disabled="busy" />
-      <label for="accept-schema">Schema UID</label>
-      <input
-        id="accept-schema"
-        v-model.trim="schemaUid"
-        pattern="[0-9a-fA-F]{64}"
-        :disabled="busy"
-      />
-      <button class="button" type="button" :disabled="busy" @click="buildPreview">
-        {{
-          busy
-            ? $t('common.working')
-            : action === 'accept' && review && payloadConsent
-              ? $t('accept.fetchAndPrepare')
-              : $t('accept.review')
-        }}
-      </button>
-    </div>
+    <UCard class="mb-6">
+      <div class="grid gap-5">
+        <UFormField :label="$t('accept.action')">
+          <USelect
+            id="subject-action"
+            v-model="action"
+            :items="[
+              { label: $t('accept.acceptAction'), value: 'accept' },
+              { label: $t('accept.rejectAction'), value: 'reject' },
+              { label: $t('accept.removeAction'), value: 'remove' },
+            ]"
+            :disabled="busy"
+          />
+        </UFormField>
+        <UFormField label="Issuer">
+          <UInput id="issuer" v-model.trim="issuer" placeholder="r…" :disabled="busy" />
+        </UFormField>
+        <UFormField label="Schema UID">
+          <UInput
+            id="accept-schema"
+            v-model.trim="schemaUid"
+            pattern="[0-9a-fA-F]{64}"
+            :disabled="busy"
+          />
+        </UFormField>
+        <div>
+          <UButton :disabled="busy" @click="buildPreview">
+            {{
+              busy
+                ? $t('common.working')
+                : action === 'accept' && review && payloadConsent
+                  ? $t('accept.fetchAndPrepare')
+                  : $t('accept.review')
+            }}
+          </UButton>
+        </div>
+      </div>
+    </UCard>
 
-    <div v-if="message" class="error-box" role="alert" data-testid="accept-error">
-      <strong>{{ messageDisplay }}</strong>
+    <StatusBox v-if="message" tone="error" data-testid="accept-error" :title="messageDisplay">
       <p v-if="messageIsLocalized">
         <code>{{ message }}</code>
       </p>
-    </div>
-    <article v-if="review" class="form-card">
-      <h2>{{ $t('accept.exactCredential') }}</h2>
-      <dl class="metadata-list">
+    </StatusBox>
+
+    <UCard v-if="review" class="mb-6">
+      <template #header>
+        <h2 class="text-xl font-semibold">{{ $t('accept.exactCredential') }}</h2>
+      </template>
+      <MetadataList>
         <dt>Issuer</dt>
         <dd>
           <code>{{ review.issuer }}</code>
@@ -723,28 +740,11 @@ async function submit() {
         <dd>
           <code>{{ review.accepted }}</code>
         </dd>
-      </dl>
+      </MetadataList>
 
-      <div v-if="acceptanceReview" class="verification-grid">
-        <article>
-          <span>{{ $t('verify.onChain') }}</span
-          ><StatusPill :value="acceptanceReview.report.onChain" />
-        </article>
-        <article>
-          <span>{{ $t('verify.schema') }}</span
-          ><StatusPill :value="acceptanceReview.report.schema" />
-        </article>
-        <article>
-          <span>{{ $t('verify.payload') }}</span
-          ><StatusPill :value="acceptanceReview.report.payload" />
-        </article>
-        <article>
-          <span>{{ $t('verify.trust') }}</span
-          ><StatusPill :value="acceptanceReview.report.issuerTrust" />
-        </article>
-      </div>
+      <VerificationGrid v-if="acceptanceReview" :report="acceptanceReview.report" :note="false" />
 
-      <div v-if="action === 'accept' && !acceptanceReview?.claims" class="warning-box">
+      <StatusBox v-if="action === 'accept' && !acceptanceReview?.claims" tone="warning">
         <p>
           {{
             $t(
@@ -755,56 +755,56 @@ async function submit() {
             )
           }}
         </p>
-        <div v-if="payloadHostBlockReason" class="error-box">{{ payloadHostBlockMessage }}</div>
-        <label v-else>
-          <input
-            data-testid="payload-consent"
-            type="checkbox"
-            :checked="payloadConsent"
-            :disabled="busy"
-            @change="setPayloadConsent(($event.target as HTMLInputElement).checked)"
-          />
-          {{ $t(payloadUsesLocalStore ? 'accept.localPayloadConsent' : 'accept.payloadConsent') }}
-        </label>
-      </div>
-      <div
+        <StatusBox v-if="payloadHostBlockReason" tone="error">
+          {{ payloadHostBlockMessage }}
+        </StatusBox>
+        <UCheckbox
+          v-else
+          data-testid="payload-consent"
+          :model-value="payloadConsent"
+          :disabled="busy"
+          :label="
+            $t(payloadUsesLocalStore ? 'accept.localPayloadConsent' : 'accept.payloadConsent')
+          "
+          @update:model-value="setPayloadConsent(Boolean($event))"
+        />
+      </StatusBox>
+      <StatusBox
         v-if="action === 'accept' && acceptanceReview?.report.issuerTrust === 'unknown'"
-        class="warning-box"
+        tone="warning"
         data-testid="issuer-trust-acknowledgement"
       >
         <p>{{ $t('accept.issuerUnknown') }}</p>
-        <label>
-          <input
-            type="checkbox"
-            :checked="issuerTrustAcknowledgementToken !== null"
-            :disabled="busy"
-            @change="setIssuerTrustAcknowledgement(($event.target as HTMLInputElement).checked)"
-          />
-          {{ $t('accept.issuerAcknowledgement') }}
-        </label>
-      </div>
+        <UCheckbox
+          :model-value="issuerTrustAcknowledgementToken !== null"
+          :disabled="busy"
+          :label="$t('accept.issuerAcknowledgement')"
+          @update:model-value="setIssuerTrustAcknowledgement(Boolean($event))"
+        />
+      </StatusBox>
       <template v-if="action === 'accept'">
-        <h2>{{ $t('accept.publicClaims') }}</h2>
-        <pre v-if="acceptanceReview?.claims">{{
-          JSON.stringify(acceptanceReview.claims, null, 2)
-        }}</pre>
-        <div v-else-if="acceptanceReview?.payloadReviewError" class="error-box">
+        <h2 class="mt-6 mb-2 text-xl font-semibold">{{ $t('accept.publicClaims') }}</h2>
+        <JsonBlock
+          v-if="acceptanceReview?.claims"
+          :code="JSON.stringify(acceptanceReview.claims, null, 2)"
+        />
+        <StatusBox v-else-if="acceptanceReview?.payloadReviewError" tone="error">
           {{ $t('accept.payloadUnavailable') }}
           <code>{{ acceptanceReview.payloadReviewError }}</code>
-        </div>
-        <p v-if="acceptanceReview?.payloadDigestHex" class="muted">
+        </StatusBox>
+        <p v-if="acceptanceReview?.payloadDigestHex" class="text-sm break-words text-muted">
           {{ acceptanceReview.payloadByteLength }} bytes ·
           <code>{{ acceptanceReview.payloadDigestHex }}</code>
         </p>
       </template>
-      <div v-if="blockReasonMessage" class="error-box">{{ blockReasonMessage }}</div>
-      <div v-else-if="action === 'reject'" class="warning-box">
+      <StatusBox v-if="blockReasonMessage" tone="error">{{ blockReasonMessage }}</StatusBox>
+      <StatusBox v-else-if="action === 'reject'" tone="warning">
         {{ $t('accept.rejectSafety') }}
-      </div>
-      <div v-else-if="action === 'remove'" class="warning-box">
+      </StatusBox>
+      <StatusBox v-else-if="action === 'remove'" tone="warning">
         {{ $t('accept.removeSafety') }}
-      </div>
-    </article>
+      </StatusBox>
+    </UCard>
 
     <TransactionPreview :transaction="transaction" :busy="busy" @confirm="submit" />
     <BusinessFinality
@@ -815,13 +815,14 @@ async function submit() {
       :business-confirmation="result.businessConfirmation"
       :business-evidence="result.businessEvidence"
     />
-    <NuxtLinkLocale
+    <UButton
       v-if="resultCredentialLink"
-      class="button secondary"
+      color="neutral"
+      variant="outline"
       data-testid="subject-result-permalink"
-      :to="resultCredentialLink"
+      :to="localePath(resultCredentialLink)"
     >
       {{ $t('accept.openPermalink') }}
-    </NuxtLinkLocale>
-  </section>
+    </UButton>
+  </UContainer>
 </template>

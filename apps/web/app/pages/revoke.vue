@@ -20,6 +20,7 @@ import { parseWalletCredentialTransactionError } from '~/utils/walletCompatibili
 import { decodeHexUtf8 } from '~/utils/serialization'
 
 const route = useRoute()
+const localePath = useLocalePath()
 const { t } = useI18n()
 const { account, busy: walletBusy, prepare, signAndSubmit } = useWallet()
 const { getActiveNetworkProfile, getCredential, verify } = useXcsApi()
@@ -249,36 +250,46 @@ async function submit() {
 </script>
 
 <template>
-  <section class="section-wrap form-page">
-    <p class="eyebrow">Credential issuer</p>
-    <h1>{{ $t('revoke.title') }}</h1>
-    <p class="lead">{{ $t('revoke.description') }}</p>
-    <div class="warning-box">{{ $t('revoke.warning') }}</div>
+  <UContainer class="py-10 sm:py-14">
+    <PageHeader
+      eyebrow="Credential issuer"
+      :title="$t('revoke.title')"
+      :lead="$t('revoke.description')"
+    />
+    <StatusBox tone="warning">{{ $t('revoke.warning') }}</StatusBox>
 
-    <div class="form-card form-grid">
-      <label for="revoke-subject">Subject</label>
-      <input id="revoke-subject" v-model.trim="subject" placeholder="r…" :disabled="busy" />
-      <label for="revoke-schema">Schema UID</label>
-      <input
-        id="revoke-schema"
-        v-model.trim="schemaUid"
-        pattern="[0-9a-fA-F]{64}"
-        :disabled="busy"
-      />
-      <button class="button" type="button" :disabled="busy" @click="buildPreview">
-        {{ busy ? $t('common.working') : $t('revoke.review') }}
-      </button>
-    </div>
+    <UCard class="mb-6">
+      <div class="grid gap-5">
+        <UFormField label="Subject">
+          <UInput id="revoke-subject" v-model.trim="subject" placeholder="r…" :disabled="busy" />
+        </UFormField>
+        <UFormField label="Schema UID">
+          <UInput
+            id="revoke-schema"
+            v-model.trim="schemaUid"
+            pattern="[0-9a-fA-F]{64}"
+            :disabled="busy"
+          />
+        </UFormField>
+        <div>
+          <UButton :disabled="busy" @click="buildPreview">
+            {{ busy ? $t('common.working') : $t('revoke.review') }}
+          </UButton>
+        </div>
+      </div>
+    </UCard>
 
-    <div v-if="message" class="error-box" role="alert" data-testid="revoke-error">
-      <strong>{{ messageDisplay }}</strong>
+    <StatusBox v-if="message" tone="error" data-testid="revoke-error" :title="messageDisplay">
       <p v-if="messageIsLocalized">
         <code>{{ message }}</code>
       </p>
-    </div>
-    <article v-if="credential && report" class="form-card">
-      <h2>{{ $t('revoke.exactCredential') }}</h2>
-      <dl class="metadata-list">
+    </StatusBox>
+
+    <UCard v-if="credential && report" class="mb-6">
+      <template #header>
+        <h2 class="text-xl font-semibold">{{ $t('revoke.exactCredential') }}</h2>
+      </template>
+      <MetadataList>
         <dt>Issuer</dt>
         <dd>
           <code>{{ credential.issuer }}</code>
@@ -303,8 +314,8 @@ async function submit() {
         <dd>
           <code>{{ credential.generationId }}</code>
         </dd>
-      </dl>
-    </article>
+      </MetadataList>
+    </UCard>
 
     <TransactionPreview :transaction="transaction" :busy="busy" @confirm="submit" />
     <BusinessFinality
@@ -315,13 +326,14 @@ async function submit() {
       :business-confirmation="result.businessConfirmation"
       :business-evidence="result.businessEvidence"
     />
-    <NuxtLinkLocale
+    <UButton
       v-if="resultCredentialLink"
-      class="button secondary"
+      color="neutral"
+      variant="outline"
       data-testid="revoke-result-permalink"
-      :to="resultCredentialLink"
+      :to="localePath(resultCredentialLink)"
     >
       {{ $t('revoke.openPermalink') }}
-    </NuxtLinkLocale>
-  </section>
+    </UButton>
+  </UContainer>
 </template>
