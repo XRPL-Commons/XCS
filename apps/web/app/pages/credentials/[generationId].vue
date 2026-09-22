@@ -33,6 +33,7 @@ interface ExactCredentialEvidence {
 }
 
 const route = useRoute()
+const localePath = useLocalePath()
 const generationId = computed(() => String(route.params.generationId).toLowerCase())
 const linkedProfileId = computed(() => singleRouteQueryValue(route.query.profile))
 const { locale, t } = useI18n()
@@ -371,6 +372,15 @@ async function copyPermalink(): Promise<void> {
   }
 }
 
+const timelineItems = computed(() =>
+  (data.value?.detail.timeline ?? []).map((event) => ({
+    value: `${event.transactionHash}:${event.nodeIndex}`,
+    title: t(`credential.events.${event.eventType}`),
+    description: `${t('explorer.ledger', { ledger: event.ledgerIndex })} · tx ${event.transactionIndex}`,
+    event,
+  })),
+)
+
 useSeoMeta({
   title: () => (data.value ? `${data.value.schema.name} — XCS` : `${t('credential.title')} — XCS`),
   description: () => data.value?.schema.description ?? t('credential.description'),
@@ -379,30 +389,34 @@ useSeoMeta({
 </script>
 
 <template>
-  <section class="section-wrap prose-page">
-    <p class="eyebrow">Explorer · Credential</p>
-    <h1>{{ data?.schema.name ?? $t('credential.title') }}</h1>
-    <p class="lead">{{ data?.schema.description ?? $t('credential.description') }}</p>
+  <UContainer class="py-10 sm:py-14">
+    <PageHeader
+      eyebrow="Explorer · Credential"
+      :title="data?.schema.name ?? $t('credential.title')"
+      :lead="data?.schema.description ?? $t('credential.description')"
+    />
 
-    <p v-if="pending" class="loading-state" role="status">{{ $t('common.loading') }}</p>
+    <EmptyState v-if="pending" loading />
     <ExplorerError v-else-if="error" :error="error" @retry="refresh" />
     <template v-else-if="data">
-      <div class="credential-heading-actions">
+      <div class="mb-6 flex flex-wrap items-center gap-3">
         <StatusPill :value="data.detail.state" />
-        <button class="button secondary compact" type="button" @click="copyPermalink">
+        <UButton color="neutral" variant="outline" size="sm" @click="copyPermalink">
           {{ $t('credential.copyLink') }}
-        </button>
-        <span v-if="copyState === 'copied'" class="muted" role="status">
+        </UButton>
+        <span v-if="copyState === 'copied'" class="text-sm text-muted" role="status">
           {{ $t('credential.linkCopied') }}
         </span>
-        <span v-else-if="copyState === 'error'" class="error-text" role="status">
+        <span v-else-if="copyState === 'error'" class="text-sm text-error" role="status">
           {{ $t('credential.copyFailed') }}
         </span>
-        <NuxtLinkLocale
+        <UButton
           v-if="subjectActionLink"
-          class="button secondary compact"
+          color="neutral"
+          variant="outline"
+          size="sm"
           data-testid="credential-subject-action"
-          :to="subjectActionLink"
+          :to="localePath(subjectActionLink)"
         >
           {{
             $t(
@@ -413,10 +427,10 @@ useSeoMeta({
                   : 'credential.managePending',
             )
           }}
-        </NuxtLinkLocale>
+        </UButton>
       </div>
 
-      <dl class="metadata-list explorer-metadata">
+      <MetadataList data-testid="explorer-metadata">
         <dt>{{ $t('credential.generation') }}</dt>
         <dd>
           <code>{{ data.detail.generation.generationId }}</code>
@@ -431,13 +445,13 @@ useSeoMeta({
         </dd>
         <dt>{{ $t('credential.schema') }}</dt>
         <dd>
-          <NuxtLinkLocale
-            class="credential-schema-reference"
-            :to="`/schemas/${data.detail.generation.schemaUid}`"
+          <NuxtLink
+            class="grid gap-1"
+            :to="localePath(`/schemas/${data.detail.generation.schemaUid}`)"
           >
             <strong>{{ data.schema.name }}</strong>
             <code>{{ data.detail.generation.schemaUid }}</code>
-          </NuxtLinkLocale>
+          </NuxtLink>
         </dd>
         <dt>{{ $t('credential.createdLedger') }}</dt>
         <dd>
@@ -452,30 +466,19 @@ useSeoMeta({
         <dd>
           <code>{{ data.detail.generation.ledgerObjectId }}</code>
         </dd>
-      </dl>
+      </MetadataList>
 
-      <section aria-labelledby="credential-verification-title">
-        <h2 id="credential-verification-title">{{ $t('credential.verificationTitle') }}</h2>
-        <div v-if="activeReview" class="verification-grid" data-testid="credential-dimensions">
-          <article data-testid="credential-dimension-on-chain">
-            <span>{{ $t('verify.onChain') }}</span>
-            <StatusPill :value="activeReview.report.onChain" />
-          </article>
-          <article data-testid="credential-dimension-schema">
-            <span>{{ $t('verify.schema') }}</span>
-            <StatusPill :value="activeReview.report.schema" />
-          </article>
-          <article data-testid="credential-dimension-payload">
-            <span>{{ $t('verify.payload') }}</span>
-            <StatusPill :value="activeReview.report.payload" />
-          </article>
-          <article data-testid="credential-dimension-trust">
-            <span>{{ $t('verify.trust') }}</span>
-            <StatusPill :value="activeReview.report.issuerTrust" />
-          </article>
-          <p class="verification-note">{{ $t('verify.trustNote') }}</p>
-        </div>
-        <div v-else class="warning-box" data-testid="credential-verification-unavailable">
+      <section aria-labelledby="credential-verification-title" class="mt-8">
+        <h2 id="credential-verification-title" class="text-xl font-semibold">
+          {{ $t('credential.verificationTitle') }}
+        </h2>
+        <VerificationGrid
+          v-if="activeReview"
+          :report="activeReview.report"
+          test-id-prefix="credential-dimension"
+          data-testid="credential-dimensions"
+        />
+        <StatusBox v-else tone="warning" data-testid="credential-verification-unavailable">
           {{
             $t(
               data.verificationError === 'CREDENTIAL_GENERATION_NOT_CURRENT'
@@ -483,13 +486,17 @@ useSeoMeta({
                 : 'credential.verificationUnavailable',
             )
           }}
-        </div>
+        </StatusBox>
       </section>
 
-      <section class="privacy-panel" aria-labelledby="credential-payload-title">
-        <h2 id="credential-payload-title">{{ $t('credential.payloadMetadata') }}</h2>
-        <p>{{ $t('credential.payloadPrivacy') }}</p>
-        <dl class="metadata-list">
+      <UCard class="mb-6" aria-labelledby="credential-payload-title">
+        <template #header>
+          <h2 id="credential-payload-title" class="text-xl font-semibold">
+            {{ $t('credential.payloadMetadata') }}
+          </h2>
+        </template>
+        <p class="mb-4 text-toned">{{ $t('credential.payloadPrivacy') }}</p>
+        <MetadataList>
           <dt>{{ $t('credential.payloadHost') }}</dt>
           <dd>
             <code>{{ payloadHost ?? '—' }}</code>
@@ -498,16 +505,16 @@ useSeoMeta({
           <dd>
             <code>{{ data.payloadUri ?? $t('credential.noUri') }}</code>
           </dd>
-        </dl>
+        </MetadataList>
 
         <div
           v-if="data.review && !verifiedReview"
-          class="credential-consent"
+          class="mt-4 grid justify-items-start gap-3"
           data-testid="credential-consent"
         >
-          <div v-if="payloadHostError" class="error-box">{{ payloadHostErrorMessage }}</div>
+          <StatusBox v-if="payloadHostError" tone="error">{{ payloadHostErrorMessage }}</StatusBox>
           <template v-else>
-            <p>
+            <p class="text-sm text-toned">
               {{
                 $t(
                   payloadUsesLocalStore
@@ -517,26 +524,23 @@ useSeoMeta({
                 )
               }}
             </p>
-            <label>
-              <input
-                data-testid="payload-consent"
-                type="checkbox"
-                :checked="payloadConsentToken !== null"
-                :disabled="verificationBusy"
-                @change="setPayloadConsent(($event.target as HTMLInputElement).checked)"
-              />
-              {{
+            <UCheckbox
+              data-testid="payload-consent"
+              :model-value="payloadConsentToken !== null"
+              :disabled="verificationBusy"
+              :label="
                 $t(
                   payloadUsesLocalStore
                     ? 'credential.localPayloadConsent'
                     : 'credential.payloadConsent',
                 )
-              }}
-            </label>
-            <button
+              "
+              @update:model-value="setPayloadConsent(Boolean($event))"
+            />
+            <UButton
               data-testid="payload-fetch"
-              class="button secondary"
-              type="button"
+              color="neutral"
+              variant="outline"
               :disabled="verificationBusy || payloadConsentToken === null"
               @click="verifyPayload"
             >
@@ -549,137 +553,77 @@ useSeoMeta({
                         : 'credential.fetchAndVerifyPayload',
                     )
               }}
-            </button>
+            </UButton>
           </template>
         </div>
-        <div v-else-if="!data.review" class="warning-box">
+        <StatusBox v-else-if="!data.review" tone="warning" class="mt-4">
           {{ $t('credential.payloadVerificationUnavailable') }}
-        </div>
-        <div v-if="verifiedReview" class="success-box" data-testid="credential-payload-checked">
+        </StatusBox>
+        <StatusBox
+          v-if="verifiedReview"
+          tone="success"
+          data-testid="credential-payload-checked"
+          class="mt-4"
+        >
           {{ $t('credential.payloadChecked', { bytes: verifiedReview.payloadByteLength ?? 0 }) }}
-          <code>{{ verifiedReview.payloadDigestHex }}</code>
-        </div>
-        <div v-if="verificationError" class="error-box" role="alert">
+          <code class="break-all">{{ verifiedReview.payloadDigestHex }}</code>
+        </StatusBox>
+        <StatusBox v-if="verificationError" tone="error" class="mt-4">
           {{ verificationError }}
-        </div>
-      </section>
+        </StatusBox>
+      </UCard>
 
       <section v-if="verifiedReview?.claims" aria-labelledby="credential-claims-title">
-        <h2 id="credential-claims-title">{{ $t('credential.publicClaims') }}</h2>
-        <p class="neutrality-note">{{ $t('credential.claimsNote') }}</p>
-        <div class="credential-claim-list" data-testid="credential-claims">
+        <h2 id="credential-claims-title" class="text-xl font-semibold">
+          {{ $t('credential.publicClaims') }}
+        </h2>
+        <p class="my-3 border-l-2 border-accented pl-3 text-sm text-toned">
+          {{ $t('credential.claimsNote') }}
+        </p>
+        <div class="grid gap-3" data-testid="credential-claims">
           <article
             v-for="row in claimRows"
             :key="row.name"
-            class="credential-claim-row"
-            :class="{ 'credential-claim-absent': !row.present }"
+            class="grid min-w-0 gap-3 rounded-[0.6rem] bg-elevated p-4 ring-1 ring-default sm:grid-cols-[minmax(0,0.65fr)_minmax(0,1.35fr)]"
+            :class="{ 'opacity-60': !row.present }"
             :data-testid="`credential-claim-${row.name}`"
           >
-            <div>
-              <code>{{ row.name }}</code>
-              <small>{{ row.type }}</small>
+            <div class="grid min-w-0 gap-1">
+              <code class="font-mono break-words">{{ row.name }}</code>
+              <small class="text-muted">{{ row.type }}</small>
             </div>
-            <pre v-if="row.structured">{{ row.displayValue }}</pre>
-            <span v-else>{{ row.displayValue }}</span>
+            <JsonBlock v-if="row.structured" :code="row.displayValue" class="my-0" />
+            <span v-else class="min-w-0 break-words">{{ row.displayValue }}</span>
           </article>
         </div>
       </section>
 
-      <section class="neutrality-panel">
-        <h2>{{ $t('credential.trustTitle') }}</h2>
-        <p>{{ $t('credential.trustNote') }}</p>
-      </section>
+      <UCard class="my-6">
+        <template #header>
+          <h2 class="text-xl font-semibold">{{ $t('credential.trustTitle') }}</h2>
+        </template>
+        <p class="text-toned">{{ $t('credential.trustNote') }}</p>
+      </UCard>
 
-      <h2>{{ $t('credential.timeline') }}</h2>
-      <ol v-if="data.detail.timeline.length" class="timeline-list">
-        <li
-          v-for="event in data.detail.timeline"
-          :key="`${event.transactionHash}:${event.nodeIndex}`"
-        >
-          <span class="timeline-marker" aria-hidden="true"></span>
-          <div>
-            <StatusPill :value="event.eventType" />
-            <strong>{{ $t(`credential.events.${event.eventType}`) }}</strong>
-            <p>
-              {{ $t('explorer.ledger', { ledger: event.ledgerIndex }) }} · tx
-              {{ event.transactionIndex }}
-            </p>
-            <p v-if="event.deletionCause">
-              <code>{{ event.deletionCause }}</code>
-            </p>
-            <NuxtLinkLocale :to="`/transactions/${event.transactionHash}`">
-              <code>{{ event.transactionHash }}</code>
-            </NuxtLinkLocale>
-          </div>
-        </li>
-      </ol>
-      <div v-else class="empty-state">{{ $t('credential.timelineEmpty') }}</div>
+      <h2 class="text-xl font-semibold">{{ $t('credential.timeline') }}</h2>
+      <UTimeline v-if="timelineItems.length" :items="timelineItems" class="mt-4">
+        <template #title="{ item }">
+          <span class="flex flex-wrap items-center gap-2">
+            <StatusPill :value="item.event.eventType" />
+            <strong>{{ item.title }}</strong>
+          </span>
+        </template>
+        <template #description="{ item }">
+          <p>{{ item.description }}</p>
+          <p v-if="item.event.deletionCause">
+            <code class="break-all">{{ item.event.deletionCause }}</code>
+          </p>
+          <NuxtLink :to="localePath(`/transactions/${item.event.transactionHash}`)"
+            ><code class="break-all">{{ item.event.transactionHash }}</code></NuxtLink
+          >
+        </template>
+      </UTimeline>
+      <EmptyState v-else>{{ $t('credential.timelineEmpty') }}</EmptyState>
     </template>
-  </section>
+  </UContainer>
 </template>
-
-<style scoped>
-.credential-heading-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.credential-schema-reference {
-  display: grid;
-  gap: 0.25rem;
-}
-
-.credential-consent {
-  display: grid;
-  gap: 0.85rem;
-  margin-top: 1rem;
-}
-
-.credential-consent .button {
-  justify-self: start;
-}
-
-.credential-claim-list {
-  display: grid;
-  gap: 0.7rem;
-  margin: 1rem 0 1.5rem;
-}
-
-.credential-claim-row {
-  display: grid;
-  grid-template-columns: minmax(10rem, 0.65fr) minmax(16rem, 1.35fr);
-  gap: 1rem;
-  align-items: start;
-  padding: 1rem;
-  border: 1px solid var(--line);
-  border-radius: 0.75rem;
-  background: white;
-}
-
-.credential-claim-row > div {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.credential-claim-row small,
-.credential-claim-absent {
-  color: var(--muted);
-}
-
-.credential-claim-row pre {
-  max-height: 18rem;
-  margin: 0;
-}
-
-.error-text {
-  color: var(--danger);
-}
-
-@media (max-width: 700px) {
-  .credential-claim-row {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

@@ -10,6 +10,7 @@ import {
 } from '~/utils/operationJournal'
 import { buildCredentialAcceptLink, buildCredentialPermalink } from '~/utils/operationLinks'
 
+const localePath = useLocalePath()
 const { operations, busy, loadOperations, retryOperation, reconfirmOperation, abandonOperation } =
   useWallet()
 const pageError = ref('')
@@ -121,79 +122,85 @@ onMounted(refresh)
 </script>
 
 <template>
-  <section class="section-wrap form-page">
-    <div class="page-heading">
-      <div>
-        <p class="eyebrow">XRPL submission journal</p>
-        <h1>{{ $t('operations.title') }}</h1>
-        <p class="lead">{{ $t('operations.description') }}</p>
-      </div>
-      <div class="button-row">
-        <button
-          class="button secondary"
-          type="button"
+  <UContainer class="py-10 sm:py-14">
+    <PageHeader
+      eyebrow="XRPL submission journal"
+      :title="$t('operations.title')"
+      :lead="$t('operations.description')"
+    >
+      <template #actions>
+        <UButton
+          color="neutral"
+          variant="outline"
           :disabled="busy || operations.length === 0"
           @click="downloadReceipts"
         >
           {{ $t('operations.export') }}
-        </button>
-        <button class="button secondary" type="button" :disabled="busy" @click="refresh">
+        </UButton>
+        <UButton color="neutral" variant="outline" :disabled="busy" @click="refresh">
           {{ $t('operations.refresh') }}
-        </button>
-      </div>
-    </div>
+        </UButton>
+      </template>
+    </PageHeader>
 
-    <div class="warning-box">{{ $t('operations.localOnly') }}</div>
-    <div v-if="pageError" class="error-box">{{ pageError }}</div>
-    <div v-if="resultMessage" :class="`${resultTone}-box`">
+    <StatusBox tone="warning">{{ $t('operations.localOnly') }}</StatusBox>
+    <StatusBox v-if="pageError" tone="error">{{ pageError }}</StatusBox>
+    <StatusBox
+      v-if="resultMessage"
+      :tone="resultTone === 'error' ? 'error' : resultTone === 'success' ? 'success' : 'notice'"
+    >
       {{ resultMessage }}
-    </div>
-    <div v-if="operations.length === 0" class="empty-state">{{ $t('operations.empty') }}</div>
+    </StatusBox>
+    <EmptyState v-if="operations.length === 0">{{ $t('operations.empty') }}</EmptyState>
 
-    <div v-else class="operation-list">
-      <article
+    <div v-else class="grid gap-4">
+      <UCard
         v-for="operation in operations"
         :key="operation.operationId"
-        class="form-card"
+        class="min-w-0"
         data-testid="operation-card"
       >
-        <div class="operation-heading">
-          <div>
-            <p class="eyebrow">{{ operation.transactionType }}</p>
-            <h2>{{ operation.stage }}</h2>
+        <template #header>
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-xs tracking-wide text-muted uppercase">
+                {{ operation.transactionType }}
+              </p>
+              <h2 class="text-xl font-semibold break-words">{{ operation.stage }}</h2>
+            </div>
+            <div class="flex flex-wrap gap-3">
+              <UButton
+                v-if="canRetryOperation(operation)"
+                color="neutral"
+                variant="solid"
+                :disabled="busy"
+                @click="retry(operation.operationId)"
+              >
+                {{ $t('operations.retry') }}
+              </UButton>
+              <UButton
+                v-if="canReconfirmOperation(operation)"
+                color="neutral"
+                variant="outline"
+                data-testid="operation-reconfirm"
+                :disabled="busy"
+                @click="reconfirm(operation.operationId)"
+              >
+                {{ $t('operations.reconfirm') }}
+              </UButton>
+              <UButton
+                v-if="canAbandonOperation(operation)"
+                color="neutral"
+                variant="outline"
+                :disabled="busy"
+                @click="abandon(operation.operationId)"
+              >
+                {{ $t('operations.abandon') }}
+              </UButton>
+            </div>
           </div>
-          <div class="button-row">
-            <button
-              v-if="canRetryOperation(operation)"
-              class="button"
-              type="button"
-              :disabled="busy"
-              @click="retry(operation.operationId)"
-            >
-              {{ $t('operations.retry') }}
-            </button>
-            <button
-              v-if="canReconfirmOperation(operation)"
-              class="button secondary"
-              data-testid="operation-reconfirm"
-              type="button"
-              :disabled="busy"
-              @click="reconfirm(operation.operationId)"
-            >
-              {{ $t('operations.reconfirm') }}
-            </button>
-            <button
-              v-if="canAbandonOperation(operation)"
-              class="button secondary"
-              type="button"
-              :disabled="busy"
-              @click="abandon(operation.operationId)"
-            >
-              {{ $t('operations.abandon') }}
-            </button>
-          </div>
-        </div>
-        <dl class="metadata-list">
+        </template>
+        <MetadataList>
           <dt>{{ $t('operations.hash') }}</dt>
           <dd>
             <code>{{ operation.txHash ?? '—' }}</code>
@@ -288,25 +295,30 @@ onMounted(refresh)
               <code>{{ operationBusinessEvidence(operation)?.reasonCode }}</code>
             </dd>
           </template>
-        </dl>
-        <div v-if="operationAcceptLink(operation)" class="button-row">
-          <NuxtLinkLocale
-            class="button secondary"
-            :to="operationAcceptLink(operation) ?? '/accept'"
+        </MetadataList>
+        <div class="mt-4 flex flex-wrap gap-3">
+          <UButton
+            v-if="operationAcceptLink(operation)"
+            color="neutral"
+            variant="outline"
+            :to="localePath(operationAcceptLink(operation) ?? '/accept')"
           >
             {{ $t('operations.acceptLink') }}
-          </NuxtLinkLocale>
+          </UButton>
+          <UButton
+            v-if="operationCredentialLink(operation)"
+            color="neutral"
+            variant="outline"
+            data-testid="operation-credential-link"
+            :to="localePath(operationCredentialLink(operation) ?? '/')"
+          >
+            {{ $t('operations.credentialLink') }}
+          </UButton>
         </div>
-        <NuxtLinkLocale
-          v-if="operationCredentialLink(operation)"
-          class="button secondary"
-          data-testid="operation-credential-link"
-          :to="operationCredentialLink(operation) ?? '/'"
-        >
-          {{ $t('operations.credentialLink') }}
-        </NuxtLinkLocale>
-        <p v-if="operation.message" class="muted">{{ operation.message }}</p>
-      </article>
+        <p v-if="operation.message" class="mt-3 text-sm break-words text-muted">
+          {{ operation.message }}
+        </p>
+      </UCard>
     </div>
-  </section>
+  </UContainer>
 </template>

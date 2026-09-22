@@ -33,15 +33,17 @@ useSeoMeta({
 </script>
 
 <template>
-  <section class="section-wrap prose-page">
-    <p class="eyebrow">Explorer · XRPL</p>
-    <h1>{{ $t('transactionExplorer.title') }}</h1>
-    <p class="lead">{{ $t('transactionExplorer.description') }}</p>
+  <UContainer class="py-10 sm:py-14">
+    <PageHeader
+      eyebrow="Explorer · XRPL"
+      :title="$t('transactionExplorer.title')"
+      :lead="$t('transactionExplorer.description')"
+    />
 
-    <p v-if="pending" class="loading-state" role="status">{{ $t('common.loading') }}</p>
+    <EmptyState v-if="pending" loading />
     <ExplorerError v-else-if="error" :error="error" @retry="refresh" />
     <template v-else-if="data">
-      <dl class="metadata-list explorer-metadata">
+      <MetadataList data-testid="explorer-metadata">
         <dt>{{ $t('transactionExplorer.hash') }}</dt>
         <dd>
           <code>{{ data.transactionHash }}</code>
@@ -52,14 +54,16 @@ useSeoMeta({
         <dd>
           <code>{{ data.ledgerHash }}</code>
         </dd>
-      </dl>
+      </MetadataList>
 
-      <section v-if="data.registration" class="evidence-card">
-        <div class="section-heading-inline">
-          <h2>{{ $t('transactionExplorer.registration') }}</h2>
-          <StatusPill :value="data.registration.status" />
-        </div>
-        <dl class="metadata-list">
+      <UCard v-if="data.registration" class="mt-6 mb-6">
+        <template #header>
+          <div class="flex flex-wrap items-center gap-3">
+            <h2 class="text-xl font-semibold">{{ $t('transactionExplorer.registration') }}</h2>
+            <StatusPill :value="data.registration.status" />
+          </div>
+        </template>
+        <MetadataList>
           <dt>{{ $t('transactionExplorer.publisher') }}</dt>
           <dd>
             <code>{{ data.registration.publisher }}</code>
@@ -67,8 +71,8 @@ useSeoMeta({
           <template v-if="data.registration.schemaUid">
             <dt>Schema UID</dt>
             <dd>
-              <NuxtLinkLocale :to="`/schemas/${data.registration.schemaUid}`"
-                ><code>{{ data.registration.schemaUid }}</code></NuxtLinkLocale
+              <NuxtLink :to="localePath(`/schemas/${data.registration.schemaUid}`)"
+                ><code>{{ data.registration.schemaUid }}</code></NuxtLink
               >
             </dd>
           </template>
@@ -84,19 +88,27 @@ useSeoMeta({
               <code>{{ data.registration.reasonCode }}</code>
             </dd>
           </template>
-        </dl>
-      </section>
+        </MetadataList>
+      </UCard>
 
-      <section v-if="data.credentialEvents.items.length" class="evidence-card">
-        <h2>{{ $t('transactionExplorer.credentialEvents') }}</h2>
-        <div class="event-list">
-          <article v-for="event in data.credentialEvents.items" :key="event.nodeIndex">
+      <UCard v-if="data.credentialEvents.items.length" class="mb-6">
+        <template #header>
+          <h2 class="text-xl font-semibold">{{ $t('transactionExplorer.credentialEvents') }}</h2>
+        </template>
+        <div class="grid gap-4">
+          <article
+            v-for="event in data.credentialEvents.items"
+            :key="event.nodeIndex"
+            class="min-w-0"
+          >
             <StatusPill :value="event.eventType" />
-            <dl class="compact-metadata">
+            <MetadataList compact class="mt-2">
               <dt>{{ $t('credential.generation') }}</dt>
               <dd>
-                <NuxtLinkLocale v-if="event.generationId" :to="`/credentials/${event.generationId}`"
-                  ><code>{{ event.generationId }}</code></NuxtLinkLocale
+                <NuxtLink
+                  v-if="event.generationId"
+                  :to="localePath(`/credentials/${event.generationId}`)"
+                  ><code>{{ event.generationId }}</code></NuxtLink
                 >
                 <span v-else>—</span>
               </dd>
@@ -110,8 +122,8 @@ useSeoMeta({
               </dd>
               <dt>{{ $t('credential.schema') }}</dt>
               <dd>
-                <NuxtLinkLocale :to="`/schemas/${event.schemaUid}`"
-                  ><code>{{ event.schemaUid }}</code></NuxtLinkLocale
+                <NuxtLink :to="localePath(`/schemas/${event.schemaUid}`)"
+                  ><code>{{ event.schemaUid }}</code></NuxtLink
                 >
               </dd>
               <template v-if="event.deletionCause">
@@ -120,35 +132,20 @@ useSeoMeta({
                   <code>{{ event.deletionCause }}</code>
                 </dd>
               </template>
-            </dl>
+            </MetadataList>
           </article>
         </div>
-      </section>
+      </UCard>
 
-      <div
-        v-if="!data.registration && data.credentialEvents.items.length === 0"
-        class="empty-state"
-      >
+      <EmptyState v-if="!data.registration && data.credentialEvents.items.length === 0">
         {{ $t('transactionExplorer.empty') }}
-      </div>
+      </EmptyState>
 
-      <nav class="pagination" :aria-label="$t('explorer.pagination.label')">
-        <NuxtLinkLocale
-          v-if="cursor"
-          class="button secondary compact"
-          :to="`/transactions/${transactionHash}`"
-        >
-          {{ $t('explorer.pagination.first') }}
-        </NuxtLinkLocale>
-        <button
-          v-if="data.credentialEvents.nextCursor"
-          class="button secondary compact"
-          type="button"
-          @click="nextPage"
-        >
-          {{ $t('explorer.pagination.next') }}
-        </button>
-      </nav>
+      <Pagination
+        :first-to="cursor ? localePath(`/transactions/${transactionHash}`) : undefined"
+        :has-next="Boolean(data.credentialEvents.nextCursor)"
+        @next="nextPage"
+      />
     </template>
-  </section>
+  </UContainer>
 </template>
