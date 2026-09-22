@@ -533,7 +533,6 @@ const credentialLink = computed(() => {
             <UFormField
               v-for="field in guidedClaims"
               :key="field.name"
-              :for="`claim-${field.name}`"
               :label="field.name"
               :hint="`${field.type} · ${$t(field.optional ? 'issue.optionalField' : 'issue.requiredField')}`"
             >
@@ -579,7 +578,10 @@ const credentialLink = computed(() => {
 
         <template v-if="localPayloadStoreEnabled">
           <!-- Native select: the pilot suite drives this control with selectOption(). -->
-          <UFormField :label="$t('issue.storage')" for="payload-storage-mode">
+          <div class="grid gap-1.5">
+            <label for="payload-storage-mode" class="text-sm font-semibold text-default">
+              {{ $t('issue.storage') }}
+            </label>
             <select
               id="payload-storage-mode"
               v-model="storageMode"
@@ -589,7 +591,7 @@ const credentialLink = computed(() => {
               <option value="https">{{ $t('issue.localStore.httpsMode') }}</option>
               <option value="local-test">{{ $t('issue.localStore.mode') }}</option>
             </select>
-          </UFormField>
+          </div>
           <StatusBox
             v-if="storageMode === 'local-test'"
             tone="warning"
