@@ -31,15 +31,16 @@ async function submitSearch(): Promise<void> {
 
 <template>
   <form
-    class="explorer-search"
-    :class="{ 'explorer-search-compact': compact }"
+    class="flex w-full items-center gap-2"
+    :class="compact ? 'max-w-xs' : 'max-w-2xl'"
     role="search"
+    data-testid="explorer-search"
     @submit.prevent="submitSearch"
   >
     <label class="sr-only" :for="compact ? 'global-explorer-search' : 'explorer-search'">
       {{ $t('explorer.search.label') }}
     </label>
-    <input
+    <UInput
       :id="compact ? 'global-explorer-search' : 'explorer-search'"
       v-model="query"
       type="search"
@@ -49,9 +50,11 @@ async function submitSearch(): Promise<void> {
       autocomplete="off"
       :autofocus="autofocus"
       :placeholder="$t('explorer.search.placeholder')"
+      :size="compact ? 'sm' : 'lg'"
+      class="flex-1"
     />
-    <button class="button compact" type="submit" :disabled="query.trim().length < 2">
+    <UButton type="submit" :size="compact ? 'sm' : 'md'" :disabled="query.trim().length < 2">
       {{ $t('explorer.search.submit') }}
-    </button>
+    </UButton>
   </form>
 </template>

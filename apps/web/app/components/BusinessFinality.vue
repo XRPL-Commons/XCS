@@ -11,42 +11,40 @@ defineProps<{
 </script>
 
 <template>
-  <section class="form-card" data-testid="business-finality">
-    <h2>{{ $t('finality.title') }}</h2>
-    <div class="notice-box" data-testid="xrpl-finality">
-      <strong>{{ $t('finality.xrplValidated') }}</strong>
+  <UCard class="mb-6" data-testid="business-finality">
+    <template #header>
+      <h2 class="text-xl font-semibold">{{ $t('finality.title') }}</h2>
+    </template>
+    <StatusBox tone="notice" :title="$t('finality.xrplValidated')" data-testid="xrpl-finality">
       <p>
         <code>{{ txHash }}</code>
       </p>
       <p>{{ engineResult ?? 'tesSUCCESS' }} · ledger {{ ledgerIndex ?? '—' }}</p>
-    </div>
-    <div
+    </StatusBox>
+    <StatusBox
       v-if="businessConfirmation === 'confirmed'"
-      class="success-box"
+      tone="success"
+      :title="$t('finality.xcsConfirmed')"
       data-testid="xcs-confirmed"
-    >
-      <strong>{{ $t('finality.xcsConfirmed') }}</strong>
-    </div>
-    <div
+    />
+    <StatusBox
       v-else-if="businessConfirmation === 'rejected'"
-      class="error-box"
+      tone="error"
+      :title="$t('finality.xcsRejected')"
       data-testid="xcs-rejected"
     >
-      <strong>{{ $t('finality.xcsRejected') }}</strong>
       <code v-if="businessEvidence?.reasonCode">{{ businessEvidence.reasonCode }}</code>
-    </div>
-    <div
+    </StatusBox>
+    <StatusBox
       v-else-if="businessConfirmation === 'mismatch'"
-      class="error-box"
+      tone="error"
+      :title="$t('finality.xcsMismatch')"
       data-testid="xcs-mismatch"
-    >
-      <strong>{{ $t('finality.xcsMismatch') }}</strong>
-    </div>
-    <div v-else class="notice-box" data-testid="xcs-pending">
-      <strong>{{ $t('finality.xcsPending') }}</strong>
+    />
+    <StatusBox v-else tone="notice" :title="$t('finality.xcsPending')" data-testid="xcs-pending">
       <p>{{ $t('finality.reconfirm') }}</p>
-    </div>
-    <dl v-if="businessEvidence" class="metadata-list">
+    </StatusBox>
+    <MetadataList v-if="businessEvidence" class="mt-5">
       <dt>{{ $t('finality.proofLedger') }}</dt>
       <dd>{{ businessEvidence.ledgerIndex }}</dd>
       <dt>{{ $t('finality.proofLedgerHash') }}</dt>
@@ -79,6 +77,6 @@ defineProps<{
           <code>{{ businessEvidence.deletionCause }}</code>
         </dd>
       </template>
-    </dl>
-  </section>
+    </MetadataList>
+  </UCard>
 </template>

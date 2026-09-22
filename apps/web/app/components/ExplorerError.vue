@@ -15,13 +15,12 @@ const messageKey = computed(() => `explorer.errors.${explorerErrorKind(props.err
 </script>
 
 <template>
-  <div class="error-box explorer-error" role="alert">
-    <strong>{{ $t(messageKey) }}</strong>
+  <StatusBox tone="error" :title="$t(messageKey)" data-testid="explorer-error">
     <p v-if="explorerErrorKind(error) === 'unavailable'">
       {{ $t('explorer.errors.unavailableHint') }}
     </p>
-    <button v-if="retryable" class="text-button" type="button" @click="$emit('retry')">
+    <UButton v-if="retryable" color="neutral" variant="link" class="px-0" @click="$emit('retry')">
       {{ $t('common.retry') }}
-    </button>
-  </div>
+    </UButton>
+  </StatusBox>
 </template>

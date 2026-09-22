@@ -31,17 +31,21 @@ async function copyCode(): Promise<void> {
 </script>
 
 <template>
-  <section class="code-snippet">
-    <header>
-      <h3>{{ title }}</h3>
-      <button class="button secondary compact" type="button" @click="copyCode">
-        {{ copyLabel }}
-      </button>
-    </header>
-    <pre><code>{{ code }}</code></pre>
-    <p v-if="copyState === 'copied'" class="muted" role="status">{{ copiedLabel }}</p>
-    <p v-else-if="copyState === 'error'" class="error-text" role="status">
+  <UCard class="mb-6">
+    <template #header>
+      <div class="flex items-center justify-between gap-3">
+        <h3 class="text-lg font-semibold">{{ title }}</h3>
+        <UButton color="neutral" variant="outline" size="sm" @click="copyCode">
+          {{ copyLabel }}
+        </UButton>
+      </div>
+    </template>
+    <JsonBlock :code="code" class="my-0" />
+    <p v-if="copyState === 'copied'" class="mt-3 text-sm text-muted" role="status">
+      {{ copiedLabel }}
+    </p>
+    <p v-else-if="copyState === 'error'" class="mt-3 text-sm text-error" role="status">
       {{ copyErrorLabel }}
     </p>
-  </section>
+  </UCard>
 </template>

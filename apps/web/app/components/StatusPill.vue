@@ -1,11 +1,11 @@
 <script setup lang="ts">
 const props = defineProps<{ value: string }>()
-const tone = computed(() => {
+const color = computed(() => {
   if (['active', 'valid', 'trusted', 'ready', 'accepted', 'created'].includes(props.value)) {
-    return 'positive'
+    return 'success'
   }
   if (['tampered', 'invalid', 'untrusted', 'deleted', 'halted', 'rejected'].includes(props.value)) {
-    return 'negative'
+    return 'error'
   }
   if (
     [
@@ -25,5 +25,5 @@ const tone = computed(() => {
 </script>
 
 <template>
-  <span class="status-pill" :class="`status-${tone}`">{{ value }}</span>
+  <UBadge :color="color" variant="subtle" :label="value" :data-tone="color" class="status-pill" />
 </template>
