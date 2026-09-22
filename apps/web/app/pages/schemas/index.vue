@@ -24,47 +24,43 @@ useSeoMeta({
 </script>
 
 <template>
-  <section class="section-wrap">
-    <div class="page-heading">
-      <div>
-        <p class="eyebrow">Registry</p>
-        <h1>{{ $t('schemas.title') }}</h1>
-      </div>
-      <NuxtLinkLocale class="button" to="/schemas/register">{{
-        $t('schemas.register')
-      }}</NuxtLinkLocale>
-    </div>
-    <p>{{ $t('schemas.description') }}</p>
-    <p v-if="pending" class="loading-state" role="status">{{ $t('common.loading') }}</p>
+  <UContainer class="py-10 sm:py-14">
+    <PageHeader eyebrow="Registry" :title="$t('schemas.title')">
+      <template #actions>
+        <UButton :to="localePath('/schemas/register')" color="neutral" variant="solid">
+          {{ $t('schemas.register') }}
+        </UButton>
+      </template>
+    </PageHeader>
+    <p class="mb-6 max-w-2xl text-toned">{{ $t('schemas.description') }}</p>
+
+    <EmptyState v-if="pending" loading />
     <ExplorerError v-else-if="error" :error="error" @retry="refresh" />
-    <div v-else-if="data?.items.length" class="schema-grid">
-      <NuxtLinkLocale
+    <div v-else-if="data?.items.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <NuxtLink
         v-for="schema in data.items"
         :key="schema.uid"
-        class="schema-card"
-        :to="`/schemas/${schema.uid}`"
+        :to="localePath(`/schemas/${schema.uid}`)"
+        data-testid="schema-card"
+        class="block min-w-0 rounded-[0.6rem] bg-elevated p-5 ring-1 ring-default hover:ring-accented"
       >
         <StatusPill :value="schema.valid ? 'valid' : 'invalid'" />
-        <h2>{{ schema.name }}</h2>
-        <p>{{ schema.description }}</p>
-        <code>{{ schema.uid }}</code>
-        <small>{{ schema.publisher }}</small>
-        <small>{{ $t('explorer.ledger', { ledger: schema.ledgerIndex }) }}</small>
-      </NuxtLinkLocale>
+        <h2 class="mt-2 text-lg break-words">{{ schema.name }}</h2>
+        <p class="mt-1 text-sm text-toned">{{ schema.description }}</p>
+        <code class="mt-2 block font-mono text-xs break-words text-muted">{{ schema.uid }}</code>
+        <small class="mt-2 block break-words text-muted">{{ schema.publisher }}</small>
+        <small class="mt-1 block text-muted">{{
+          $t('explorer.ledger', { ledger: schema.ledgerIndex })
+        }}</small>
+      </NuxtLink>
     </div>
-    <div v-else class="empty-state">{{ $t('schemas.empty') }}</div>
-    <nav v-if="data" class="pagination" :aria-label="$t('explorer.pagination.label')">
-      <NuxtLinkLocale v-if="cursor" class="button secondary compact" to="/schemas">
-        {{ $t('explorer.pagination.first') }}
-      </NuxtLinkLocale>
-      <button
-        v-if="data.nextCursor"
-        class="button secondary compact"
-        type="button"
-        @click="nextPage"
-      >
-        {{ $t('explorer.pagination.next') }}
-      </button>
-    </nav>
-  </section>
+    <EmptyState v-else>{{ $t('schemas.empty') }}</EmptyState>
+
+    <Pagination
+      v-if="data"
+      :first-to="cursor ? localePath('/schemas') : undefined"
+      :has-next="Boolean(data?.nextCursor)"
+      @next="nextPage"
+    />
+  </UContainer>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const { getStats } = useXcsApi()
 const { locale, t } = useI18n()
+const localePath = useLocalePath()
 const {
   data: stats,
   pending,
@@ -18,9 +19,13 @@ useSeoMeta({
 </script>
 
 <template>
-  <div class="landing-page">
-    <section class="landing-hero" aria-labelledby="landing-title">
-      <picture class="landing-art" aria-hidden="true">
+  <div>
+    <section
+      class="relative isolate overflow-hidden bg-neutral-950 text-neutral-50"
+      aria-labelledby="landing-title"
+      data-testid="landing-hero"
+    >
+      <picture class="absolute inset-0 -z-10" aria-hidden="true" data-testid="landing-art">
         <img
           src="/images/xcs-orbit-hero.jpg"
           alt=""
@@ -28,94 +33,112 @@ useSeoMeta({
           height="941"
           fetchpriority="high"
           decoding="async"
+          class="size-full object-cover opacity-60"
         />
       </picture>
-      <div class="landing-hero-content">
-        <p class="landing-badge"><span aria-hidden="true" />{{ $t('home.badge') }}</p>
-        <h1 id="landing-title">{{ $t('home.title') }}</h1>
-        <p class="hero-copy">{{ $t('home.description') }}</p>
-        <div class="button-row landing-actions">
-          <NuxtLinkLocale class="button" to="/studio">
-            <span class="terminal-glyph" aria-hidden="true">&gt;_</span>
-            {{ $t('home.start') }}
-          </NuxtLinkLocale>
-          <a
-            class="button secondary"
-            href="https://github.com/XRPL-Commons/XCS"
-            target="_blank"
-            rel="noopener noreferrer"
+      <UContainer class="py-20 sm:py-28">
+        <div class="max-w-3xl min-w-0">
+          <p
+            class="mb-5 inline-flex items-center gap-2 text-xs font-semibold tracking-[0.2em] uppercase"
           >
-            {{ $t('home.github') }}
-            <span aria-hidden="true">↗</span>
-          </a>
+            <span class="size-2 rounded-full bg-sage-300" aria-hidden="true" />{{
+              $t('home.badge')
+            }}
+          </p>
+          <h1
+            id="landing-title"
+            class="text-4xl leading-tight tracking-tight break-words sm:text-5xl lg:text-6xl"
+          >
+            {{ $t('home.title') }}
+          </h1>
+          <p class="mt-6 max-w-2xl text-lg text-neutral-200">{{ $t('home.description') }}</p>
+          <div class="mt-8 flex flex-wrap gap-3">
+            <UButton :to="localePath('/studio')" color="neutral" variant="outline" size="lg">
+              <span class="font-mono" aria-hidden="true">&gt;_</span>
+              {{ $t('home.start') }}
+            </UButton>
+            <UButton
+              href="https://github.com/XRPL-Commons/XCS"
+              target="_blank"
+              rel="noopener noreferrer"
+              color="neutral"
+              variant="ghost"
+              size="lg"
+              class="text-neutral-50"
+            >
+              {{ $t('home.github') }} <span aria-hidden="true">↗</span>
+            </UButton>
+          </div>
+          <div
+            class="mt-8 inline-flex max-w-full min-w-0 flex-wrap items-center gap-3 rounded-[0.45rem] bg-neutral-900/80 px-4 py-2 font-mono text-sm ring-1 ring-neutral-700"
+            :aria-label="$t('home.commandLabel')"
+            data-testid="install-command"
+          >
+            <span aria-hidden="true">$</span>
+            <code class="break-words">pnpm install</code>
+          </div>
         </div>
-        <div class="install-command" :aria-label="$t('home.commandLabel')">
-          <span aria-hidden="true">$</span>
-          <code>pnpm install</code>
-        </div>
-      </div>
+      </UContainer>
     </section>
 
-    <section class="section-wrap landing-explorer" aria-labelledby="network-overview-title">
-      <div class="section-heading-inline">
-        <div>
-          <p class="eyebrow">{{ $t('home.stats.eyebrow') }}</p>
-          <h2 id="network-overview-title">{{ $t('home.stats.title') }}</h2>
+    <UContainer class="py-12 sm:py-16" aria-labelledby="network-overview-title">
+      <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div class="min-w-0">
+          <p class="text-xs font-semibold tracking-[0.2em] text-muted uppercase">
+            {{ $t('home.stats.eyebrow') }}
+          </p>
+          <h2 id="network-overview-title" class="text-3xl break-words">
+            {{ $t('home.stats.title') }}
+          </h2>
         </div>
-        <NuxtLinkLocale class="text-link" to="/status">{{
-          $t('home.stats.status')
-        }}</NuxtLinkLocale>
+        <UButton :to="localePath('/status')" color="neutral" variant="link" class="px-0">
+          {{ $t('home.stats.status') }}
+        </UButton>
       </div>
-      <p class="landing-explorer-copy">{{ $t('home.searchIntro') }}</p>
+      <p class="mb-4 max-w-2xl text-toned">{{ $t('home.searchIntro') }}</p>
       <ExplorerSearch />
-      <p v-if="pending" class="loading-state" role="status">{{ $t('common.loading') }}</p>
+      <EmptyState v-if="pending" loading />
       <ExplorerError v-else-if="error" :error="error" @retry="refresh" />
-      <div v-else-if="stats" class="stat-grid">
-        <article>
-          <strong>{{ numberFormat.format(stats.schemas.total) }}</strong>
-          <span>{{ $t('home.stats.schemas') }}</span>
-        </article>
-        <article>
-          <strong>{{ numberFormat.format(stats.schemas.publishers) }}</strong>
-          <span>{{ $t('home.stats.publishers') }}</span>
-        </article>
-        <article>
-          <strong>{{ numberFormat.format(stats.credentialGenerations.total) }}</strong>
-          <span>{{ $t('home.stats.credentials') }}</span>
-        </article>
-        <article>
-          <strong>{{ numberFormat.format(stats.checkpoint.ledgerIndex) }}</strong>
-          <span>{{ $t('home.stats.ledger') }}</span>
-        </article>
+      <div v-else-if="stats" class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <UCard
+          v-for="stat in [
+            { value: stats.schemas.total, label: $t('home.stats.schemas') },
+            { value: stats.schemas.publishers, label: $t('home.stats.publishers') },
+            { value: stats.credentialGenerations.total, label: $t('home.stats.credentials') },
+            { value: stats.checkpoint.ledgerIndex, label: $t('home.stats.ledger') },
+          ]"
+          :key="stat.label"
+        >
+          <strong class="block text-3xl break-words">{{ numberFormat.format(stat.value) }}</strong>
+          <span class="text-sm text-muted">{{ stat.label }}</span>
+        </UCard>
       </div>
-    </section>
+    </UContainer>
 
-    <section class="section-wrap landing-flow" aria-labelledby="landing-flow-title">
-      <div class="landing-section-heading">
-        <p class="eyebrow">{{ $t('home.flowEyebrow') }}</p>
-        <h2 id="landing-flow-title">{{ $t('home.flowTitle') }}</h2>
-      </div>
-      <ol class="landing-steps">
-        <li><span>01</span>{{ $t('home.flow.schema') }}</li>
-        <li><span>02</span>{{ $t('home.flow.issue') }}</li>
-        <li><span>03</span>{{ $t('home.flow.accept') }}</li>
-        <li><span>04</span>{{ $t('home.flow.verify') }}</li>
+    <UContainer class="py-12" aria-labelledby="landing-flow-title">
+      <p class="text-xs font-semibold tracking-[0.2em] text-muted uppercase">
+        {{ $t('home.flowEyebrow') }}
+      </p>
+      <h2 id="landing-flow-title" class="mb-6 text-3xl">{{ $t('home.flowTitle') }}</h2>
+      <ol class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <li
+          v-for="(step, index) in ['schema', 'issue', 'accept', 'verify']"
+          :key="step"
+          class="min-w-0 rounded-[0.6rem] bg-elevated p-5 ring-1 ring-default"
+        >
+          <span class="block font-mono text-sm text-muted">0{{ index + 1 }}</span>
+          {{ $t(`home.flow.${step}`) }}
+        </li>
       </ol>
-    </section>
+    </UContainer>
 
-    <section class="section-wrap pillars landing-pillars">
-      <article>
-        <h2>{{ $t('home.pillars.keys.title') }}</h2>
-        <p>{{ $t('home.pillars.keys.copy') }}</p>
-      </article>
-      <article>
-        <h2>{{ $t('home.pillars.data.title') }}</h2>
-        <p>{{ $t('home.pillars.data.copy') }}</p>
-      </article>
-      <article>
-        <h2>{{ $t('home.pillars.trust.title') }}</h2>
-        <p>{{ $t('home.pillars.trust.copy') }}</p>
-      </article>
-    </section>
+    <UContainer class="py-12">
+      <div class="grid gap-4 sm:grid-cols-3">
+        <UCard v-for="pillar in ['keys', 'data', 'trust']" :key="pillar">
+          <h2 class="text-xl font-semibold">{{ $t(`home.pillars.${pillar}.title`) }}</h2>
+          <p class="mt-2 text-sm text-toned">{{ $t(`home.pillars.${pillar}.copy`) }}</p>
+        </UCard>
+      </div>
+    </UContainer>
   </div>
 </template>

@@ -1,43 +1,31 @@
 <template>
-  <article class="section-wrap prose-page">
-    <p class="eyebrow">XCS 0.1</p>
-    <h1>{{ $t('learn.title') }}</h1>
-    <p class="lead">{{ $t('learn.intro') }}</p>
+  <UContainer as="article" class="py-10 sm:py-14">
+    <PageHeader eyebrow="XCS 0.1" :title="$t('learn.title')" :lead="$t('learn.intro')" />
 
-    <h2>{{ $t('learn.actorsTitle') }}</h2>
-    <div class="definition-grid">
-      <section>
-        <h3>Publisher</h3>
-        <p>{{ $t('learn.publisher') }}</p>
-      </section>
-      <section>
-        <h3>Issuer</h3>
-        <p>{{ $t('learn.issuer') }}</p>
-      </section>
-      <section>
-        <h3>Subject</h3>
-        <p>{{ $t('learn.subject') }}</p>
-      </section>
-      <section>
-        <h3>Verifier</h3>
-        <p>{{ $t('learn.verifier') }}</p>
-      </section>
-      <section>
-        <h3>Indexer</h3>
-        <p>{{ $t('learn.indexer') }}</p>
-      </section>
-      <section>
-        <h3>Registry</h3>
-        <p>{{ $t('learn.registry') }}</p>
-      </section>
+    <h2 class="mb-4 text-2xl">{{ $t('learn.actorsTitle') }}</h2>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <UCard
+        v-for="actor in [
+          { name: 'Publisher', copy: $t('learn.publisher') },
+          { name: 'Issuer', copy: $t('learn.issuer') },
+          { name: 'Subject', copy: $t('learn.subject') },
+          { name: 'Verifier', copy: $t('learn.verifier') },
+          { name: 'Indexer', copy: $t('learn.indexer') },
+          { name: 'Registry', copy: $t('learn.registry') },
+        ]"
+        :key="actor.name"
+      >
+        <h3 class="text-lg font-semibold">{{ actor.name }}</h3>
+        <p class="mt-2 text-sm text-toned">{{ actor.copy }}</p>
+      </UCard>
     </div>
 
-    <h2>{{ $t('learn.verificationTitle') }}</h2>
-    <p>{{ $t('learn.verification') }}</p>
-    <div class="status-examples">
+    <h2 class="mt-12 mb-4 text-2xl">{{ $t('learn.verificationTitle') }}</h2>
+    <p class="mb-4 text-toned">{{ $t('learn.verification') }}</p>
+    <div class="flex flex-wrap gap-2">
       <StatusPill value="active" />
       <StatusPill value="valid" />
       <StatusPill value="unknown" />
     </div>
-  </article>
+  </UContainer>
 </template>

@@ -24,70 +24,65 @@ useSeoMeta({
 </script>
 
 <template>
-  <section class="section-wrap">
-    <div class="page-heading">
-      <div>
-        <p class="eyebrow">Explorer</p>
-        <h1>{{ $t('activity.title') }}</h1>
-      </div>
-      <NuxtLinkLocale class="button secondary" to="/schemas">{{
-        $t('nav.schemas')
-      }}</NuxtLinkLocale>
-    </div>
-    <p class="lead">{{ $t('activity.description') }}</p>
-    <p class="neutrality-note">{{ $t('activity.scope') }}</p>
+  <UContainer class="py-10 sm:py-14">
+    <PageHeader eyebrow="Explorer" :title="$t('activity.title')">
+      <template #actions>
+        <UButton :to="localePath('/schemas')" color="neutral" variant="outline">
+          {{ $t('nav.schemas') }}
+        </UButton>
+      </template>
+    </PageHeader>
+    <p class="mb-3 max-w-2xl text-toned">{{ $t('activity.description') }}</p>
+    <p class="mb-6 border-l-2 border-accented pl-3 text-sm text-toned">
+      {{ $t('activity.scope') }}
+    </p>
 
-    <p v-if="pending" class="loading-state" role="status">{{ $t('common.loading') }}</p>
+    <EmptyState v-if="pending" loading />
     <ExplorerError v-else-if="error" :error="error" @retry="refresh" />
-    <ol v-else-if="data?.items.length" class="activity-list">
-      <li v-for="registration in data.items" :key="registration.transactionHash">
-        <div>
-          <StatusPill :value="registration.status" />
-          <strong>{{ $t(`activity.${registration.status}`) }}</strong>
-          <p>
-            {{ $t('activity.by') }} <code>{{ registration.publisher }}</code>
-          </p>
-        </div>
-        <dl class="compact-metadata">
-          <dt>{{ $t('schemas.ledger') }}</dt>
-          <dd>{{ registration.ledgerIndex }} · tx {{ registration.transactionIndex }}</dd>
-          <dt>{{ $t('activity.transaction') }}</dt>
-          <dd>
-            <NuxtLinkLocale :to="`/transactions/${registration.transactionHash}`"
-              ><code>{{ registration.transactionHash }}</code></NuxtLinkLocale
-            >
-          </dd>
-          <template v-if="registration.schemaUid">
-            <dt>Schema UID</dt>
+    <ol v-else-if="data?.items.length" class="grid gap-4">
+      <li v-for="registration in data.items" :key="registration.transactionHash" class="min-w-0">
+        <UCard>
+          <div class="mb-4 flex flex-wrap items-center gap-2">
+            <StatusPill :value="registration.status" />
+            <strong>{{ $t(`activity.${registration.status}`) }}</strong>
+            <p class="w-full min-w-0 text-sm break-words text-muted">
+              {{ $t('activity.by') }} <code class="font-mono">{{ registration.publisher }}</code>
+            </p>
+          </div>
+          <MetadataList compact>
+            <dt>{{ $t('schemas.ledger') }}</dt>
+            <dd>{{ registration.ledgerIndex }} · tx {{ registration.transactionIndex }}</dd>
+            <dt>{{ $t('activity.transaction') }}</dt>
             <dd>
-              <NuxtLinkLocale :to="`/schemas/${registration.schemaUid}`"
-                ><code>{{ registration.schemaUid }}</code></NuxtLinkLocale
+              <NuxtLink :to="localePath(`/transactions/${registration.transactionHash}`)"
+                ><code>{{ registration.transactionHash }}</code></NuxtLink
               >
             </dd>
-          </template>
-          <template v-if="registration.reasonCode">
-            <dt>{{ $t('activity.reason') }}</dt>
-            <dd>
-              <code>{{ registration.reasonCode }}</code>
-            </dd>
-          </template>
-        </dl>
+            <template v-if="registration.schemaUid">
+              <dt>Schema UID</dt>
+              <dd>
+                <NuxtLink :to="localePath(`/schemas/${registration.schemaUid}`)"
+                  ><code>{{ registration.schemaUid }}</code></NuxtLink
+                >
+              </dd>
+            </template>
+            <template v-if="registration.reasonCode">
+              <dt>{{ $t('activity.reason') }}</dt>
+              <dd>
+                <code>{{ registration.reasonCode }}</code>
+              </dd>
+            </template>
+          </MetadataList>
+        </UCard>
       </li>
     </ol>
-    <div v-else class="empty-state">{{ $t('activity.empty') }}</div>
+    <EmptyState v-else>{{ $t('activity.empty') }}</EmptyState>
 
-    <nav v-if="data" class="pagination" :aria-label="$t('explorer.pagination.label')">
-      <NuxtLinkLocale v-if="cursor" class="button secondary compact" to="/activity">
-        {{ $t('explorer.pagination.first') }}
-      </NuxtLinkLocale>
-      <button
-        v-if="data.nextCursor"
-        class="button secondary compact"
-        type="button"
-        @click="nextPage"
-      >
-        {{ $t('explorer.pagination.next') }}
-      </button>
-    </nav>
-  </section>
+    <Pagination
+      v-if="data"
+      :first-to="cursor ? localePath('/activity') : undefined"
+      :has-next="Boolean(data?.nextCursor)"
+      @next="nextPage"
+    />
+  </UContainer>
 </template>

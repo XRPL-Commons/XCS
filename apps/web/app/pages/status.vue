@@ -30,20 +30,24 @@ useSeoMeta({
 </script>
 
 <template>
-  <section class="section-wrap prose-page">
-    <p class="eyebrow">Explorer · Network</p>
-    <h1>{{ $t('networkStatus.title') }}</h1>
-    <p class="lead">{{ $t('networkStatus.description') }}</p>
+  <UContainer class="py-10 sm:py-14">
+    <PageHeader
+      eyebrow="Explorer · Network"
+      :title="$t('networkStatus.title')"
+      :lead="$t('networkStatus.description')"
+    />
 
-    <p v-if="pending" class="loading-state" role="status">{{ $t('common.loading') }}</p>
+    <EmptyState v-if="pending" loading />
     <ExplorerError v-else-if="error" :error="error" @retry="refresh" />
     <template v-else-if="data">
-      <div class="status-overview">
+      <div class="flex flex-wrap items-center gap-3">
         <StatusPill :value="data.status.state" />
         <strong>{{ $t(`networkStatus.states.${data.status.state}`) }}</strong>
       </div>
-      <p class="neutrality-note">{{ $t('networkStatus.failClosed') }}</p>
-      <dl class="metadata-list explorer-metadata">
+      <p class="my-4 border-l-2 border-accented pl-3 text-sm text-toned">
+        {{ $t('networkStatus.failClosed') }}
+      </p>
+      <MetadataList data-testid="explorer-metadata">
         <dt>{{ $t('networkStatus.profile') }}</dt>
         <dd>
           <code>{{ data.profile.profileId }}</code>
@@ -88,7 +92,7 @@ useSeoMeta({
             <code>{{ data.status.errorCode }}</code>
           </dd>
         </template>
-      </dl>
+      </MetadataList>
     </template>
-  </section>
+  </UContainer>
 </template>

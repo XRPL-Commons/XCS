@@ -23,27 +23,26 @@ useSeoMeta({
 </script>
 
 <template>
-  <section class="section-wrap">
-    <div class="page-heading">
-      <div>
-        <p class="eyebrow">Explorer</p>
-        <h1>{{ $t('explorer.search.title') }}</h1>
-      </div>
-    </div>
-    <p class="lead">{{ $t('explorer.search.description') }}</p>
+  <UContainer class="py-10 sm:py-14">
+    <PageHeader
+      eyebrow="Explorer"
+      :title="$t('explorer.search.title')"
+      :lead="$t('explorer.search.description')"
+    />
     <ExplorerSearch :initial-query="query" autofocus />
 
-    <p v-if="pending" class="loading-state" role="status">{{ $t('common.loading') }}</p>
+    <EmptyState v-if="pending" loading />
     <ExplorerError v-else-if="error" :error="error" @retry="refresh" />
-    <div v-else-if="query === ''" class="empty-state">{{ $t('explorer.search.prompt') }}</div>
-    <div v-else-if="data?.items.length" class="result-list">
+    <EmptyState v-else-if="query === ''">{{ $t('explorer.search.prompt') }}</EmptyState>
+    <div v-else-if="data?.items.length" class="mt-8 grid gap-3">
       <NuxtLink
         v-for="item in data.items"
         :key="`${item.type}:${item.type === 'schema' ? item.schemaUid : item.type === 'credential_generation' ? item.generationId : item.transactionHash}`"
-        class="result-card"
         :to="resultPath(item)"
+        data-testid="result-card"
+        class="flex min-w-0 items-start justify-between gap-3 rounded-[0.6rem] bg-elevated p-5 ring-1 ring-default hover:ring-accented"
       >
-        <div>
+        <div class="min-w-0">
           <StatusPill
             :value="
               item.type === 'schema'
@@ -53,13 +52,15 @@ useSeoMeta({
                   : 'transaction'
             "
           />
-          <h2 v-if="item.type === 'schema'">{{ item.name }}</h2>
-          <h2 v-else-if="item.type === 'credential_generation'">
+          <h2 v-if="item.type === 'schema'" class="mt-2 text-lg break-words">{{ item.name }}</h2>
+          <h2 v-else-if="item.type === 'credential_generation'" class="mt-2 text-lg break-words">
             {{ $t('explorer.search.credential') }}
           </h2>
-          <h2 v-else>{{ $t('explorer.search.transaction') }}</h2>
-          <p v-if="item.type === 'schema'">{{ item.description }}</p>
-          <code>{{
+          <h2 v-else class="mt-2 text-lg break-words">{{ $t('explorer.search.transaction') }}</h2>
+          <p v-if="item.type === 'schema'" class="mt-1 text-sm text-toned">
+            {{ item.description }}
+          </p>
+          <code class="mt-2 block font-mono text-xs break-words text-muted">{{
             item.type === 'schema'
               ? item.schemaUid
               : item.type === 'credential_generation'
@@ -69,8 +70,8 @@ useSeoMeta({
         </div>
         <span aria-hidden="true">→</span>
       </NuxtLink>
-      <p v-if="data.hasMore" class="warning-box">{{ $t('explorer.search.limited') }}</p>
+      <StatusBox v-if="data.hasMore" tone="warning">{{ $t('explorer.search.limited') }}</StatusBox>
     </div>
-    <div v-else class="empty-state">{{ $t('explorer.search.empty') }}</div>
-  </section>
+    <EmptyState v-else>{{ $t('explorer.search.empty') }}</EmptyState>
+  </UContainer>
 </template>
