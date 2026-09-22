@@ -109,7 +109,9 @@ useSeoMeta({
           ]"
           :key="stat.label"
         >
-          <strong class="block text-3xl break-words">{{ numberFormat.format(stat.value) }}</strong>
+          <strong class="block font-display text-3xl break-words">{{
+            numberFormat.format(stat.value)
+          }}</strong>
           <span class="text-sm text-muted">{{ stat.label }}</span>
         </UCard>
       </div>
