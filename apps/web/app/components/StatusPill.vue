@@ -25,5 +25,5 @@ const color = computed(() => {
 </script>
 
 <template>
-  <UBadge :color="color" variant="subtle" :label="value" :data-tone="color" class="status-pill" />
+  <UBadge :color="color" variant="subtle" :label="value" :data-tone="color" />
 </template>

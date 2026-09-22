@@ -40,7 +40,7 @@ async function copyCode(): Promise<void> {
         </UButton>
       </div>
     </template>
-    <JsonBlock :code="code" class="my-0" />
+    <JsonBlock :code="code" flush />
     <p v-if="copyState === 'copied'" class="mt-3 text-sm text-muted" role="status">
       {{ copiedLabel }}
     </p>

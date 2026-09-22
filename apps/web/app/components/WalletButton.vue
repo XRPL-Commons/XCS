@@ -51,6 +51,7 @@ function shortAddress(address: string) {
 </script>
 
 <template>
+  <!-- Escape here only covers focus on the trigger during wallet discovery: the popover is not open yet, so Reka UI does not handle it. -->
   <div class="relative" @keydown.esc.stop="closeWalletMenu()">
     <UPopover
       :open="open"
