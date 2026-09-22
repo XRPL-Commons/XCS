@@ -150,7 +150,7 @@ In `apps/web/package.json` change:
 to:
 
 ```json
-"lint": "eslint . && NODE_ENV=development XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt typecheck",
+"lint": "NODE_ENV=development XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt prepare && eslint . && NODE_ENV=development XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt typecheck",
 ```
 
 - [ ] **Step 5: Prepare and lint**

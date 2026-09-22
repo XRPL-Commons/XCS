@@ -210,8 +210,10 @@ action = `variant="link"`; compact = `size="sm"`.
   module options so no rule conflicts with the root Prettier configuration (no semicolons, single
   quotes, trailing commas, width 100).
 - `apps/web/package.json` scripts: `lint` becomes
-  `eslint . && NODE_ENV=development XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt typecheck`.
-  `pnpm verify` at the root therefore runs ESLint through Turbo without any root change.
+  `NODE_ENV=development XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt prepare && eslint . && NODE_ENV=development XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt typecheck`.
+  The `nuxt prepare` prefix generates the git-ignored `.nuxt/eslint.config.mjs` that
+  `eslint.config.mjs` imports, so lint works on a clean checkout. `pnpm verify` at the root
+  therefore runs ESLint through Turbo without any root change.
 - Production build is unchanged in shape: `nuxt build` with `XCS_BROWSER_E2E=0` and
   `XCS_LOCAL_PAYLOAD_STORE=0`, then `node .output/server/index.mjs`.
 
