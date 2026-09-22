@@ -71,9 +71,6 @@ function notFound(): never {
 }
 
 export default defineEventHandler((event) => {
-  // @ts-expect-error -- @nuxt/eslint's devtools transitively resolve a second h3 typings
-  // package (see pnpm why h3), which TS treats as structurally incompatible with nitro's
-  // ambient H3Event here even though the runtime object is identical.
   const config = useRuntimeConfig(event)
   assertBrowserE2eServerMode(config.browserE2eMode, config.public.browserE2eMode, import.meta.dev)
   if (config.browserE2eMode !== 'enabled') return notFound()
