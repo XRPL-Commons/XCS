@@ -156,7 +156,9 @@ export async function readCanonicalHttpsPayload(
         signal: controller.signal,
       })
     } catch (error) {
-      if (timedOut || controller.signal.aborted) throw new Error('PAYLOAD_FETCH_TIMEOUT')
+      if (timedOut || controller.signal.aborted) {
+        throw new Error('PAYLOAD_FETCH_TIMEOUT', { cause: error })
+      }
       throw new Error('PAYLOAD_FETCH_FAILED', { cause: error })
     }
 
@@ -175,7 +177,9 @@ export async function readCanonicalHttpsPayload(
     try {
       bytes = await readResponseBytes(response, maxBytes)
     } catch (error) {
-      if (timedOut || controller.signal.aborted) throw new Error('PAYLOAD_FETCH_TIMEOUT')
+      if (timedOut || controller.signal.aborted) {
+        throw new Error('PAYLOAD_FETCH_TIMEOUT', { cause: error })
+      }
       throw error
     }
     const content = decodeUtf8(bytes)

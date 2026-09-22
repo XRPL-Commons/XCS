@@ -28,6 +28,23 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-08-19',
   css: ['~/assets/css/main.css'],
   devtools: { enabled: false },
+  modules: ['@nuxt/eslint', '@nuxt/ui', '@nuxtjs/i18n', 'nuxt-security'],
+  ui: {
+    // System font stacks: no build-time font download, font-src 'self' stays valid.
+    fonts: false,
+    // Light only. Also avoids the color-mode inline script in the SSR head.
+    colorMode: false,
+  },
+  icon: {
+    // Inline SVG: no per-icon <style> tag competes with the CSP nonce.
+    mode: 'svg',
+  },
+  eslint: {
+    config: {
+      // Prettier owns formatting for the whole monorepo.
+      stylistic: false,
+    },
+  },
   vite: {
     optimizeDeps: {
       // These linked workspace packages publish from dist. Force a fresh
@@ -37,7 +54,6 @@ export default defineNuxtConfig({
       include: ['@xcs-protocol/core', '@xcs-protocol/sdk'],
     },
   },
-  modules: ['@nuxtjs/i18n', 'nuxt-security'],
   i18n: {
     defaultLocale: 'fr',
     strategy: 'prefix_except_default',

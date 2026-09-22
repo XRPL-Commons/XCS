@@ -7,7 +7,7 @@
     "build": "XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt build",
     "clean": "rm -rf .nuxt .output coverage",
     "dev": "nuxt dev",
-    "lint": "NODE_ENV=development XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt typecheck",
+    "lint": "eslint . && NODE_ENV=development XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt typecheck",
     "start": "node .output/server/index.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -16,6 +16,9 @@
     "typecheck": "NODE_ENV=development XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt typecheck"
   },
   "dependencies": {
+    "@iconify-json/lucide": "^1.2.135",
+    "@iconify-json/simple-icons": "^1.2.97",
+    "@nuxt/ui": "^4.11.1",
     "@nuxtjs/i18n": "^10.0.6",
     "@xcs-protocol/core": "workspace:*",
     "@xcs-protocol/sdk": "workspace:*",
@@ -28,8 +31,10 @@
     "xrpl-connect": "1.0.0-rc.0"
   },
   "devDependencies": {
+    "@nuxt/eslint": "^1.17.0",
     "@playwright/test": "^1.62.1",
     "@types/node": "^24.0.0",
+    "eslint-config-prettier": "^10.1.8",
     "vitest": "^3.2.4",
     "vue-tsc": "^3.1.2"
   }

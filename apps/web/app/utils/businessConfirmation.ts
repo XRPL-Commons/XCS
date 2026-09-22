@@ -181,7 +181,7 @@ function inspectCredentialEvent(
     return { state: 'mismatch' }
   }
   const generationId = event.generationId.toLowerCase()
-  let confirmed = false
+  let confirmed: boolean
   if (business.action === 'credential-issue') {
     confirmed =
       event.eventType === 'created' &&
@@ -267,6 +267,7 @@ export async function waitForIndexedBusinessEvidence(
     }
     if (Date.now() >= deadline) throw new Error('BUSINESS_EVIDENCE_TIMEOUT')
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+    // eslint-disable-next-line no-constant-condition -- intentional poll loop; exits via return/throw above.
   } while (true)
 }
 

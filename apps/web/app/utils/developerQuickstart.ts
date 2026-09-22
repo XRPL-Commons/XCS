@@ -4,6 +4,7 @@ import { parseJson } from './serialization'
 
 const GENERATION_ID_PATTERN = /^[0-9a-f]{64}$/u
 const PROFILE_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,127}$/u
+// eslint-disable-next-line no-control-regex -- intentionally matches control characters to reject them.
 const URL_CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/u
 const LOOPBACK_API_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 

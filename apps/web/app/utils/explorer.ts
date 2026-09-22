@@ -74,6 +74,7 @@ export function decodeUtf8HexForDisplay(value: unknown): string | undefined {
   try {
     const bytes = new Uint8Array(value.match(/.{2}/gu)!.map((byte) => Number.parseInt(byte, 16)))
     const decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    // eslint-disable-next-line no-control-regex -- intentionally matches control characters to reject them.
     return /[\u0000-\u001f\u007f-\u009f]/u.test(decoded) ? undefined : decoded
   } catch {
     return undefined

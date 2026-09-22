@@ -575,6 +575,7 @@ export async function waitForCredentialOperationEvent(
     }
     if (Date.now() >= deadline) throw new Error('CREDENTIAL_EVENT_CONFIRMATION_TIMEOUT')
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+    // eslint-disable-next-line no-constant-condition -- intentional poll loop; exits via return/throw above.
   } while (true)
 }
 
