@@ -14,7 +14,7 @@ useSeoMeta({ title: () => `${props.error.statusCode} — XCS`, robots: 'noindex'
     <UContainer class="flex min-h-screen flex-col items-center justify-center py-16 text-center">
       <p class="font-display text-7xl font-semibold text-sage-700">{{ error.statusCode }}</p>
       <h1 class="mt-4 text-3xl font-semibold">
-        {{ is404 ? $t('explorer.errors.unavailable') : $t('explorer.errors.unavailable') }}
+        {{ is404 ? $t('explorer.errors.not-found') : $t('explorer.errors.unavailable') }}
       </h1>
       <p v-if="!is404" class="mt-3 text-sm text-muted">
         {{ $t('explorer.errors.unavailableHint') }}
