@@ -278,7 +278,7 @@ useSeoMeta({
       <UFormField
         :label="$t('verify.generationLabel')"
         :help="$t('verify.generationHint')"
-        :error="generationLookupError || undefined"
+        :error="Boolean(generationLookupError)"
       >
         <div class="flex flex-wrap items-center gap-2">
           <UInput

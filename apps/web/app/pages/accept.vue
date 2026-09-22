@@ -742,6 +742,7 @@ async function submit() {
         </dd>
       </MetadataList>
 
+      <!-- The legacy accept verification grid had no trust note. -->
       <VerificationGrid v-if="acceptanceReview" :report="acceptanceReview.report" :note="false" />
 
       <StatusBox v-if="action === 'accept' && !acceptanceReview?.claims" tone="warning">
