@@ -40,15 +40,22 @@ onMounted(() => {
       {{ $t('nav.skip') }}
     </a>
 
-    <UHeader :ui="{ root: 'bg-default/95 backdrop-blur-lg' }">
+    <UHeader
+      :ui="{
+        root: 'bg-default/95 backdrop-blur-lg',
+        container: 'px-3 sm:px-6 gap-2 sm:gap-3',
+        left: 'gap-1 sm:gap-1.5',
+        right: 'gap-1 sm:gap-1.5',
+      }"
+    >
       <template #left>
         <NuxtLink
           :to="localePath('/')"
-          class="inline-flex items-center gap-3 text-2xl font-extrabold tracking-tight"
+          class="inline-flex items-center gap-2 text-lg font-extrabold tracking-tight sm:gap-3 sm:text-2xl"
           aria-label="XCS home"
         >
           <span
-            class="relative size-9 rounded-full bg-neutral-950 after:absolute after:inset-[28%] after:rounded-full after:bg-neutral-50 after:content-['']"
+            class="relative size-7 rounded-full sm:size-9 bg-neutral-950 after:absolute after:inset-[28%] after:rounded-full after:bg-neutral-50 after:content-['']"
             aria-hidden="true"
           />
           <span>XCS</span>

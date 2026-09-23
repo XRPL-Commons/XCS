@@ -65,7 +65,7 @@ function shortAddress(address: string) {
         :variant="account ? 'outline' : 'solid'"
         size="sm"
         :disabled="busy"
-        class="whitespace-nowrap"
+        class="px-2 whitespace-nowrap sm:px-3"
       >
         {{ account ? shortAddress(account.address) : $t('wallet.connect') }}
       </UButton>
