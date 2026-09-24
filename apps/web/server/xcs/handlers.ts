@@ -151,6 +151,17 @@ function compile(schema: object | undefined): ValidateFunction | undefined {
   return schema === undefined ? undefined : ajv.compile(schema)
 }
 
+/**
+ * Reproduces the default schema error formatter of the framework the read API
+ * used to run on: `<context><instancePath> <message>` for the single Ajv error
+ * produced under `allErrors: false`.
+ */
+function validationMessage(context: string, validate: ValidateFunction): string {
+  const error = validate.errors?.[0]
+  if (error === undefined) return `${context} Invalid request`
+  return `${context}${error.instancePath} ${error.message ?? 'is invalid'}`
+}
+
 export function mapError(error: unknown): ApiReply {
   if (error instanceof PinningError) {
     return {
@@ -187,6 +198,26 @@ export function mapError(error: unknown): ApiReply {
       body: {
         error: error.code,
         message: error.statusCode >= 500 ? 'Internal server error' : error.message,
+      },
+    }
+  }
+  // Anything else carrying a client-error status keeps its own message, the way
+  // the previous error handler mapped `error.statusCode` below 500.
+  const candidate =
+    typeof error === 'object' && error !== null
+      ? (error as { statusCode?: unknown; message?: unknown })
+      : {}
+  if (
+    typeof candidate.statusCode === 'number' &&
+    candidate.statusCode >= 400 &&
+    candidate.statusCode < 500
+  ) {
+    return {
+      statusCode: candidate.statusCode,
+      headers: {},
+      body: {
+        error: 'REQUEST_ERROR',
+        message: typeof candidate.message === 'string' ? candidate.message : 'Invalid request',
       },
     }
   }
@@ -236,15 +267,21 @@ function route<P = Record<string, string>, Q = Record<string, string | undefined
         reply.header('cache-control', options.cacheControl)
       }
       try {
-        if (
-          (validateParams !== undefined && !validateParams(request.params)) ||
-          (validateQuery !== undefined && !validateQuery(request.query)) ||
-          (validateBody !== undefined && !validateBody(request.body))
-        ) {
+        const failure = (
+          [
+            ['params', validateParams, request.params],
+            ['querystring', validateQuery, request.query],
+            ['body', validateBody, request.body],
+          ] as const
+        ).find(([, validate, data]) => validate !== undefined && !validate(data))
+        if (failure !== undefined) {
           return {
             statusCode: 400,
             headers: reply.result().headers,
-            body: { error: 'VALIDATION_ERROR', message: 'Invalid request' },
+            body: {
+              error: 'VALIDATION_ERROR',
+              message: validationMessage(failure[0], failure[1]!),
+            },
           }
         }
         const returned = await handler(request as unknown as TypedRequest<P, Q, B>, reply)
@@ -1290,12 +1327,10 @@ export function createApiHandlers(options: CreateApiOptions): ApiHandlers {
           request.query.publisher !== undefined &&
           !isValidClassicAddress(request.query.publisher)
         ) {
-          return reply
-            .code(400)
-            .send({
-              error: 'ADDRESS_INVALID',
-              message: 'publisher must be a valid classic address',
-            })
+          return reply.code(400).send({
+            error: 'ADDRESS_INVALID',
+            message: 'publisher must be a valid classic address',
+          })
         }
         let cursor
         try {

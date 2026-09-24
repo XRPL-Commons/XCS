@@ -1,4 +1,55 @@
+import { Ajv, type ValidateFunction } from 'ajv'
+
+import { xcsFieldDescriptorSchema } from '../../server/xcs/http-schemas.js'
 import type { ApiHandlers, HttpMethod, RouteDefinition } from '../../server/xcs/http.js'
+
+/**
+ * The handler table declares a response schema per status code but, unlike the
+ * framework it replaced, does not serialize through it. The injector validates
+ * against it instead, so an undeclared or malformed response field fails a test
+ * rather than leaking to a caller.
+ */
+const responseAjv = new Ajv({
+  removeAdditional: false,
+  coerceTypes: false,
+  allErrors: false,
+  strict: false,
+  logger: false,
+})
+responseAjv.addSchema(xcsFieldDescriptorSchema)
+
+const responseValidators = new WeakMap<object, ValidateFunction>()
+
+function responseValidator(schema: object): ValidateFunction {
+  const cached = responseValidators.get(schema)
+  if (cached !== undefined) return cached
+  const compiled = responseAjv.compile(schema)
+  responseValidators.set(schema, compiled)
+  return compiled
+}
+
+/**
+ * The serialized body is what the schema describes, so the guard validates the
+ * JSON round-trip rather than the in-memory value: a `Date` field declared as a
+ * string reaches the caller as its ISO form, exactly as it did before.
+ */
+function assertDeclaredResponse(
+  route: RouteDefinition,
+  statusCode: number,
+  serialized: string | undefined,
+): void {
+  const schema = route.schema?.response?.[statusCode]
+  if (schema === undefined || serialized === undefined) return
+  const body: unknown = JSON.parse(serialized)
+  const validate = responseValidator(schema)
+  if (validate(body)) return
+  const error = validate.errors?.[0]
+  throw new Error(
+    `${route.method} ${route.path} responded ${statusCode} with a body its schema does not declare: ` +
+      `${error === undefined ? 'unknown error' : `${error.instancePath || '/'} ${error.message ?? ''}`} ` +
+      `(${JSON.stringify(body)?.slice(0, 400)})`,
+  )
+}
 
 export interface InjectOptions {
   method: HttpMethod
@@ -55,6 +106,7 @@ export function createInjector(handlers: ApiHandlers) {
         ip: options.ip ?? '127.0.0.1',
       })
       const body = typeof reply.body === 'string' ? reply.body : JSON.stringify(reply.body)
+      assertDeclaredResponse(route, reply.statusCode, body)
       return {
         statusCode: reply.statusCode,
         headers: reply.headers,

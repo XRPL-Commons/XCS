@@ -11,7 +11,7 @@ import type {
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { ApiHandlers } from '../../server/xcs/http.js'
-import { createApiHandlers, type CreateApiOptions } from '../../server/xcs/handlers.js'
+import { createApiHandlers, mapError, type CreateApiOptions } from '../../server/xcs/handlers.js'
 import type { OperationalMetricsRepository } from '../../server/xcs/operational-metrics.js'
 import {
   MAX_SCHEMA_CATALOG_ENTRIES,
@@ -2479,6 +2479,77 @@ describe('read API', () => {
         timeWindowMs: 60_000,
       })
     }
+  })
+
+  it('reports the failing request section and the schema violation on a 400', async () => {
+    const instance = await app()
+
+    const params = await instance.inject({
+      method: 'GET',
+      url: '/v1/networks/invalid!/readiness',
+    })
+    expect(params.statusCode).toBe(400)
+    expect(params.json()).toEqual({
+      error: 'VALIDATION_ERROR',
+      message: 'params/network must match pattern "^[a-z0-9][a-z0-9._-]{0,127}$"',
+    })
+
+    const querystring = await instance.inject({
+      method: 'GET',
+      url: '/v1/networks/testnet/search?q=Course&limit=51',
+    })
+    expect(querystring.statusCode).toBe(400)
+    expect(querystring.json()).toEqual({
+      error: 'VALIDATION_ERROR',
+      message: 'querystring/limit must match pattern "^(?:[1-9]|[1-4][0-9]|50)$"',
+    })
+
+    const unexpectedQuery = await instance.inject({
+      method: 'GET',
+      url: '/v1/networks/testnet/search?q=Course&cursor=unexpected',
+    })
+    expect(unexpectedQuery.statusCode).toBe(400)
+    expect(unexpectedQuery.json()).toEqual({
+      error: 'VALIDATION_ERROR',
+      message: 'querystring must NOT have additional properties',
+    })
+
+    const body = await instance.inject({
+      method: 'POST',
+      url: '/v1/verify',
+      payload: {
+        network: 'testnet',
+        issuer: ISSUER,
+        subject: SUBJECT,
+        schemaUid: UID,
+        unexpected: true,
+      },
+    })
+    expect(body.statusCode).toBe(400)
+    expect(body.json()).toEqual({
+      error: 'VALIDATION_ERROR',
+      message: 'body must NOT have additional properties',
+    })
+  })
+
+  it('maps a thrown client-error status onto the request-error envelope', async () => {
+    expect(
+      mapError(Object.assign(new Error('Request body is too large'), { statusCode: 413 })),
+    ).toEqual({
+      statusCode: 413,
+      headers: {},
+      body: { error: 'REQUEST_ERROR', message: 'Request body is too large' },
+    })
+    expect(mapError(Object.assign(new Error('boom'), { statusCode: 500 }))).toEqual({
+      statusCode: 500,
+      headers: {},
+      body: { error: 'INTERNAL_ERROR', message: 'Internal server error' },
+    })
+    expect(mapError(new Error('boom'))).toEqual({
+      statusCode: 500,
+      headers: {},
+      body: { error: 'INTERNAL_ERROR', message: 'Internal server error' },
+    })
   })
 
   it('keeps demo pinning routes absent unless explicitly configured', async () => {

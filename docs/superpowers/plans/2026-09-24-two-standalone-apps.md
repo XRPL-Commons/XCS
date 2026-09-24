@@ -173,7 +173,7 @@ Mechanical rules, applied to every route in `apps/api/src/app.ts`:
    where `route()` wraps the closure: it creates a reply shim, awaits the closure, and returns `reply.sent ? reply.result() : { statusCode: reply.statusCode, headers: reply.headers, body: returnedValue }`. An `onSend` that set `cache-control` becomes `reply.header('cache-control', …)` at the top of the closure.
 2. `config.rateLimit: false` → `rateLimit: false`; `config.rateLimit: { max, timeWindow: '1 minute' }` → `rateLimit: { max, timeWindowMs: 60_000 }`; routes without config get the default `{ max: 100, timeWindowMs: 60_000 }` under `/v1/` and `false` elsewhere.
 3. `request.params.x` / `request.query.x` / `request.body` / `request.ip` map 1:1 to `ApiRequest`. Fastify coerced nothing (`coerceTypes: false`), so numeric query values were validated as strings; keep the schemas as they are.
-4. Validation: `route()` validates `params`, `query`, `body` against `schema` with one shared Ajv instance (`new Ajv({ removeAdditional: false, coerceTypes: false, allErrors: false, strict: false })` plus `addSchema(xcsFieldDescriptorSchema)`); a failure returns `{ statusCode: 400, body: { error: 'VALIDATION_ERROR', message: 'Invalid request' } }` (the same envelope the old error handler produced for `error.validation`).
+4. Validation: `route()` validates `params`, then `querystring`, then `body` against `schema` with one shared Ajv instance (`new Ajv({ removeAdditional: false, coerceTypes: false, allErrors: false, strict: false })` plus `addSchema(xcsFieldDescriptorSchema)`); the first section that fails determines the response. A failure returns `{ statusCode: 400, body: { error: 'VALIDATION_ERROR', message } }` where `message` reproduces the old default schema error formatter verbatim — `` `${context}${error.instancePath} ${error.message}` `` with `context` being `params`, `querystring` or `body` and `error` the single Ajv error produced under `allErrors: false` (for example `querystring/limit must match pattern "^(?:[1-9]|[1-4][0-9]|50)$"` or `body must NOT have additional properties`). This is the envelope the old error handler produced for `error.validation`; it never flattens to a generic `'Invalid request'` string.
 5. The old `setErrorHandler` becomes `mapError(error): ApiReply` exported from `handlers.ts`, applied by `route()` around the closure: `PinningError`, `SchemaProjectionInvalidError`, `IndexerUnavailableError`, `VerificationNetworkNotFoundError` → their `statusCode` and `code` exactly as today; `HttpError` → its status and code; anything else → 500 `{ error: 'INTERNAL_ERROR', message: 'Internal server error' }`.
 6. Swagger/cors/rate-limit plugin registrations, `rateLimitKey`, `tokensMatch` for the SSR token, and the `INTERNAL_SSR_*` constants are dropped. `tokensMatch` stays for the metrics bearer token.
 7. The metrics `onResponse` hook (429 counting) is replaced by an exported `recordRateLimited(routePath)` on the handlers object, called by the rate-limit middleware in A3.
@@ -310,14 +310,16 @@ async function readJsonBody(event: H3Event, limit: number) {
     throw createError({ statusCode: 413, data: { error: 'PAYLOAD_TOO_LARGE' } })
   try {
     return JSON.parse(raw)
-  } catch {
+  } catch (error) {
     throw createError({
       statusCode: 400,
-      data: { error: 'VALIDATION_ERROR', message: 'Invalid request' },
+      data: { error: 'VALIDATION_ERROR', message: (error as Error).message },
     })
   }
 }
 ```
+
+A body that is not valid JSON never reaches the handler table, so it has no schema context to name. It returns `VALIDATION_ERROR` with the JSON parser's own message; schema failures inside `route()` carry the formatter message described in Task A2 rule 4 instead.
 
 Each adapter file is three lines, for example `apps/web/server/api/v1/networks/[network]/status.get.ts`:
 
