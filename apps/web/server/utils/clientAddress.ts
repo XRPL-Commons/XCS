@@ -1,19 +1,7 @@
-import { createHmac } from 'node:crypto'
-
 import ipaddr from 'ipaddr.js'
-
-import type { InternalSsrRateLimitContext } from '../../app/utils/internalSsrRateLimit'
-
-const INTERNAL_SSR_TOKEN = /^[A-Za-z0-9_-]{32,256}$/u
 
 type Address = ReturnType<typeof ipaddr.parse>
 type Cidr = ReturnType<typeof ipaddr.parseCIDR>
-
-export function assertInternalSsrToken(value: unknown): asserts value is string {
-  if (typeof value !== 'string' || !INTERNAL_SSR_TOKEN.test(value)) {
-    throw new Error('INTERNAL_SSR_TOKEN_INVALID')
-  }
-}
 
 function normalizedAddress(value: unknown): Address | undefined {
   if (typeof value !== 'string' || !ipaddr.isValid(value)) return undefined
@@ -27,27 +15,35 @@ function normalizedAddressText(address: Address): string {
   return address instanceof ipaddr.IPv6 ? address.toRFC5952String() : address.toString()
 }
 
+/**
+ * Accepts the comma-separated form the environment uses and the parsed list
+ * `loadApiConfig` produces. Anything else, and any range that would trust the
+ * whole internet, fails closed.
+ */
 export function parseTrustedProxyCidrs(value: unknown): Cidr[] {
-  if (typeof value !== 'string') throw new Error('INTERNAL_SSR_TRUSTED_PROXY_CIDRS_INVALID')
-  const entries = value
-    .split(',')
+  if (value === undefined || value === null) return []
+  const entries = Array.isArray(value)
+    ? value.map((entry) => String(entry))
+    : typeof value === 'string'
+      ? value.split(',')
+      : undefined
+  if (entries === undefined) throw new Error('TRUSTED_PROXY_CIDRS_INVALID')
+
+  return entries
     .map((entry) => entry.trim())
     .filter(Boolean)
-
-  return entries.map((entry) => {
-    if (!entry.includes('/') && !ipaddr.isValid(entry)) {
-      throw new Error('INTERNAL_SSR_TRUSTED_PROXY_CIDRS_INVALID')
-    }
-    const withPrefix = entry.includes('/')
-      ? entry
-      : `${entry}/${ipaddr.parse(entry).kind() === 'ipv4' ? 32 : 128}`
-    if (!ipaddr.isValidCIDR(withPrefix)) {
-      throw new Error('INTERNAL_SSR_TRUSTED_PROXY_CIDRS_INVALID')
-    }
-    const cidr = ipaddr.parseCIDR(withPrefix)
-    if (cidr[1] === 0) throw new Error('INTERNAL_SSR_TRUSTED_PROXY_CIDRS_INVALID')
-    return cidr
-  })
+    .map((entry) => {
+      if (!entry.includes('/') && !ipaddr.isValid(entry)) {
+        throw new Error('TRUSTED_PROXY_CIDRS_INVALID')
+      }
+      const withPrefix = entry.includes('/')
+        ? entry
+        : `${entry}/${ipaddr.parse(entry).kind() === 'ipv4' ? 32 : 128}`
+      if (!ipaddr.isValidCIDR(withPrefix)) throw new Error('TRUSTED_PROXY_CIDRS_INVALID')
+      const cidr = ipaddr.parseCIDR(withPrefix)
+      if (cidr[1] === 0) throw new Error('TRUSTED_PROXY_CIDRS_INVALID')
+      return cidr
+    })
 }
 
 function isTrusted(address: Address, trustedProxyCidrs: Cidr[]): boolean {
@@ -57,7 +53,12 @@ function isTrusted(address: Address, trustedProxyCidrs: Cidr[]): boolean {
   })
 }
 
-export function resolveSsrClientAddress(
+/**
+ * Resolves the address a rate-limit bucket is keyed by. Forwarded addresses are
+ * honoured only while the chain walks back through explicitly trusted proxies,
+ * so a client-supplied `x-forwarded-for` cannot rotate its own bucket.
+ */
+export function resolveClientAddress(
   remoteAddress: unknown,
   forwardedFor: unknown,
   trustedProxyCidrsInput: unknown,
@@ -81,22 +82,4 @@ export function resolveSsrClientAddress(
     current = forwarded[index]!
   }
   return normalizedAddressText(current)
-}
-
-export function resolveInternalSsrRateLimit(
-  token: string,
-  remoteAddress: unknown,
-  forwardedFor: unknown,
-  trustedProxyCidrsInput: unknown,
-): InternalSsrRateLimitContext {
-  assertInternalSsrToken(token)
-  const clientAddress = resolveSsrClientAddress(remoteAddress, forwardedFor, trustedProxyCidrsInput)
-  return {
-    headers: {
-      'x-xcs-internal-token': token,
-      'x-xcs-client-key': createHmac('sha256', token)
-        .update(`client-ip:${clientAddress}`, 'utf8')
-        .digest('hex'),
-    },
-  }
 }

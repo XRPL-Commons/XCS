@@ -5,7 +5,6 @@ import {
   exactCredentialPath,
   exactSchemaRegistrationPath,
 } from '../utils/transactions'
-import type { InternalSsrRateLimitContext } from '../utils/internalSsrRateLimit'
 import { parseSigningReadiness, type SigningReadiness } from '../utils/signingReadiness'
 
 export interface ApiSchemaSummary {
@@ -176,25 +175,10 @@ export type VerificationResponse = VerificationDimensions
 
 export function useXcsApi() {
   const config = useRuntimeConfig()
-  const baseURL = import.meta.server ? config.apiBaseUrl : config.public.apiBaseUrl
-  const internalSsrRequest = (() => {
-    if (!import.meta.server) return undefined
-    const event = useRequestEvent()
-    if (event === undefined) throw new Error('INTERNAL_SSR_REQUEST_CONTEXT_UNAVAILABLE')
-    const context = event.context as typeof event.context & {
-      xcsSsrRateLimit?: InternalSsrRateLimitContext
-    }
-    if (context.xcsSsrRateLimit === undefined) {
-      throw new Error('INTERNAL_SSR_RATE_LIMIT_CONTEXT_UNAVAILABLE')
-    }
-    return context.xcsSsrRateLimit
-  })()
-  const apiFetch =
-    internalSsrRequest === undefined
-      ? $fetch
-      : $fetch.create({
-          headers: internalSsrRequest.headers,
-        })
+  // The read API is served by this application's own server routes, so the same
+  // relative paths work in the browser and, in process, during server rendering.
+  const baseURL = ''
+  const apiFetch = $fetch
 
   function listNetworks() {
     return apiFetch<{ items: NetworkProfile[] }>('/v1/networks', { baseURL })

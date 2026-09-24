@@ -23,11 +23,11 @@ interface DeveloperEvidence {
   readonly review: CredentialReview
 }
 
-const config = useRuntimeConfig()
 const localePath = useLocalePath()
 const { t } = useI18n()
 const { getActiveNetworkProfile, getCredentialGeneration, getSchema, verify } = useXcsApi()
-const apiBaseUrl = normalizeDeveloperApiBaseUrl(String(config.public.apiBaseUrl))
+// The read API is served by this application, so its base is this origin.
+const apiBaseUrl = normalizeDeveloperApiBaseUrl(useRequestURL().origin)
 const apiDocumentationUrl = computed(() => `${apiBaseUrl}/documentation`)
 
 const {

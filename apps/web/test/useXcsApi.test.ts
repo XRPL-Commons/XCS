@@ -24,8 +24,7 @@ describe('useXcsApi discovery contract', () => {
       return { items: [], hasMore: false }
     })
     vi.stubGlobal('useRuntimeConfig', () => ({
-      apiBaseUrl: 'http://api.internal',
-      public: { apiBaseUrl: 'https://api.example', profileId: PROFILE.profileId },
+      public: { profileId: PROFILE.profileId },
     }))
     vi.stubGlobal('$fetch', fetchMock)
 
@@ -49,8 +48,7 @@ describe('useXcsApi discovery contract', () => {
       timeline: [],
     }))
     vi.stubGlobal('useRuntimeConfig', () => ({
-      apiBaseUrl: 'http://api.internal',
-      public: { apiBaseUrl: 'https://api.example', profileId: PROFILE.profileId },
+      public: { profileId: PROFILE.profileId },
     }))
     vi.stubGlobal('$fetch', fetchMock)
     const api = useXcsApi()
@@ -59,7 +57,7 @@ describe('useXcsApi discovery contract', () => {
     await api.getCredentialGeneration(hash, PROFILE.profileId)
     expect(fetchMock).toHaveBeenLastCalledWith(
       `/v1/networks/${PROFILE.profileId}/credential-generations/${hash.toLowerCase()}`,
-      { baseURL: 'https://api.example' },
+      { baseURL: '' },
     )
 
     await api.getTransaction(hash, {
@@ -70,14 +68,14 @@ describe('useXcsApi discovery contract', () => {
     expect(fetchMock).toHaveBeenLastCalledWith(
       `/v1/networks/${PROFILE.profileId}/transactions/${hash.toLowerCase()}`,
       {
-        baseURL: 'https://api.example',
+        baseURL: '',
         query: { cursor: '25', limit: 25 },
       },
     )
 
     await api.getStats(PROFILE.profileId)
     expect(fetchMock).toHaveBeenLastCalledWith(`/v1/networks/${PROFILE.profileId}/stats`, {
-      baseURL: 'https://api.example',
+      baseURL: '',
     })
   })
 
@@ -94,15 +92,14 @@ describe('useXcsApi discovery contract', () => {
     } as const
     const fetchMock = vi.fn(async () => readiness)
     vi.stubGlobal('useRuntimeConfig', () => ({
-      apiBaseUrl: 'http://api.internal',
-      public: { apiBaseUrl: 'https://api.example', profileId: PROFILE.profileId },
+      public: { profileId: PROFILE.profileId },
     }))
     vi.stubGlobal('$fetch', fetchMock)
 
     const api = useXcsApi()
     await expect(api.getNetworkReadiness(PROFILE.profileId)).resolves.toEqual(readiness)
     expect(fetchMock).toHaveBeenLastCalledWith(`/v1/networks/${PROFILE.profileId}/readiness`, {
-      baseURL: 'https://api.example',
+      baseURL: '',
       cache: 'no-store',
       retry: 0,
       timeout: 5_000,

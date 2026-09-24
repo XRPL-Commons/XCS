@@ -18,9 +18,6 @@ if (localPayloadStoreInput === '1' && process.env.NODE_ENV === 'production') {
   throw new Error('XCS_LOCAL_PAYLOAD_STORE cannot be enabled in production.')
 }
 const localPayloadStoreMode = localPayloadStoreInput === '1' ? 'enabled' : 'disabled'
-const apiInternalToken =
-  process.env.NUXT_API_INTERNAL_TOKEN ??
-  (process.env.NODE_ENV === 'production' ? '' : 'xcs-development-internal-token-0001')
 const production = process.env.NODE_ENV === 'production'
 const cspConnectSources = ["'self'", 'https:', 'wss:', ...(production ? [] : ['http:', 'ws:'])]
 
@@ -107,14 +104,14 @@ export default defineNuxtConfig({
     ],
     langDir: 'locales',
   },
+  nitro: {
+    // The read API answers with its own JSON envelope; pages keep Nuxt's renderer.
+    errorHandler: '~~/server/error',
+  },
   runtimeConfig: {
-    apiBaseUrl: 'http://localhost:3001',
-    apiInternalToken,
-    trustedProxyCidrs: process.env.NUXT_TRUSTED_PROXY_CIDRS ?? '',
     browserE2eMode,
     localPayloadStoreMode,
     public: {
-      apiBaseUrl: 'http://localhost:3001',
       profileId: '',
       rpcUrl: 'wss://s.altnet.rippletest.net:51233',
       xamanApiKey: '',
