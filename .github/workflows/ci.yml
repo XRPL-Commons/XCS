@@ -20,6 +20,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The vendored-copy check reads a retired source (the former
+          # packages/db) with `git show <sha>:<path>`, which the default
+          # depth-1 clone does not contain.
+          fetch-depth: 0
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 10.34.4
@@ -33,6 +37,11 @@ jobs:
       - run: pnpm format:check
       - name: Lint, typecheck, test and build the shared packages
         run: pnpm exec turbo run lint typecheck test build
+      # The two applications import no workspace package: they carry hand-made
+      # copies of this code, and nothing else in the build would notice one
+      # drifting. See CONTRIBUTING.md, "The mirroring rule".
+      - name: Check the vendored copies against their sources
+        run: node ops/ci/check-vendored-copies.mjs
 
   web:
     runs-on: ubuntu-24.04

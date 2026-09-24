@@ -1,4 +1,5 @@
 // Copied from packages/db/src/bootstrap.ts at 5ce8eaa; keep in sync by hand (see CONTRIBUTING.md).
+// Diverges by design (migrations moved from packages/db/drizzle to db/migrations, with the XCS_MIGRATIONS_DIR override the container image sets); source sha256:ef5dc1f95861fc8465a9d68e59e25f5a55eedab91a483b9d34ec89abf7346ca3.
 import { fileURLToPath } from 'node:url'
 
 import { migrate } from 'drizzle-orm/postgres-js/migrator'

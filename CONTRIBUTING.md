@@ -45,6 +45,46 @@ The copy locations are:
 | `apps/indexer/src/lib/xcs/`  | the `packages/core` modules the indexer reaches   |
 | `apps/indexer/src/lib/db/`   | client, fencing, transactions, provision, migrate |
 
+### How the rule is enforced
+
+CI runs `node ops/ci/check-vendored-copies.mjs` in the `packages` job. For every file under a
+vendored directory it reads the header, finds the source, and fails unless the copy matches it. Run
+it locally before pushing a mirrored change:
+
+```sh
+node ops/ci/check-vendored-copies.mjs
+```
+
+Three things it will reject:
+
+- a copy whose body differs from its source by anything other than a rewritten `import`/`export …
+from` module specifier — which is the case this check exists for, since a change landing in
+  `packages/core` that nobody mirrored looks exactly like this;
+- a new file under a vendored directory with no header at all, so a copy cannot be added unlabelled;
+- a stale by-design divergence (below).
+
+It compares against the source **as it is now**, not as it was at the recorded `<sha>`. The sha is
+immutable, so comparing against it would only ever notice edits to the copy. A source that has been
+retired from the tree (the former `packages/db`) can no longer change, so for those files the
+recorded commit is used.
+
+A copy that genuinely has to differ — because the surrounding application requires it, not because
+someone edited it — declares that on a second header line, pinning the exact source the divergence
+was reviewed against:
+
+```ts
+// Copied from packages/db/src/bootstrap.ts at 5ce8eaa; keep in sync by hand (see CONTRIBUTING.md).
+// Diverges by design (<reason>); source sha256:<hex>.
+```
+
+That file is then exempt from the line comparison, but fails as soon as the source changes, so the
+divergence has to be re-reviewed rather than quietly outliving its reason. Use it sparingly. A file
+with no upstream at all is instead marked:
+
+```ts
+// Not a vendored copy (<reason>): <description>
+```
+
 The one exception is the database **schema**: `db/schema/` and `db/migrations/` are shared source,
 compiled by both apps through the `#db/*` path alias. They are edited once, never mirrored. After
 editing `db/schema/`, regenerate the migration with the indexer's tooling and commit the result:

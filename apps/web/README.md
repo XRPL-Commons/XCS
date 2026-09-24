@@ -154,8 +154,9 @@ alert on `/health/ready` separately. Counters are process-local and reset on res
 
 `/v1/**` allows only the explicit origins in `XCS_ALLOWED_ORIGINS` (`*` is rejected). Because the UI
 shares this origin, that list matters only for third-party API consumers. The in-memory limiter
-allows 100 requests per minute per client address on `/v1/**` and 10 per minute on `/v1/pinning/**`;
-health, metrics and `/_nuxt/**` are exempt. The client address is resolved through
+allows, per client address per minute, 100 requests on `/v1/**` generally, but only 20 on
+`/v1/verify` and 10 on `/v1/pinning/**`; health, metrics and `/_nuxt/**` are exempt. Size a
+verification integration against the 20/min verify budget, not the general 100. The client address is resolved through
 `XCS_TRUSTED_PROXY_CIDRS` — narrow, exact ingress CIDRs only; catch-all `/0` ranges are rejected, and
 an undeclared proxy safely collapses its visitors into one shared budget. Horizontal replicas would
 need a shared edge or store-backed limiter.

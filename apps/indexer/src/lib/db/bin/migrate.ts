@@ -1,4 +1,5 @@
-// New file (no upstream in packages/db): applies db/migrations without provisioning roles.
+// Not a vendored copy (no upstream: packages/db never had a bin/migrate.ts): applies
+// db/migrations without provisioning roles.
 import { initializeDatabase, migrationsFolder } from '../bootstrap.js'
 import { createDatabaseClient } from '../client.js'
 

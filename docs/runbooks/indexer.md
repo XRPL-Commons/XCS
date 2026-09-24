@@ -26,8 +26,12 @@ pnpm --dir apps/indexer install --ignore-workspace --frozen-lockfile
 ```sh
 pnpm --dir apps/indexer db:bootstrap
 pnpm --dir apps/indexer preflight
+pnpm --dir apps/indexer build
 pnpm --dir apps/indexer start
 ```
+
+`start` runs `node dist/main.js`, so it needs a build first; `pnpm --dir apps/indexer dev` runs from
+source instead and needs no build step.
 
 The read API is not a separate service: it is served by `apps/web` from the same database. Start it
 independently; see [`deployment.md`](./deployment.md).

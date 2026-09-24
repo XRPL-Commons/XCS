@@ -1,4 +1,5 @@
 // Copied from packages/db/src/transactions.ts at 5ce8eaa; keep in sync by hand (see CONTRIBUTING.md).
+// Diverges by design (the web app's ESLint config enables preserve-caught-error, which the package config does not, so this copy carries the disable comment); source sha256:b367ac3f9b4388ba910cc2cd03d32b17325e71fa5d8a6982b120f8cd2dd13e1e.
 import type { XcsDatabase } from './client.js'
 
 const RETRYABLE_TRANSACTION_ERROR_CODES = new Set(['40001', '40P01'])
