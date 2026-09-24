@@ -57,6 +57,21 @@ function applyReply(event: H3Event, reply: ApiReply): unknown {
 }
 
 /**
+ * The JSON 404 envelope every API prefix answers with. The read API owns its
+ * prefixes end to end, so a path under one of them that no route covers never
+ * falls through to the framework's HTML error document.
+ */
+export function apiRouteNotFound(event: H3Event): unknown {
+  setResponseHeader(event, 'content-type', 'application/json; charset=utf-8')
+  setResponseStatus(event, 404)
+  return {
+    statusCode: 404,
+    error: 'Not Found',
+    message: `Route ${event.method}:${event.path} not found`,
+  }
+}
+
+/**
  * Bridges one Nitro route to its entry in the framework-free handler table. The
  * adapters carry the table's own path so a route is matched by identity rather
  * than by re-deriving it from the URL.
@@ -69,13 +84,7 @@ export async function dispatch(event: H3Event, method: HttpMethod, path: string)
   if (route === undefined) {
     // A route the handler table did not register (demo pinning, operational
     // metrics) is absent, exactly as it was before it had an adapter file.
-    setResponseHeader(event, 'content-type', 'application/json; charset=utf-8')
-    setResponseStatus(event, 404)
-    return {
-      statusCode: 404,
-      error: 'Not Found',
-      message: `Route ${method}:${event.path} not found`,
-    }
+    return apiRouteNotFound(event)
   }
 
   const cacheControlHeaders: Record<string, string> =

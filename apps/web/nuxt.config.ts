@@ -104,10 +104,6 @@ export default defineNuxtConfig({
     ],
     langDir: 'locales',
   },
-  nitro: {
-    // The read API answers with its own JSON envelope; pages keep Nuxt's renderer.
-    errorHandler: '~~/server/error',
-  },
   runtimeConfig: {
     browserE2eMode,
     localPayloadStoreMode,

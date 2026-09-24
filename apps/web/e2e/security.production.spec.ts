@@ -70,8 +70,8 @@ test('keeps the browser E2E fixtures out of the production build', async ({ requ
   // The production build configures an unreachable database, so the real read
   // API must fail rather than answer with the browser end-to-end fixtures.
   const networks = await request.get('/v1/networks')
-  expect([500, 503]).toContain(networks.status())
+  expect(networks.status()).toBe(500)
   const body = (await networks.json()) as Record<string, unknown>
-  expect(typeof body.error).toBe('string')
+  expect(body.error).toBe('INTERNAL_ERROR')
   expect(body).not.toHaveProperty('items')
 })

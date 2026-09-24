@@ -155,8 +155,9 @@ fixture context: the handlers in `server/routes/__e2e-api/**` are moved into
 `server/xcs/e2e-fixtures.ts` as plain functions, and a request hook on `/v1/**` answers from them
 before the real handlers run. Playwright configs point at the same origin, `NUXT_PUBLIC_PROFILE_ID`
 stays `xrpl-testnet-xcs-browser-e2e`. `security.production.spec.ts` keeps proving the fixtures are
-inert in a production build (`/v1/networks` must answer 503 `database_unavailable`, not fixture data,
-when no database is configured).
+inert in a production build: with an unreachable database `/v1/networks` must answer 500
+`INTERNAL_ERROR`, never fixture data (`database_unavailable` is the `/health/ready` reason, not this
+route's envelope).
 
 ### Web contract (`apps/web/.env.example`)
 
