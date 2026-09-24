@@ -1,9 +1,22 @@
 # Monitoring and recovery objectives
 
-The optional `monitoring` Compose profile collects authenticated XCS API metrics, PostgreSQL
-exporter metrics and host capacity metrics. It provisions one Grafana dashboard and Prometheus alert
+The optional `monitoring` Compose profile collects authenticated metrics from the web app, from the
+PostgreSQL exporter and from the host. It provisions one Grafana dashboard and Prometheus alert
 rules. It does not configure an Alertmanager destination; routing notifications to the Commons
 on-call system remains a deployment-specific external step.
+
+> **Local development only.** Compose is no longer a deployment template (see
+> [`deployment.md`](./deployment.md)), and this profile passes Grafana's admin password
+> (`XCS_GRAFANA_ADMIN_PASSWORD`) and the exporter's database password
+> (`XCS_MONITOR_DATABASE_PASSWORD`) as **plain container environment variables** read from `.env`.
+> They are visible to anyone who can run `docker inspect` or read the container's environment. That
+> is acceptable only because this stack is local development with loopback-only ports and disposable
+> credentials. Never run this profile on a shared or public host, never put a real deployment's
+> credentials in `.env`, and treat a hosted monitoring stack as a separate design that must carry
+> its own secret handling.
+
+The alert rules, dashboard and scrape configuration in `ops/monitoring/` are reusable by a hosted
+monitoring stack; the Compose services around them are not.
 
 ## Objectives
 
@@ -22,62 +35,62 @@ cannot prove those external conditions by configuration alone.
 
 ## Enable the profile
 
-Hosted monitoring requires Docker Compose `2.24.4` or newer and the production secret overlay. Set
-`XCS_METRICS_ENABLED=true` and configure the eight core secret-file paths:
+Requires Docker Compose `2.24.4` or newer. In `.env` (copied from `.env.compose.example`):
 
-- `XCS_POSTGRES_ADMIN_PASSWORD_FILE`;
-- `XCS_INDEXER_DATABASE_PASSWORD_FILE`;
-- `XCS_API_DATABASE_PASSWORD_FILE`;
-- `XCS_MONITOR_DATABASE_PASSWORD_FILE`;
-- `XCS_INTERNAL_API_TOKEN_FILE`;
-- `XCS_METRICS_TOKEN_FILE`;
-- `XCS_RPC_URL_PRIMARY_FILE`;
-- `XCS_RPC_URL_SECONDARY_FILE`.
+```dotenv
+XCS_METRICS_ENABLED=true
+XCS_METRICS_TOKEN=<32+ URL-safe random characters>
+XCS_MONITOR_DATABASE_PASSWORD=<the value db:bootstrap provisioned for xcs_monitor>
+XCS_GRAFANA_ADMIN_USER=xcs_admin
+XCS_GRAFANA_ADMIN_PASSWORD=<a distinct random value; there is no default>
+XCS_GRAFANA_COOKIE_SECURE=false
+```
 
-The API and Prometheus read the same metrics-token file. PostgreSQL exporter authenticates as the
-dedicated `xcs_monitor` role. Provisioning first requires the built-in `pg_monitor`,
-`pg_read_all_settings`, `pg_read_all_stats` and `pg_stat_scan_tables` attributes, exact membership
-graph and ACLs to match PostgreSQL's recorded installation baseline. Drift fails closed instead of
-being silently repaired. Only then does `xcs_monitor` inherit `pg_monitor`, without `SET ROLE`,
-application-table DML or any raw advisory-lock function. Create a ninth, independent
-`XCS_GRAFANA_ADMIN_PASSWORD_FILE` for Grafana. Compose implements file-backed secrets as bind mounts:
-keep their parent directory mode `0700` and each file mode `0644`, allowing the distinct
-unprivileged container UIDs to read only secrets mounted into their service. Do not put them in a
-host directory accessible by another user, commit them, log them or pass their contents on a command
-line. The default paths are under `ops/secrets/`, whose contents are ignored by Git.
+`XCS_METRICS_TOKEN` must exist in the environment, even empty, whenever the monitoring profile runs:
+an unset variable fails the Compose secret, not just the scrape. The web app and Prometheus read that
+same value — Compose materializes it as the file Prometheus reads as its scrape credential.
+
+The PostgreSQL exporter authenticates as the dedicated `xcs_monitor` role. Provisioning that role
+first requires the built-in `pg_monitor`, `pg_read_all_settings`, `pg_read_all_stats` and
+`pg_stat_scan_tables` attributes, exact membership graph and ACLs to match PostgreSQL's recorded
+installation baseline. Drift fails closed instead of being silently repaired. Only then does
+`xcs_monitor` inherit `pg_monitor`, without `SET ROLE`, application-table DML or any raw
+advisory-lock function.
 
 Validate the fully rendered configuration without printing it, then start the profile:
 
 ```sh
-docker compose -f docker-compose.yml \
-  --profile monitoring config --quiet
-docker compose -f docker-compose.yml \
+docker compose --profile monitoring config --quiet
+docker compose --profile monitoring up --build
+```
+
+Prometheus and Grafana stay on the internal `monitoring` network and publish no port. To inspect them
+on loopback during development, layer the explicit override:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.dev.yml \
   --profile monitoring up --build
 ```
 
-This example builds the alpha source locally. For digest-pinned deployment images, follow the
-`pull` plus `up --no-build` procedure in [`deployment.md`](./deployment.md).
-
-Prometheus and Grafana stay on the internal monitoring network and publish no port. Use an
-authenticated reverse proxy or an operator tunnel in a hosted environment. The explicit
-`docker-compose.dev.yml` override may expose them on loopback for development; set
-`XCS_GRAFANA_COOKIE_SECURE=false` only for that local HTTP session.
+Set `XCS_GRAFANA_COOKIE_SECURE=false` only for that local HTTP session.
 
 ## Signals and alerts
 
-Prometheus scrapes `GET /internal/metrics/prometheus` every 30 seconds with the metrics bearer token.
-The public route is disabled unless metrics are enabled, bypasses public rate-limit accounting and
-must retain `Cache-Control: no-store`. The separate `/internal/metrics` JSON representation is for
-bounded operator diagnostics; Prometheus does not scrape it.
+Prometheus scrapes the `web` service (`web:3000`) at `GET /internal/metrics/prometheus` every 30
+seconds with the metrics bearer token. Both metrics routes belong to the web app, which serves the
+`/v1` API; there is no separate API service. The route is disabled unless metrics are enabled,
+bypasses public rate-limit accounting and must retain `Cache-Control: no-store`. The separate
+`/internal/metrics` JSON representation is for bounded operator diagnostics; Prometheus does not
+scrape it.
 
 Committed rules cover:
 
-- metrics/API, PostgreSQL and exporter unavailability or snapshot failures;
+- web-app metrics, PostgreSQL and exporter unavailability or snapshot failures;
 - missing readiness telemetry and a halted or persistently non-ready indexer;
 - checkpoint age above 120 seconds and projection lag above five ledgers;
 - missing or diverging source tips;
 - PostgreSQL connection use above 80 percent;
-- rolling 30-day authoritative readiness below 99.5 percent, with API scrape failures and missing
+- rolling 30-day authoritative readiness below 99.5 percent, with scrape failures and missing
   readiness samples counted as unavailable;
 - host filesystem use above 80 and 90 percent.
 
@@ -85,14 +98,11 @@ The Grafana dashboard is provisioned from `ops/monitoring/grafana/dashboards/xcs
 configuration changes before deployment:
 
 ```sh
-docker compose -f docker-compose.yml \
-  --profile monitoring run --rm --no-deps \
+docker compose --profile monitoring run --rm --no-deps \
   --entrypoint /bin/promtool prometheus check config /etc/prometheus/prometheus.yml
-docker compose -f docker-compose.yml \
-  --profile monitoring run --rm --no-deps \
+docker compose --profile monitoring run --rm --no-deps \
   --entrypoint /bin/promtool prometheus check rules /etc/prometheus/rules/xcs-alerts.yml
-docker compose -f docker-compose.yml \
-  --profile monitoring run --rm --no-deps \
+docker compose --profile monitoring run --rm --no-deps \
   --entrypoint /bin/promtool prometheus test rules /etc/prometheus/tests/xcs-alerts.test.yml
 jq empty ops/monitoring/grafana/dashboards/*.json
 ```
@@ -105,8 +115,8 @@ exporter is protocol authority.
 
 1. Record alert time, profile ID, current image digests, writer epoch, checkpoint index/hash and the
    two source tips. Do not paste tokens or connection URLs into the incident record.
-2. Treat a halted indexer or source divergence as fail-closed. Keep the API non-authoritative; do not
-   override readiness or manually advance a checkpoint.
+2. Treat a halted indexer or source divergence as fail-closed. Keep the web app's read API
+   non-authoritative; do not override readiness or manually advance a checkpoint.
 3. Determine whether the fault is source, host, database, image or configuration. Preserve the exact
    network profile and database backup before mutation.
 4. Restore the last known-good compatible images/database or provision a fresh database. Replay only
@@ -115,19 +125,18 @@ exporter is protocol authority.
    Re-enable authoritative traffic only after the writer lease, source agreement, transaction root
    and freshness checks all pass.
 6. Record time to recovery and whether every event after activation was reconstructed. A recovery
-   beyond four hours or any unavailable ledger range is an objective breach, even if the API process
+   beyond four hours or any unavailable ledger range is an objective breach, even if the web process
    itself stayed live.
 
 Exercise this process before the public beta and after changes to PostgreSQL, provider retention,
 backup tooling or deployment topology. A real drill needs Commons infrastructure, provider access
-and named incident authority; CI validates configuration and a local API smoke, not those external
-facts.
+and named incident authority; CI validates configuration and a local web-app smoke, not those
+external facts.
 
 ## Rotation and retention
 
 `XCS_METRICS_RETENTION` defaults to 30 days, matching the readiness objective window. Retain incident
 records and drill evidence outside Prometheus according to Commons policy. To rotate the metrics
-token, update the API environment and token file atomically, then restart API and Prometheus; a
-partial rotation intentionally makes the scrape fail. Rotate the database and Grafana passwords
-through their normal secret procedures and rerun database bootstrap after a database
-password change.
+token, update `XCS_METRICS_TOKEN` and restart both the web app and Prometheus; a partial rotation
+intentionally makes the scrape fail. Rotate the database and Grafana passwords through their normal
+procedures and rerun `pnpm --dir apps/indexer db:bootstrap` after a database password change.

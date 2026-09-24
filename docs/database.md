@@ -128,18 +128,18 @@ cascaded away.
 
 ## Table catalog
 
-| Domain           | Table                    | Purpose                                                                                                        | Normal mutation pattern                                               |
-| ---------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Network evidence | `network_profiles`       | Network, registry, activation, and protocol-version boundary used by every projection.                         | Insert during profile initialization; `enabled` is operational state. |
-| Network evidence | `ledger_checkpoints`     | Canonical ledger hash chain, transaction root, close time, and transaction count used to prove API freshness.  | Append once per processed validated ledger.                           |
-| Indexer control  | `indexer_status`         | One row per profile containing quorum progress, live writer lease, fencing epoch, and halt state.              | Insert once; update only through fenced coordination operations.      |
-| Indexer control  | `indexer_incidents`      | Durable record of each fenced halt and the source tips that caused it.                                         | Append-only, keyed by profile and writer epoch.                       |
-| Schema catalog   | `schema_events`          | Accepted and rejected schema-registration transactions with their ledger ordering and parsed memo evidence.    | Append-only event history.                                            |
-| Schema catalog   | `schemas`                | Materialized, searchable catalog of accepted schemas, including original and inheritance-resolved definitions. | Insert when an accepted registration event is projected.              |
-| Credentials      | `credential_generations` | Current state of one logical Credential generation, including acceptance and deletion state.                   | Insert on creation; column-limited updates on later lifecycle events. |
-| Credentials      | `credential_events`      | Immutable creation, acceptance, and deletion evidence plus the resulting ledger-node snapshot.                 | Append-only event history.                                            |
-| Demo pinning     | `pin_challenges`         | Short-lived, wallet-bound challenge preventing unauthenticated pin requests and replay.                        | Created, marked used, and expired by the API.                         |
-| Demo pinning     | `demo_pins`              | Operational state for the optional Testnet payload-pinning convenience service.                                | API-managed lifecycle from pending to pinned, failed, or unpinned.    |
+| Domain           | Table                    | Purpose                                                                                                            | Normal mutation pattern                                                |
+| ---------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| Network evidence | `network_profiles`       | Network, registry, activation, and protocol-version boundary used by every projection.                             | Insert during profile initialization; `enabled` is operational state.  |
+| Network evidence | `ledger_checkpoints`     | Canonical ledger hash chain, transaction root, close time, and transaction count used to prove read-API freshness. | Append once per processed validated ledger.                            |
+| Indexer control  | `indexer_status`         | One row per profile containing quorum progress, live writer lease, fencing epoch, and halt state.                  | Insert once; update only through fenced coordination operations.       |
+| Indexer control  | `indexer_incidents`      | Durable record of each fenced halt and the source tips that caused it.                                             | Append-only, keyed by profile and writer epoch.                        |
+| Schema catalog   | `schema_events`          | Accepted and rejected schema-registration transactions with their ledger ordering and parsed memo evidence.        | Append-only event history.                                             |
+| Schema catalog   | `schemas`                | Materialized, searchable catalog of accepted schemas, including original and inheritance-resolved definitions.     | Insert when an accepted registration event is projected.               |
+| Credentials      | `credential_generations` | Current state of one logical Credential generation, including acceptance and deletion state.                       | Insert on creation; column-limited updates on later lifecycle events.  |
+| Credentials      | `credential_events`      | Immutable creation, acceptance, and deletion evidence plus the resulting ledger-node snapshot.                     | Append-only event history.                                             |
+| Demo pinning     | `pin_challenges`         | Short-lived, wallet-bound challenge preventing unauthenticated pin requests and replay.                            | Created, marked used, and expired by the web app.                      |
+| Demo pinning     | `demo_pins`              | Operational state for the optional Testnet payload-pinning convenience service.                                    | Web-app-managed lifecycle from pending to pinned, failed, or unpinned. |
 
 `schema_events` and `credential_events` preserve what the indexer observed. `schemas` and
 `credential_generations` are query-oriented projections derived from those events. A replay can
@@ -155,7 +155,7 @@ finite replays.
 - Projection writes, the corresponding checkpoint, and published indexer status commit in the same
   fenced transaction. A stale writer epoch cannot commit partial state after lease takeover.
 - A halt status and its durable `indexer_incidents` row commit atomically.
-- API authoritative reads use one read-only, repeatable-read transaction so status, checkpoint, and
+- The web app's authoritative reads use one read-only, repeatable-read transaction so status, checkpoint, and
   projection evidence describe the same database snapshot.
 - Pinning tables are operational convenience data and are isolated from ledger-derived protocol
   projections.
@@ -166,28 +166,86 @@ finite replays.
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
 | `xcs_admin`   | Owns the schema and grants; unrestricted bootstrap access.                                                                    | One-shot bootstrap and controlled maintenance only. |
 | `xcs_indexer` | Reads and inserts ledger-derived rows; receives column-limited updates only on `indexer_status` and `credential_generations`. | Indexer runtime.                                    |
-| `xcs_api`     | Reads ledger-derived projections and manages only `pin_challenges` and `demo_pins`.                                           | API runtime.                                        |
+| `xcs_api`     | Reads ledger-derived projections and manages only `pin_challenges` and `demo_pins`.                                           | Web app (`/v1` API) runtime.                        |
 | `xcs_monitor` | No application-table DML; inherits PostgreSQL's `pg_monitor` role.                                                            | Metrics collection.                                 |
 
 Runtime roles own no objects, cannot create database objects, are not superusers, and have finite
 connection limits and statement timeouts. Bootstrap requires an explicit dedicated-cluster
 acknowledgement because PostgreSQL roles are cluster-wide.
 
-## Schema ownership and bootstrap
+## Schema ownership, migrations and bootstrap
+
+The schema lives in `db/`, which is **not a package**: it has no `package.json`, no build and no
+version. Both applications compile its files as their own sources through the `#db/*` path alias
+(`#db/schema` → `db/schema/index.ts`), so both pin the same `drizzle-orm` version. It is the only
+code `apps/web` and `apps/indexer` share; everything else is copied by hand (see
+[`CONTRIBUTING.md`](../CONTRIBUTING.md)).
 
 The Drizzle source is split by domain:
 
-- [`profiles.ts`](../packages/db/src/schema/profiles.ts): network profiles and ledger checkpoints.
-- [`indexer.ts`](../packages/db/src/schema/indexer.ts): writer status and durable incidents.
-- [`catalog.ts`](../packages/db/src/schema/catalog.ts): schema registration events and catalog rows.
-- [`credentials.ts`](../packages/db/src/schema/credentials.ts): Credential history and current state.
-- [`pinning.ts`](../packages/db/src/schema/pinning.ts): optional demo-pinning administration.
+- [`profiles.ts`](../db/schema/profiles.ts): network profiles and ledger checkpoints.
+- [`indexer.ts`](../db/schema/indexer.ts): writer status and durable incidents.
+- [`catalog.ts`](../db/schema/catalog.ts): schema registration events and catalog rows.
+- [`credentials.ts`](../db/schema/credentials.ts): Credential history and current state.
+- [`pinning.ts`](../db/schema/pinning.ts): optional demo-pinning administration.
 
-[`0000_baseline.sql`](../packages/db/drizzle/0000_baseline.sql) is generated from those modules and
-creates the entire schema for an empty database. [`bootstrap.ts`](../packages/db/src/bootstrap.ts)
-applies that baseline and then normalizes the fixed runtime roles and grants. Both operations are
-idempotent, so starting the stack again is safe.
+Generated SQL migrations live in [`db/migrations/`](../db/migrations); `migrations/meta/_journal.json`
+is the applied-migration ledger and must stay append-only.
+[`0000_baseline.sql`](../db/migrations/0000_baseline.sql) creates the entire schema for an empty
+database.
 
-Until the first production release, schema changes regenerate the baseline and disposable databases
-are recreated. The baseline freezes at production launch; later schema changes must use forward
-migrations rather than rewriting deployed history.
+### PostgreSQL is external
+
+PostgreSQL is provisioned outside this repository — a managed instance, or a cluster an operator
+runs. Nothing here creates or owns the server. The repository's Compose stack includes a PostgreSQL
+container for **local development only**; it is not a deployment topology.
+
+### The indexer owns the tooling
+
+`drizzle-kit` and the migration runner are devDependencies of `apps/indexer` only. The web app has
+no migration command: it connects to an already-migrated database as `xcs_api`.
+
+Generate a migration after editing `db/schema/`, and commit both the SQL file and the updated
+snapshot — CI regenerates and fails on any diff:
+
+```sh
+pnpm --dir apps/indexer db:generate
+```
+
+Apply migrations to an existing database:
+
+```sh
+XCS_BOOTSTRAP_DATABASE_URL=postgres://xcs_admin:…@host:5432/xcs \
+  pnpm --dir apps/indexer db:migrate
+```
+
+This is idempotent: `drizzle-orm`'s migrator records applied migrations in
+`drizzle.__drizzle_migrations` and a second run applies nothing. The migration folder defaults to
+`db/migrations` relative to the indexer application and can be overridden with `XCS_MIGRATIONS_DIR`
+(the container image sets it to the copy of `db/migrations` beside the built application).
+
+### Bootstrap once, then migrate
+
+`db:bootstrap` is migration **plus** role provisioning. Run it once against a fresh database, then
+use `db:migrate` for every later schema change:
+
+```sh
+XCS_BOOTSTRAP_DATABASE_URL=postgres://xcs_admin:…@host:5432/xcs \
+  XCS_DATABASE_CLUSTER_SCOPE=dedicated \
+  XCS_INDEXER_DATABASE_PASSWORD=… \
+  XCS_API_DATABASE_PASSWORD=… \
+  XCS_MONITOR_DATABASE_PASSWORD=… \
+  pnpm --dir apps/indexer db:bootstrap
+```
+
+It applies the migrations and then normalizes the fixed runtime roles (`xcs_indexer`, `xcs_api`,
+`xcs_monitor`), their passwords and their grants in one administrative transaction. Both operations
+are idempotent, so running it again is safe and is also how a runtime password is rotated.
+`XCS_DATABASE_CLUSTER_SCOPE=dedicated` is required because PostgreSQL login roles are cluster-wide
+even though the grants are scoped to the selected database. Bootstrap reports role names or a stable
+failure code, never URLs or password values.
+
+Until the first production release, disposable databases are recreated rather than upgraded in place.
+The migration history freezes at production launch; after that, every schema change is a reviewed
+forward migration with an explicit compatibility, lock, backup and rollback plan. Never edit an
+applied migration — add a new one.

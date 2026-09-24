@@ -7,22 +7,40 @@ issuer/subject wallet -> unsigned transaction from SDK/web/CLI -> XRPL
                                                                |
                                            two rippled sources |
                                                                v
-                                                          indexer
+                                                    apps/indexer (writer)
                                                                |
                                                     PostgreSQL projection
                                                                |
-                                                         API -> web/verifier
+                                            apps/web (Nitro): /v1 API + UI
+                                                               |
+                                                        browser/verifier
 ```
 
 ## Ownership
 
+Two deployable applications, one shared schema folder, and a library that neither application
+imports. See [ADR 0004](./adr/0004-two-standalone-apps.md).
+
+- `apps/indexer` is the projection writer and the only normal writer to protocol projections. It
+  advances only on validated ledger evidence agreed by its configured sources, and it owns the
+  database tooling: migration generation, migration application and one-shot bootstrap.
+- `apps/web` is one Nitro server with two responsibilities on one origin. Its `server/` half reads
+  the projection and fetches off-ledger payloads for verification, failing closed when projection
+  evidence is stale or inconsistent; its `app/` half presents the workflows and connects user
+  wallets. Browser-visible RPC configuration is separate from the private indexer sources.
+- `db/` defines the rebuildable PostgreSQL model — Drizzle tables and generated SQL migrations. It
+  is not a package: both applications compile it as their own source through the `#db/*` alias.
 - `core` parses and validates protocol values. It is browser-safe and performs no I/O.
 - `sdk` builds and validates XRPL transaction JSON and submits signed blobs. It never owns keys.
 - `cli` is a thin command layer over core and SDK.
-- `indexer` is the projection writer. It advances only on validated ledger evidence agreed by its configured sources.
-- `api` reads the projection and fetches off-ledger payloads for verification. It fails closed when projection evidence is stale or inconsistent.
-- `web` presents the workflows and connects user wallets. Browser-visible RPC configuration is separate from private indexer sources.
-- `db` defines the rebuildable PostgreSQL model and is maintained separately.
+
+The applications do not import `core` or `sdk`. Each carries hand-maintained copies of the protocol
+code it needs, every file headed with its origin; `packages/core` remains the reference
+implementation and the place a protocol change lands first. The mirroring rule is in
+[`CONTRIBUTING.md`](../CONTRIBUTING.md).
+
+PostgreSQL itself is provisioned outside this repository. The committed Compose stack is a
+local-development convenience, not a deployment topology.
 
 ## Trust boundaries
 
@@ -44,7 +62,6 @@ An unavailable payload is distinct from a tampered payload. A cryptographically 
 
 ## Operational projection
 
-The indexer is the only normal writer to protocol projections. Checkpoint, events, and status move atomically under a fenced writer lease. The API reads a consistent snapshot and returns `503` when the writer lease, source agreement, checkpoint, transaction-root evidence, or freshness requirements fail.
+The indexer is the only normal writer to protocol projections. Checkpoint, events, and status move atomically under a fenced writer lease. The web app's read API opens a consistent snapshot and returns `503` when the writer lease, source agreement, checkpoint, transaction-root evidence, or freshness requirements fail.
 
 The controlled Testnet pilot is disposable. It must not be promoted to Mainnet or presented as a neutral permanent registry. See [ADR 0003](./adr/0003-disposable-controlled-testnet-registry.md).
-An unavailable payload is distinct from a tampered payload. A cryptographically valid Credential does not prove that the issuer is trustworthy.

@@ -16,13 +16,13 @@ by hand (see `CONTRIBUTING.md`).
 
 ## The indexer owns the tooling
 
-`drizzle-kit` and the migration runner are devDependencies of `apps/indexer` only. Every command
-below is run from `apps/indexer` (or with `pnpm --filter @xcs-protocol/indexer`).
+`drizzle-kit` and the migration runner are devDependencies of `apps/indexer` only. `apps/indexer` is
+not a workspace member, so every command below uses `--dir` rather than `--filter`.
 
 ### Generate a migration after editing `schema/`
 
 ```sh
-pnpm --filter @xcs-protocol/indexer db:generate
+pnpm --dir apps/indexer db:generate
 ```
 
 This changes into this folder and runs `drizzle-kit generate --config ./drizzle.config.ts`
@@ -33,7 +33,7 @@ an updated snapshot under `db/migrations/`. Commit them: CI regenerates and fail
 
 ```sh
 XCS_BOOTSTRAP_DATABASE_URL=postgres://xcs_admin:…@host:5432/xcs \
-  pnpm --filter @xcs-protocol/indexer db:migrate
+  pnpm --dir apps/indexer db:migrate
 ```
 
 Idempotent: `drizzle-orm`'s migrator records applied migrations in `drizzle.__drizzle_migrations`
@@ -44,7 +44,7 @@ to the copy of `db/migrations` beside the built application).
 ### Bootstrap a fresh database
 
 ```sh
-pnpm --filter @xcs-protocol/indexer db:bootstrap
+pnpm --dir apps/indexer db:bootstrap
 ```
 
 Applies the migrations and then provisions the cluster-wide runtime roles (`xcs_indexer`, `xcs_api`,

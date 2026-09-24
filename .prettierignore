@@ -7,3 +7,4 @@ coverage
 pnpm-lock.yaml
 XCS_draft0.pdf
 apps/*/pnpm-lock.yaml
+.superpowers

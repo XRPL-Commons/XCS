@@ -5,6 +5,28 @@ keeps four entries—Explorer, Create, Verify and Docs—while preserving the sc
 lifecycle and developer workflows in one deployment. EAS and EASScan are interaction-design
 references only; the site constructs native XRPL transactions under the frozen XCS v0.1 protocol.
 
+The same Nitro server also **is** the XCS read and verification API: `/v1/**`, `/health/*`,
+`/internal/metrics*` and `/documentation` are served from this application, on the same origin as the
+UI. There is no separate API service and no server-side hop.
+
+This is a standalone deployable with its own `package.json`, `pnpm-lock.yaml`, `.npmrc`, tsconfig,
+Prettier config, `Dockerfile` and `.env.example`. It imports no workspace package: the protocol code
+it needs is copied by hand into `app/lib/xcs/{core,sdk}/` and the database client into
+`server/lib/db/`, each file headed with the file it came from. The only shared source is
+[`db/`](../../db/README.md), compiled through the `#db/*` alias. See
+[`CONTRIBUTING.md`](../../CONTRIBUTING.md) and
+[ADR 0004](../../docs/adr/0004-two-standalone-apps.md).
+
+```sh
+pnpm --dir apps/web install --ignore-workspace --frozen-lockfile
+pnpm --dir apps/web dev       # http://localhost:3000 — UI and /v1 on one origin
+pnpm --dir apps/web verify    # format:check, lint, test, build
+```
+
+`--ignore-workspace` is mandatory on any pnpm command that resolves dependencies (`install`, `audit`,
+`licenses list`); without it pnpm silently operates on the root workspace and still exits 0. Commands
+that only run a script do not need it.
+
 ## UI stack
 
 The site is built on Nuxt UI 4 and Tailwind CSS 4. The XCS identity lives in
@@ -61,6 +83,82 @@ it published, while a complete 64-digit hexadecimal value performs exact schema 
 and transaction-hash resolution. The activity page is not a Credential activity feed. Search
 results and exact Credential/transaction pages emit `noindex` metadata so search engines are not
 invited to turn shared coordinates into a secondary public directory.
+
+## The read and verification API
+
+`server/` hosts the API that the browser, the CLI (`xcs verify --api https://<origin>`) and any
+third-party integrator call. It reads the indexer's PostgreSQL projection as the least-privilege
+`xcs_api` role through `XCS_DATABASE_URL` and never writes protocol projections.
+
+### Routes
+
+| Method | Path                                                                                    |
+| ------ | --------------------------------------------------------------------------------------- |
+| `GET`  | `/v1/networks`                                                                          |
+| `GET`  | `/v1/networks/:network/status`                                                          |
+| `GET`  | `/v1/networks/:network/readiness`                                                       |
+| `GET`  | `/v1/networks/:network/stats`                                                           |
+| `GET`  | `/v1/networks/:network/search`                                                          |
+| `GET`  | `/v1/networks/:network/activity`                                                        |
+| `GET`  | `/v1/networks/:network/schemas`                                                         |
+| `GET`  | `/v1/networks/:network/schemas/:uid`                                                    |
+| `GET`  | `/v1/networks/:network/schemas/:uid/catalog`                                            |
+| `GET`  | `/v1/networks/:network/schema-registrations/:transactionHash`                           |
+| `GET`  | `/v1/networks/:network/credential-generations/:generationId`                            |
+| `GET`  | `/v1/networks/:network/transactions/:transactionHash`                                   |
+| `GET`  | `/v1/networks/:network/credentials/:issuer/:subject/:schemaUid`                         |
+| `GET`  | `/v1/networks/:network/credentials/:issuer/:subject/:schemaUid/events`                  |
+| `GET`  | `/v1/networks/:network/credentials/:issuer/:subject/:schemaUid/events/:transactionHash` |
+| `POST` | `/v1/verify`                                                                            |
+| `POST` | `/v1/pinning/challenges`                                                                |
+| `POST` | `/v1/pinning/pins`                                                                      |
+
+The two pinning routes answer `404` unless `XCS_DEMO_PINNING_ENABLED=true` for the requested profile.
+
+Authoritative ledger-derived routes fail closed: they return `503` when the indexer's writer lease,
+source agreement, checkpoint, transaction-root evidence or freshness
+(`XCS_READINESS_MAX_LEDGER_AGE_SECONDS`, default 120 seconds) do not hold. Discovery is deliberately
+exact — there is no subject feed, account-wide enumeration or claims search.
+
+### OpenAPI
+
+- `GET /documentation` renders the API reference.
+- `GET /documentation/openapi.json` returns the OpenAPI 3.1 document, built from the same JSON
+  schemas the handlers validate against.
+
+### Health
+
+| Path                | Meaning                                                                                                                                                               |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /health/live`  | The process is up. Use this for the platform's container health check.                                                                                                |
+| `GET /health`       | Compatibility alias.                                                                                                                                                  |
+| `GET /health/ready` | Authoritative readiness: live writer lease, source agreement, transaction-root-bearing checkpoint at the effective tip, within the freshness window. `503` otherwise. |
+
+All three emit `Cache-Control: no-store` and bypass the application rate limiter. Never use
+`/health/ready` as the container health check — a normal indexer catch-up must not restart the web
+process — and restrict all three at the ingress to the load balancer and monitoring network.
+
+### Metrics
+
+`XCS_METRICS_ENABLED=true` exposes two routes, both requiring `Authorization: Bearer
+$XCS_METRICS_TOKEN`, both `Cache-Control: no-store`, neither consuming the public rate-limit budget:
+
+- `GET /internal/metrics` — a bounded JSON operator snapshot (schema version 1);
+- `GET /internal/metrics/prometheus` — the Prometheus exposition Prometheus scrapes.
+
+The metrics routes stay `200` during a database outage so process-local counters remain observable;
+alert on `/health/ready` separately. Counters are process-local and reset on restart. See
+[`docs/runbooks/monitoring.md`](../../docs/runbooks/monitoring.md).
+
+### CORS and rate limiting
+
+`/v1/**` allows only the explicit origins in `XCS_ALLOWED_ORIGINS` (`*` is rejected). Because the UI
+shares this origin, that list matters only for third-party API consumers. The in-memory limiter
+allows 100 requests per minute per client address on `/v1/**` and 10 per minute on `/v1/pinning/**`;
+health, metrics and `/_nuxt/**` are exempt. The client address is resolved through
+`XCS_TRUSTED_PROXY_CIDRS` — narrow, exact ingress CIDRs only; catch-all `/0` ranges are rejected, and
+an undeclared proxy safely collapses its visitors into one shared budget. Horizontal replicas would
+need a shared edge or store-backed limiter.
 
 ## Wallet support
 
@@ -147,7 +245,7 @@ creation and subject acceptance, then verifies the same digest from that browser
 proves that an external IPFS CID absent from local storage is never described as browser-local.
 
 ```bash
-pnpm --filter @xcs-protocol/web exec playwright install chromium
+pnpm --dir apps/web exec playwright install chromium
 pnpm test:e2e
 ```
 
@@ -197,7 +295,7 @@ plugin reject the mode outside a development bundle. `nuxt.config.ts` also rejec
 For manual Testnet flows without an issuer-controlled HTTPS host, start the development site with:
 
 ```bash
-XCS_LOCAL_PAYLOAD_STORE=1 pnpm --filter @xcs-protocol/web dev
+XCS_LOCAL_PAYLOAD_STORE=1 pnpm --dir apps/web dev
 ```
 
 On a loopback origin only, the issuance page then offers **Local test storage (this browser)**. It
@@ -222,7 +320,7 @@ The Node SSR deployment emits defensive browser headers and a nonce-based strict
 Policy in `Content-Security-Policy-Report-Only`. The observed policy has no `unsafe-inline` or
 `unsafe-eval`: Nuxt's server-rendered scripts and styles receive a fresh random nonce for every HTML
 response. Production browser connections are limited to the same origin, HTTPS and WSS. Local
-development additionally permits HTTP and WS for the separate development API and Vite HMR.
+development additionally permits HTTP and WS for Vite HMR.
 
 The CSP is intentionally report-only until every enabled XRPL Connect adapter passes the manual
 Testnet matrix. WalletConnect modal styles/images must also be observed and qualified before
@@ -238,73 +336,68 @@ Every rendered HTML response, including Nuxt error documents, is `private, no-st
 intermediary cannot replay a response-bound nonce. Fingerprinted `/_nuxt/` assets remain public and
 immutable.
 
-`connect-src` necessarily permits arbitrary HTTPS destinations because the configured public API
-and issuer-hosted payload origins are deployment or Credential data, while the public XRPL client
-uses WSS. This means CSP cannot prevent HTTPS exfiltration after an already-authorized same-origin
+`connect-src` necessarily permits arbitrary HTTPS destinations because issuer-hosted payload origins
+are Credential data chosen permissionlessly, while the public XRPL client uses WSS. This means CSP cannot prevent HTTPS exfiltration after an already-authorized same-origin
 script is compromised. Treat the deployed JavaScript bundle and origin as part of the signing trust
 boundary. Before changing the policy from report-only to enforced, run every Playwright flow with no
 CSP console violations and record real extension tests for connect, register, create, accept,
 issuer/subject delete, cancellation, account/network changes, external payload CORS and the public
 XRPL WSS endpoint.
 
-## Network safety
+## Configuration
 
-Set:
+The complete contract is [`.env.example`](./.env.example). A minimal deployment sets:
 
 ```bash
-NUXT_API_BASE_URL=http://api:3001
-NUXT_API_INTERNAL_TOKEN=replace-with-the-private-api-token
-NUXT_TRUSTED_PROXY_CIDRS=10.42.0.2/32
-NUXT_PUBLIC_API_BASE_URL=https://xcs-api.example
-NUXT_PUBLIC_RPC_URL=wss://s.altnet.rippletest.net:51233
+XCS_DATABASE_URL=postgres://xcs_api:...@db.example:5432/xcs
+XCS_ALLOWED_ORIGINS=https://xcs.example
+XCS_TRUSTED_PROXY_CIDRS=10.42.0.2/32
 NUXT_PUBLIC_PROFILE_ID=xrpl-testnet-xcs-v0.1
+NUXT_PUBLIC_RPC_URL=wss://s.altnet.rippletest.net:51233
 NUXT_PUBLIC_XAMAN_API_KEY=optional-public-xaman-application-id
 NUXT_PUBLIC_XAMAN_REDIRECT_URL=https://xcs.example/
 NUXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=optional-public-reown-project-id
 ```
 
-`NUXT_API_BASE_URL` is the server-side/SSR endpoint; in Compose it is `http://api:3001`.
-`NUXT_API_INTERNAL_TOKEN` is private runtime configuration shared only with the API. Nuxt uses it
-to authenticate an opaque HMAC rate-limit key deterministically derived from the visitor network
-address on SSR requests, so visitors cannot mint or rotate arbitrary budgets. It must match
-`XCS_INTERNAL_API_TOKEN`, contain 32–256 URL-safe random characters, and must never be placed under
-`runtimeConfig.public` or a `NUXT_PUBLIC_*` variable. Forwarded addresses are ignored unless the
-immediate peer matches `NUXT_TRUSTED_PROXY_CIDRS`; configure only the narrow CIDRs of ingress
-proxies that overwrite client-supplied forwarding headers. With no trusted proxy, the direct socket
-address is used, which is safe but may collapse visitors behind an undeclared proxy.
-`NUXT_PUBLIC_API_BASE_URL` is exposed to the browser and must therefore be browser-reachable. The
-profile is fetched from the XCS API, parsed by the SDK, and matched against the RPC server's reported
-`network_id` before autofill and again before signing or recovery. This alpha rejects profiles other
-than XRPL Testnet (`networkId: 1`). If `NUXT_PUBLIC_PROFILE_ID` is omitted, exactly one Testnet
-profile must be returned by the API.
+`XCS_DATABASE_URL` authenticates as the read-only `xcs_api` role that `db:bootstrap` provisions; the
+web app has no migration command and must never receive the admin URL. The database itself is
+provisioned outside this repository, and the indexer owns every database command.
+
+Forwarded client addresses are ignored unless the immediate peer matches `XCS_TRUSTED_PROXY_CIDRS`.
+Configure only the narrow CIDRs of ingress proxies that overwrite client-supplied forwarding headers.
+With no trusted proxy, the direct socket address is used, which is safe but may collapse visitors
+behind an undeclared proxy.
+
+The active network profile is read from this application's own `/v1` API, parsed locally and matched
+against the RPC server's reported `network_id` before autofill and again before signing or recovery.
+This alpha rejects profiles other than XRPL Testnet (`networkId: 1`). If `NUXT_PUBLIC_PROFILE_ID` is
+omitted, exactly one Testnet profile must be available.
 
 `NUXT_PUBLIC_XAMAN_API_KEY` and `NUXT_PUBLIC_WALLET_CONNECT_PROJECT_ID` are optional public
 application identifiers. Omitting either variable removes only that adapter; it does not prevent the
 other six adapters from loading. Do not put a Xaman secret, WalletConnect relay secret, wallet key or
-other credential in either value. `NUXT_PUBLIC_XAMAN_REDIRECT_URL` is optional and otherwise
-defaults to the current application origin with a trailing slash. When set, it must be that exact
-same-origin root URL; non-loopback deployments require HTTPS. Add the same exact URL to the Xaman
-application's redirect allowlist. In Compose, set the corresponding operator variables
-`XCS_PUBLIC_XAMAN_API_KEY`, `XCS_PUBLIC_XAMAN_REDIRECT_URL` and
-`XCS_PUBLIC_WALLET_CONNECT_PROJECT_ID`.
+other credential in either value. `NUXT_PUBLIC_XAMAN_REDIRECT_URL` is optional and otherwise defaults
+to the current application origin with a trailing slash. When set, it must be that exact same-origin
+root URL; non-loopback deployments require HTTPS. Add the same exact URL to the Xaman application's
+redirect allowlist.
 
 Each independently hosted XCS deployment needs its own Xaman public application key and registered
 origin. The Commons key is not a universal credential for arbitrary self-hosted domains. Follow
 Xaman's [browser SDK setup](https://docs.xaman.dev/environments/browser-web3); API secrets remain
 server-side and are not used by this browser integration.
 
-`XCS_LOCAL_PAYLOAD_STORE` is a source-time development gate rather than a deployment setting. Do
-not pass it through Compose or expose it as a general Commons storage option.
+`XCS_LOCAL_PAYLOAD_STORE` is a source-time development gate rather than a deployment setting. Do not
+pass it through Compose or expose it as a general Commons storage option.
 
-When the configured API profile selector ends in `-controlled-pilot`, the network status page labels
-its registry as controlled. The primary navigation no longer carries persistent environment banners;
-profile/API mismatches still fail through the normal active-profile checks.
+When the active profile selector ends in `-controlled-pilot`, the network status page labels its
+registry as controlled. The primary navigation carries no persistent environment banner; profile
+mismatches still fail through the normal active-profile checks.
 
-`NUXT_PUBLIC_RPC_URL` is serialized into browser-visible runtime configuration. A Nitro startup
-guard and every wallet submission boundary reject embedded username/password values and require
-`wss://` (`ws://` is accepted only for loopback development). They cannot determine whether an
-opaque path or query parameter contains a provider token, so this setting must use a genuinely
-public endpoint rather than either private indexer source.
+`NUXT_PUBLIC_RPC_URL` is serialized into browser-visible runtime configuration. A Nitro startup guard
+and every wallet submission boundary reject embedded username/password values and require `wss://`
+(`ws://` is accepted only for loopback development). They cannot determine whether an opaque path or
+query parameter contains a provider token, so this setting must use a genuinely public endpoint
+rather than either private indexer source.
 
 ## Pilot payload publication
 

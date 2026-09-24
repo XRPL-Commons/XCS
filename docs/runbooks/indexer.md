@@ -1,28 +1,46 @@
 # Indexer runbook
 
-## Before starting
-
-1. Copy `.env.compose.example` to `.env`, set PostgreSQL, and configure distinct
-   `XCS_RPC_URL_PRIMARY`/`XCS_RPC_URL_SECONDARY` WSS endpoints operated independently.
-   `XCS_INDEXER_DATABASE_URL` must authenticate as the least-privilege `xcs_indexer` role; keep
-   `XCS_BOOTSTRAP_DATABASE_URL` confined to the bootstrap command.
-2. Replace the example network profile with the audited profile for the current Testnet reset.
-3. Confirm both `rippled` sources expose every validated ledger from the activation ledger. Clio is
-   not yet a supported source for this alpha.
-4. Bootstrap the fresh database, run the quorum preflight, then start the API and indexer:
+The indexer is a standalone application. Every command below runs from `apps/indexer` with its own
+lockfile. `--ignore-workspace` is mandatory on commands that resolve dependencies; commands that only
+run a script do not need it.
 
 ```sh
-pnpm --filter @xcs-protocol/indexer db:bootstrap
-pnpm --filter @xcs-protocol/indexer preflight
-pnpm --filter @xcs-protocol/api start
-pnpm --filter @xcs-protocol/indexer start
+pnpm --dir apps/indexer install --ignore-workspace --frozen-lockfile
 ```
 
-The idempotent command applies the current generated baseline and then configures the three runtime
-roles without printing database URLs or passwords. Run it only on a dedicated cluster: PostgreSQL
-roles are cluster-wide even though the application grants are scoped to the selected database. This
-pre-production baseline is not an upgrader. After a schema change, recreate the disposable
-projection database and regenerate the baseline before bootstrapping it again.
+## Before starting
+
+1. Fill the contract in `apps/indexer/.env.example`. `XCS_INDEXER_DATABASE_URL` must authenticate as
+   the least-privilege `xcs_indexer` role; keep `XCS_BOOTSTRAP_DATABASE_URL` confined to the
+   bootstrap and migrate commands. Configure distinct `XCS_RPC_URL_PRIMARY`/`XCS_RPC_URL_SECONDARY`
+   WSS endpoints operated independently. For local development, `.env.compose.example` copied to
+   `.env` drives the Compose stack instead.
+2. Replace the example network profile with the audited profile for the current Testnet reset. The
+   committed `testnet.example.json` is a placeholder and fails closed with
+   `SOURCE_REGISTRY_NOT_BLACKHOLED`; the indexer cannot reach a steady state without an operator-
+   supplied profile naming a genuinely blackholed registry account.
+3. Confirm both `rippled` sources expose every validated ledger from the activation ledger. Clio is
+   not yet a supported source for this alpha.
+4. Bootstrap the fresh database, run the quorum preflight, then start the indexer:
+
+```sh
+pnpm --dir apps/indexer db:bootstrap
+pnpm --dir apps/indexer preflight
+pnpm --dir apps/indexer start
+```
+
+The read API is not a separate service: it is served by `apps/web` from the same database. Start it
+independently; see [`deployment.md`](./deployment.md).
+
+`db:bootstrap` is idempotent: it applies the committed migrations and then configures the three
+runtime roles without printing database URLs or passwords. Run it only on a dedicated cluster —
+PostgreSQL roles are cluster-wide even though the application grants are scoped to the selected
+database — and only once, on a fresh database.
+
+After editing `db/schema/`, regenerate the migration with `pnpm --dir apps/indexer db:generate` and
+apply it to an already-bootstrapped database with `pnpm --dir apps/indexer db:migrate`. Before
+production, an incompatible schema change instead means recreating the disposable projection
+database and replaying it.
 
 The preflight checks network ID, contiguous retained history, the amendment, activation ledger and
 selected registry policy on both sources. The default `blackholed` policy requires the complete
@@ -85,7 +103,7 @@ Monitor checkpoint age, source RPC errors, invalid registrations, ingestion retr
 - On a projection bug, stop writes, deploy corrected deterministic code, truncate only rebuildable projections through an explicit maintenance procedure, and replay the append-only events.
 - Never skip a missing ledger or replace an activation hash in place.
 
-Every checkpoint in the current baseline has a transaction root. A projection created by an older
+Every checkpoint in the current schema has a transaction root. A projection created by an older
 schema must be rebuilt into a fresh database before it can be served as authoritative.
 
 Accepted schema events store the exact parsed JCS memo separately from the normalized schema used
@@ -102,8 +120,8 @@ one immutable target boundary as both a ledger index and its 64-hex-character ha
 ```sh
 export XCS_REPLAY_TARGET_LEDGER_INDEX=123456
 export XCS_REPLAY_TARGET_LEDGER_HASH=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-pnpm --filter @xcs-protocol/indexer replay
-pnpm --filter @xcs-protocol/indexer projection:digest
+pnpm --dir apps/indexer replay
+pnpm --dir apps/indexer projection:digest
 ```
 
 Before projection advances, both configured sources must expose the target ledger and agree on its
@@ -133,7 +151,7 @@ from the bundle's last committed ledger and binds the evidence to the exact prof
 unset XCS_RPC_URL_PRIMARY XCS_RPC_URL_SECONDARY XCS_RPC_URL
 export XCS_REPLAY_FIXTURE_BUNDLE=./fixtures/testnet-pilot
 export XCS_REPLAY_FIXTURE_BUNDLE_SHA256='<bundleDigest printed by fixture:capture>'
-pnpm --filter @xcs-protocol/indexer replay
+pnpm --dir apps/indexer replay
 ```
 
 `XCS_REPLAY_TARGET_LEDGER_INDEX` and `XCS_REPLAY_TARGET_LEDGER_HASH` may be omitted in fixture mode.
@@ -155,11 +173,11 @@ export XCS_FIXTURE_TARGET_LEDGER_INDEX=123456
 export XCS_FIXTURE_OUTPUT=./fixtures/testnet-pilot
 export XCS_FIXTURE_PRIMARY_OPERATOR='XRPL Commons'
 export XCS_FIXTURE_SECONDARY_OPERATOR='Independent Operator'
-pnpm --filter @xcs-protocol/indexer fixture:capture
+pnpm --dir apps/indexer fixture:capture
 
 export XCS_FIXTURE_BUNDLE=./fixtures/testnet-pilot
 export XCS_FIXTURE_BUNDLE_SHA256='<bundleDigest printed by fixture:capture>'
-pnpm --filter @xcs-protocol/indexer fixture:validate
+pnpm --dir apps/indexer fixture:validate
 ```
 
 Validation is offline and requires the exact `XCS_NETWORK_PROFILE`, bundle path and externally
@@ -175,8 +193,9 @@ bundle directory.
 
 ## Rollback
 
-Application containers can roll back only to an image compatible with the current baseline. Before
-production, a database-schema rollback means recreating and replaying the projection. After the
-baseline freezes for production, forward migrations require an explicit tested rollback strategy.
+The indexer and the web app roll back independently. Roll the indexer image back only to a version
+compatible with the applied migrations. Before production, a database-schema rollback means
+recreating and replaying the projection. After the migration history freezes for production, forward
+migrations require an explicit tested rollback strategy.
 On-ledger registrations cannot be removed; a normative error requires a new protocol
 profile/version.

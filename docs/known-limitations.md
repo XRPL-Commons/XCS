@@ -51,8 +51,8 @@ integrators.
 - CI replays one deterministic synthetic ledger bundle through two PostgreSQL projections and pins
   their complete digest, but this proves the harness rather than Testnet history. A reviewed public
   Testnet capture from two demonstrably independent providers remains release evidence.
-- Discovery indexes are part of the single generated baseline; this pre-production package does not
-  support applying them to an already populated deployment.
+- Discovery indexes are part of the committed baseline migration; this pre-production repository
+  does not support applying them to an already populated deployment.
 - PostgreSQL is a self-hostable, rebuildable reference projection, not a Commons authority and not a
   protocol requirement for third-party implementations. A MongoDB adapter would need to reproduce
   atomic checkpoints, single-writer fencing, snapshots, constraints, and deterministic replay.
@@ -62,20 +62,21 @@ integrators.
   attestation. The administrator and reviewed baseline remain trusted; transport security and an
   explicit SCRAM `pg_hba.conf` policy remain operator responsibilities.
 - There is intentionally no pre-production upgrade history. Every current constraint and index is
-  created by `0000_baseline.sql`; a schema change requires regenerating the baseline and recreating
-  the projection database. The baseline must freeze before production, after which changes require
-  reviewed forward migrations.
+  created by `db/migrations/0000_baseline.sql`; before production a schema change means regenerating
+  that migration and recreating the projection database. The migration history must freeze before
+  production, after which changes require reviewed forward migrations. `db:migrate` exists and is
+  idempotent, but it has never been exercised across a real pre-existing deployment.
 - Signed PostgreSQL `integer` coordinate columns, including transaction and node indexes, still
   represent at most `2147483647`, not the full abstract uint32 range. The schema enforces their
   non-negative boundary but does not widen them.
 - XRPL Commons intends to host the shared Testnet indexer, read API and PostgreSQL projection. That
   projection remains a reconstructible cache and contains neither issuer/subject signing keys nor
   credential claims.
-- The built-in API rate limiter is in-memory and suitable for the single-instance beta. Horizontal
-  replicas require a shared edge/store limiter. Nuxt SSR derives one opaque budget per safely
-  resolved network address; reverse-proxy CIDRs must be narrow and explicitly configured, while
-  catch-all `/0` trust ranges are rejected.
-- Operational counters are also process-local and reset whenever an API replica restarts. The
+- The `/v1` rate limiter is in-memory and suitable for the single-instance beta. Horizontal replicas
+  require a shared edge/store limiter. The client address is resolved through
+  `XCS_TRUSTED_PROXY_CIDRS`, which must be narrow and explicitly configured; catch-all `/0` trust
+  ranges are rejected, and an undeclared proxy collapses its visitors into one shared budget.
+- Operational counters are also process-local and reset whenever a web replica restarts. The
   protected JSON snapshot exposes only the current durable indexer halt, not continuity incident
   history. It cannot observe browser-local XRPL submission outcomes, postgres.js pool queues, or
   physical PostgreSQL volume capacity; its database byte count is logical size only. Multi-replica
@@ -102,6 +103,39 @@ integrators.
   collector and retention policy.
 - HSTS covers only the deployed host. It deliberately omits `includeSubDomains` and `preload`, so it
   does not assert HTTPS readiness for unrelated organizational subdomains.
+
+### Repository restructure (ADR 0004)
+
+- `apps/web` and `apps/indexer` are standalone deployables that import no workspace package. Each
+  carries hand-maintained copies of the protocol and database code it needs, headed by a comment
+  naming the source file and the commit it was copied at. **Nothing enforces that they stay in
+  sync.** A fix landed in `packages/core` with green package tests changes nothing in either
+  application until a human mirrors it, and no build, type check or test fails to point that out.
+  The mirroring rule in [`CONTRIBUTING.md`](../CONTRIBUTING.md) and code review are the only
+  controls. This is the deliberate cost of independent deployability, and it is a real correctness
+  risk for security-relevant protocol fixes.
+- The copies can also drift silently in the other direction: a change made directly in an
+  application copy does not reach `packages/core`, `packages/sdk` or the CLI, so the published
+  library can become the stale one. Treat `packages/core` as the reference implementation and land
+  there first.
+- The two applications pin their dependencies in separate lockfiles. `drizzle-orm` in particular must
+  stay identical in both, because `db/schema/` is compiled by each application against its own copy;
+  nothing checks this automatically.
+- `--ignore-workspace` is mandatory on every per-app pnpm command that resolves dependencies
+  (`install`, `audit`, `licenses list`). Without it pnpm silently operates on the root workspace and
+  still exits 0, so an audit or licence report can appear to pass while covering the wrong lockfile.
+- The licence CI job is currently **red** for `apps/web`: the wallet dependency tree carries the
+  WalletConnect Community License and the GemWallet integration, both of which are unresolved release
+  gates (see _Wallets_ below). The job is knowingly failing and must not be described as passing or
+  worked around.
+- PostgreSQL is provisioned outside this repository. The Compose stack — including the `monitoring`
+  and `demo-pinning` profiles — is local development only: it carries no secret-file mechanism and
+  passes Grafana's admin password and the exporter's database password as plain container
+  environment. A hosted deployment needs its own database provisioning, secret store and monitoring
+  design; this repository provides the alert rules and dashboards, not the topology.
+- The two applications are deployed and versioned independently, so a deployment can run mismatched
+  revisions. They share only database rows; there is no version negotiation between them, and a
+  schema change must be rolled out in a compatible order by the operator.
 
 ## Wallets
 
