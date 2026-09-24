@@ -6,7 +6,6 @@ import {
   type SchemaDefinition,
 } from '@xcs-protocol/core'
 
-const API_PREFIX = '/__e2e-api'
 const PROFILE_ID = 'xrpl-testnet-xcs-browser-e2e'
 const ISSUER = 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh'
 const SUBJECT = 'r9cZA1mLK5R5Am25ArfXFmqgNwjZgnfk59'
@@ -77,16 +76,16 @@ test('runs the privacy-explicit exact-generation quickstart and shows four dimen
   page.on('request', (request) => {
     const url = new URL(request.url())
     if (url.hostname === 'issuer.xcs.invalid') issuerHostRequests += 1
-    if (!url.pathname.startsWith(`${API_PREFIX}/v1/`)) return
-    apiPaths.push(url.pathname.slice(API_PREFIX.length))
-    if (request.method() === 'POST' && url.pathname === `${API_PREFIX}/v1/verify`) {
+    if (!url.pathname.startsWith('/v1/')) return
+    apiPaths.push(url.pathname)
+    if (request.method() === 'POST' && url.pathname === '/v1/verify') {
       verifyBodies.push(request.postDataJSON() as Record<string, unknown>)
     }
   })
 
   await page.goto('/en/developers')
   await page.locator('[data-client-ready="true"]').waitFor()
-  await expect(page.getByTestId('developer-api-base')).toContainText(API_PREFIX)
+  await expect(page.getByTestId('developer-api-base')).toHaveText(new URL(page.url()).origin)
   await expect(page.getByTestId('developer-profile-id')).toHaveText(PROFILE_ID)
 
   await page.getByTestId('developer-generation-input').fill(GENERATION_ID)
@@ -144,7 +143,7 @@ test('never restores a stale report when the payload changes during verification
     releaseResponse = resolve
   })
 
-  await page.route(`**${API_PREFIX}/v1/verify`, async (route) => {
+  await page.route('**/v1/verify', async (route) => {
     const body = route.request().postDataJSON() as Record<string, unknown>
     if (Object.hasOwn(body, 'payload')) {
       signalRequestStarted()
@@ -177,7 +176,7 @@ test('keeps a generation without a URI metadata-only', async ({ page }) => {
   const verifyBodies: Record<string, unknown>[] = []
   page.on('request', (request) => {
     const url = new URL(request.url())
-    if (request.method() === 'POST' && url.pathname === `${API_PREFIX}/v1/verify`) {
+    if (request.method() === 'POST' && url.pathname === '/v1/verify') {
       verifyBodies.push(request.postDataJSON() as Record<string, unknown>)
     }
   })
@@ -202,7 +201,7 @@ test('fails closed before payload input when an exact generation was replaced', 
   const verifyBodies: Record<string, unknown>[] = []
   page.on('request', (request) => {
     const url = new URL(request.url())
-    if (request.method() === 'POST' && url.pathname === `${API_PREFIX}/v1/verify`) {
+    if (request.method() === 'POST' && url.pathname === '/v1/verify') {
       verifyBodies.push(request.postDataJSON() as Record<string, unknown>)
     }
   })

@@ -60,3 +60,18 @@ test('serves production assets without applying an HTML CSP to them', async ({ r
     expect(asset.headers()['cache-control'], assetPath).toBe('public, max-age=31536000, immutable')
   }
 })
+
+test('keeps the browser E2E fixtures out of the production build', async ({ request }) => {
+  const live = await request.get('/health/live')
+  expect(live.status()).toBe(200)
+  expect(live.headers()['cache-control']).toBe('no-store')
+  await expect(live.json()).resolves.toEqual({ status: 'ok' })
+
+  // The production build configures an unreachable database, so the real read
+  // API must fail rather than answer with the browser end-to-end fixtures.
+  const networks = await request.get('/v1/networks')
+  expect([500, 503]).toContain(networks.status())
+  const body = (await networks.json()) as Record<string, unknown>
+  expect(typeof body.error).toBe('string')
+  expect(body).not.toHaveProperty('items')
+})

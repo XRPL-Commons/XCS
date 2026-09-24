@@ -2,12 +2,13 @@ import {
   computeSchemaUid,
   createHttpsPayloadUri,
   parseSchema,
+  type JsonValue,
   type NetworkProfile,
   type SchemaDefinition,
 } from '@xcs-protocol/core'
 
-import { assertBrowserE2eServerMode } from '../../../../app/utils/browserE2eMode'
-import { canonicalJson, encodeHexUtf8 } from '../../../../app/utils/serialization'
+import { canonicalJson, encodeHexUtf8 } from '../../app/utils/serialization'
+import type { ApiReply } from './http.js'
 
 const PROFILE_ID = 'xrpl-testnet-xcs-browser-e2e'
 const ISSUER = 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh'
@@ -40,19 +41,20 @@ const ACCEPTED_TRANSACTION_HASH = '78'.repeat(32)
 const HISTORICAL_GENERATION_ID = '56'.repeat(32)
 const DELETED_TRANSACTION_HASH = 'bc'.repeat(32)
 const PAYLOAD_URL = 'https://issuer.xcs.invalid/diploma.json'
+const CLAIMS = {
+  programId: 'xcs-protocol-engineering-2026',
+  programName: 'Protocol Engineering',
+  awardedAt: '2026-08-25T10:00:00Z',
+  diplomaId: 'DIP-2026-0042',
+  prenom: 'Personne Test',
+  honors: 'with distinction',
+}
 const CANONICAL_PAYLOAD = canonicalJson({
   xcsVersion: '0.1',
   issuer: ISSUER,
   subject: SUBJECT,
   schema: SCHEMA_UID,
-  claims: {
-    programId: 'xcs-protocol-engineering-2026',
-    programName: 'Protocol Engineering',
-    awardedAt: '2026-08-25T10:00:00Z',
-    diplomaId: 'DIP-2026-0042',
-    prenom: 'Personne Test',
-    honors: 'with distinction',
-  },
+  claims: CLAIMS,
 })
 const CREDENTIAL_URI = createHttpsPayloadUri(PAYLOAD_URL, CANONICAL_PAYLOAD)
 const PROFILE: NetworkProfile = {
@@ -66,20 +68,37 @@ const PROFILE: NetworkProfile = {
   activationLedgerHash: 'ef'.repeat(32),
 }
 
-function notFound(): never {
-  throw createError({ statusCode: 404, statusMessage: 'Browser E2E API route not found' })
+function ok(body: unknown): ApiReply {
+  return { statusCode: 200, headers: {}, body }
 }
 
-export default defineEventHandler((event) => {
-  const config = useRuntimeConfig(event)
-  assertBrowserE2eServerMode(config.browserE2eMode, config.public.browserE2eMode, import.meta.dev)
-  if (config.browserE2eMode !== 'enabled') return notFound()
+/**
+ * Rebuilds the flat path the fixtures are keyed by from the handler table's
+ * route path and the request's router parameters, so the canned data below is
+ * the same table the `__e2e-api` catch-all route served.
+ */
+function resolvePath(routePath: string, params: Record<string, string>): string {
+  return routePath
+    .replace(/^\/v1\//u, '')
+    .split('/')
+    .map((segment) => (segment.startsWith(':') ? (params[segment.slice(1)] ?? '') : segment))
+    .join('/')
+}
 
-  const path = getRouterParam(event, 'path') ?? ''
-  if (path === 'networks') return { items: [PROFILE] }
+/**
+ * Answers one `GET /v1/**` route from the deterministic browser end-to-end
+ * fixtures, or returns `undefined` when the fixtures do not cover it.
+ */
+export function fixtureGet(
+  routePath: string,
+  params: Record<string, string>,
+): ApiReply | undefined {
+  const path = resolvePath(routePath, params)
+
+  if (path === 'networks') return ok({ items: [PROFILE] })
 
   if (path === `networks/${PROFILE_ID}/stats`) {
-    return {
+    return ok({
       network: PROFILE_ID,
       schemas: { total: 12, publishers: 4 },
       credentialGenerations: {
@@ -95,11 +114,11 @@ export default defineEventHandler((event) => {
         closeTime: 838_857_600,
         transactionRoot: 'cd'.repeat(32),
       },
-    }
+    })
   }
 
   if (path === `networks/${PROFILE_ID}/search`) {
-    return {
+    return ok({
       items: [
         {
           type: 'schema',
@@ -115,11 +134,11 @@ export default defineEventHandler((event) => {
         },
       ],
       hasMore: false,
-    }
+    })
   }
 
   if (path === `networks/${PROFILE_ID}/schemas/${SCHEMA_UID}`) {
-    return {
+    return ok({
       schemaUid: SCHEMA_UID,
       name: SCHEMA.name,
       description: SCHEMA.description,
@@ -131,11 +150,11 @@ export default defineEventHandler((event) => {
       registrationTransactionHash: '56'.repeat(32),
       ledgerIndex: 100_001,
       transactionIndex: 1,
-    }
+    })
   }
 
   if (path === `networks/${PROFILE_ID}/credential-generations/${GENERATION_ID}`) {
-    return {
+    return ok({
       generation: {
         generationId: GENERATION_ID,
         ledgerObjectId: '90'.repeat(32),
@@ -182,11 +201,11 @@ export default defineEventHandler((event) => {
           deletionCause: null,
         },
       ],
-    }
+    })
   }
 
   if (path === `networks/${PROFILE_ID}/credential-generations/${NO_URI_GENERATION_ID}`) {
-    return {
+    return ok({
       generation: {
         generationId: NO_URI_GENERATION_ID,
         ledgerObjectId: '92'.repeat(32),
@@ -219,11 +238,11 @@ export default defineEventHandler((event) => {
           deletionCause: null,
         },
       ],
-    }
+    })
   }
 
   if (path === `networks/${PROFILE_ID}/credential-generations/${HISTORICAL_GENERATION_ID}`) {
-    return {
+    return ok({
       generation: {
         generationId: HISTORICAL_GENERATION_ID,
         ledgerObjectId: '91'.repeat(32),
@@ -270,11 +289,11 @@ export default defineEventHandler((event) => {
           deletionCause: 'issuer_revoked',
         },
       ],
-    }
+    })
   }
 
   if (path === `networks/${PROFILE_ID}/credentials/${ISSUER}/${SUBJECT}/${SCHEMA_UID}`) {
-    return {
+    return ok({
       generationId: GENERATION_ID,
       ledgerObjectId: '90'.repeat(32),
       issuer: ISSUER,
@@ -289,11 +308,11 @@ export default defineEventHandler((event) => {
       deletedLedgerIndex: null,
       deletionCause: null,
       state: 'active',
-    }
+    })
   }
 
   if (path === `networks/${PROFILE_ID}/credentials/${ISSUER}/${ISSUER}/${SCHEMA_UID}`) {
-    return {
+    return ok({
       generationId: NO_URI_GENERATION_ID,
       ledgerObjectId: '92'.repeat(32),
       issuer: ISSUER,
@@ -308,8 +327,64 @@ export default defineEventHandler((event) => {
       deletedLedgerIndex: null,
       deletionCause: null,
       state: 'active',
+    })
+  }
+
+  return undefined
+}
+
+function payloadMatches(input: unknown, expected: JsonValue): boolean {
+  try {
+    return canonicalJson(input) === canonicalJson(expected)
+  } catch {
+    return false
+  }
+}
+
+/** Answers `POST /v1/verify` from the fixtures, comparing the canonical payload. */
+export function fixtureVerify(input: unknown): ApiReply {
+  const body = (typeof input === 'object' && input !== null ? input : {}) as Record<string, unknown>
+  const hasPayload = Object.hasOwn(body, 'payload')
+  const metadataOnlyWithoutUri = body.subject === ISSUER && !hasPayload
+  const expectedPayload = {
+    xcsVersion: '0.1',
+    issuer: ISSUER,
+    subject: SUBJECT,
+    schema: body.schemaUid,
+    claims: CLAIMS,
+  }
+  if (
+    body.network !== PROFILE_ID ||
+    body.issuer !== ISSUER ||
+    (body.subject !== SUBJECT && body.subject !== ISSUER) ||
+    typeof body.schemaUid !== 'string' ||
+    !/^[0-9a-f]{64}$/u.test(body.schemaUid) ||
+    (hasPayload
+      ? Object.hasOwn(body, 'resolvePayload') ||
+        !payloadMatches(body.payload, expectedPayload as JsonValue)
+      : body.resolvePayload !== false)
+  ) {
+    return {
+      statusCode: 400,
+      headers: {},
+      body: { error: 'VALIDATION_ERROR', message: 'Browser E2E verify input invalid' },
     }
   }
 
-  return notFound()
-})
+  return ok({
+    onChain: 'active',
+    schema: 'valid',
+    payload: hasPayload ? 'valid' : 'not_checked',
+    issuerTrust: 'unknown',
+    generationId: metadataOnlyWithoutUri ? NO_URI_GENERATION_ID : GENERATION_ID,
+  })
+}
+
+/** The reply the fixtures send for a `/v1` route they hold no canned data for. */
+export function fixtureNotFound(): ApiReply {
+  return {
+    statusCode: 404,
+    headers: {},
+    body: { error: 'NOT_FOUND', message: 'Browser E2E API route not found' },
+  }
+}

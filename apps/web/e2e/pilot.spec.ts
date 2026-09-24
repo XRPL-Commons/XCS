@@ -14,7 +14,6 @@ import {
 } from '@xcs-protocol/core'
 import { hashes, Wallet } from 'xrpl'
 
-const API_PREFIX = '/__e2e-api'
 const PROFILE_ID = 'xrpl-testnet-xcs-browser-e2e'
 const ISSUER = 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh'
 const SUBJECT = 'r9cZA1mLK5R5Am25ArfXFmqgNwjZgnfk59'
@@ -141,9 +140,9 @@ function consumeExpectedHttpFailure(page: Page, status: string): void {
 }
 
 async function installApiMock(page: Page, options: ApiMockOptions = {}): Promise<void> {
-  await page.route(`**${API_PREFIX}/v1/**`, async (route) => {
+  await page.route('**/v1/**', async (route) => {
     const url = new URL(route.request().url())
-    const path = url.pathname.slice(API_PREFIX.length)
+    const path = url.pathname
     if (route.request().method() === 'POST' && path === '/v1/verify') {
       const body = route.request().postDataJSON() as Record<string, unknown>
       const lifecycle = options.credentialLifecycle
@@ -1434,7 +1433,7 @@ test('issues, reconfirms, then accepts a credential with exact indexed evidence'
   let subjectMutationVerifyRequests = 0
   page.on('request', (request) => {
     const url = new URL(request.url())
-    if (request.method() === 'POST' && url.pathname === `${API_PREFIX}/v1/verify`) {
+    if (request.method() === 'POST' && url.pathname === '/v1/verify') {
       subjectMutationVerifyRequests += 1
     }
   })
@@ -1532,10 +1531,7 @@ test('rejects a pending credential without loading payload or trust', async ({ p
     await route.abort('blockedbyclient')
   })
   page.on('request', (request) => {
-    if (
-      request.method() === 'POST' &&
-      new URL(request.url()).pathname === `${API_PREFIX}/v1/verify`
-    ) {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/v1/verify') {
       verifyRequestCount += 1
     }
   })
@@ -1622,8 +1618,8 @@ test('reveals an exact diploma permalink only after bound payload consent', asyn
       requestTrace.push('issuer')
       return
     }
-    if (!url.pathname.startsWith(`${API_PREFIX}/v1/`)) return
-    const apiPath = url.pathname.slice(API_PREFIX.length)
+    if (!url.pathname.startsWith('/v1/')) return
+    const apiPath = url.pathname
     if (apiPath === '/v1/networks') requestTrace.push('networks')
     if (apiPath.includes('/credential-generations/')) requestTrace.push('generation')
     if (apiPath.includes('/schemas/')) requestTrace.push('schema')

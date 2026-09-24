@@ -28,12 +28,15 @@ export default defineConfig({
       NODE_ENV: 'production',
       NITRO_HOST: '127.0.0.1',
       NITRO_PORT: '3101',
-      NUXT_API_INTERNAL_TOKEN: 'xcs-security-production-e2e-token-0001',
       NUXT_BROWSER_E2E_MODE: 'disabled',
       NUXT_PUBLIC_BROWSER_E2E_MODE: 'disabled',
       NUXT_PUBLIC_PROFILE_ID: 'commons-testnet-xcs-v0.1-controlled-pilot',
       XCS_BROWSER_E2E: '0',
       XCS_LOCAL_PAYLOAD_STORE: '0',
+      // The production build boots the real API context; the address is
+      // deliberately unreachable so the read routes answer 503 rather than data.
+      XCS_DATABASE_URL: 'postgres://127.0.0.1:1/xcs',
+      XCS_ALLOWED_ORIGINS: baseURL,
     },
   },
   projects: [{ name: 'chromium-security-production', use: { ...devices['Desktop Chrome'] } }],

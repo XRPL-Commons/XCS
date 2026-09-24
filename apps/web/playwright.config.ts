@@ -29,8 +29,6 @@ export default defineConfig({
       NUXT_IGNORE_LOCK: '1',
       XCS_BROWSER_E2E: '1',
       XCS_LOCAL_PAYLOAD_STORE: '1',
-      NUXT_API_BASE_URL: `${baseURL}/__e2e-api`,
-      NUXT_PUBLIC_API_BASE_URL: `${baseURL}/__e2e-api`,
       NUXT_PUBLIC_PROFILE_ID: 'xrpl-testnet-xcs-browser-e2e',
       NUXT_PUBLIC_RPC_URL: 'ws://127.0.0.1:1',
     },

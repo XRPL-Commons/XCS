@@ -245,15 +245,42 @@ function defaultRateLimit(path: string): false | RouteRateLimit {
   return path.startsWith('/v1/') ? DEFAULT_PUBLIC_RATE_LIMIT : false
 }
 
+/**
+ * Compiles a route's request schema into a single check that returns the
+ * validation failure envelope, or `undefined` when the request is valid. The
+ * browser end-to-end fixture table reuses it so a fixture-backed route
+ * validates exactly like the real one.
+ */
+export function createSchemaValidator(
+  schema: RouteSchema | undefined,
+): (request: ApiRequest) => ApiReply | undefined {
+  const validateParams = compile(schema?.params)
+  const validateQuery = compile(schema?.querystring)
+  const validateBody = compile(schema?.body)
+  return (request: ApiRequest): ApiReply | undefined => {
+    const failure = (
+      [
+        ['params', validateParams, request.params],
+        ['querystring', validateQuery, request.query],
+        ['body', validateBody, request.body],
+      ] as const
+    ).find(([, validate, data]) => validate !== undefined && !validate(data))
+    if (failure === undefined) return undefined
+    return {
+      statusCode: 400,
+      headers: {},
+      body: { error: 'VALIDATION_ERROR', message: validationMessage(failure[0], failure[1]!) },
+    }
+  }
+}
+
 function route<P = Record<string, string>, Q = Record<string, string | undefined>, B = unknown>(
   method: HttpMethod,
   path: string,
   options: RouteOptions,
   handler: (request: TypedRequest<P, Q, B>, reply: ReplyShim) => Promise<unknown>,
 ): RouteDefinition {
-  const validateParams = compile(options.schema?.params)
-  const validateQuery = compile(options.schema?.querystring)
-  const validateBody = compile(options.schema?.body)
+  const validateRequest = createSchemaValidator(options.schema)
   return {
     method,
     path,
@@ -267,22 +294,9 @@ function route<P = Record<string, string>, Q = Record<string, string | undefined
         reply.header('cache-control', options.cacheControl)
       }
       try {
-        const failure = (
-          [
-            ['params', validateParams, request.params],
-            ['querystring', validateQuery, request.query],
-            ['body', validateBody, request.body],
-          ] as const
-        ).find(([, validate, data]) => validate !== undefined && !validate(data))
+        const failure = validateRequest(request)
         if (failure !== undefined) {
-          return {
-            statusCode: 400,
-            headers: reply.result().headers,
-            body: {
-              error: 'VALIDATION_ERROR',
-              message: validationMessage(failure[0], failure[1]!),
-            },
-          }
+          return { ...failure, headers: { ...reply.result().headers, ...failure.headers } }
         }
         const returned = await handler(request as unknown as TypedRequest<P, Q, B>, reply)
         if (reply.sent) return reply.result()
