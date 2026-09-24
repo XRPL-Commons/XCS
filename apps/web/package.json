@@ -14,7 +14,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:security": "playwright test --config playwright.security.config.ts",
-    "test:postgres": "XCS_REQUIRE_POSTGRES_TESTS=1 vitest run test/postgres.integration.test.ts",
+    "test:postgres": "NODE_ENV=development XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt prepare && XCS_REQUIRE_POSTGRES_TESTS=1 vitest run test/postgres.integration.test.ts",
     "typecheck": "NODE_ENV=development XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt typecheck",
     "verify": "pnpm format:check && pnpm lint && pnpm test && pnpm build"
   },

@@ -205,8 +205,8 @@ services:
     volumes:
       - ./ops/monitoring/prometheus:/etc/prometheus:ro
       - xcs-prometheus:/prometheus
-    # Prometheus reads the scrape credentials from a file; Compose materializes
-    # it from the same .env value the web service uses.
+    # Prometheus reads the scrape credentials from a file the operator writes
+    # from the same XCS_METRICS_TOKEN value the web service receives.
     secrets: [xcs_metrics_token]
     depends_on:
       web:
@@ -346,7 +346,11 @@ volumes:
   xcs-grafana:
 
 secrets:
-  # XCS_METRICS_TOKEN must exist in the environment, even empty, whenever the
-  # monitoring profile runs: an unset variable fails the secret, not just the scrape.
+  # Prometheus reads the scrape credential with `credentials_file` and runs
+  # `read_only: true`; Compose refuses an environment-sourced secret for a
+  # read-only service ("`file` is the sole supported option"), so this one secret
+  # is materialized as a file. The operator writes XCS_METRICS_TOKEN into it as an
+  # explicit step -- see docs/runbooks/monitoring.md. This is not the retired
+  # `*_FILE` application-configuration pattern: no application reads it.
   xcs_metrics_token:
-    environment: XCS_METRICS_TOKEN
+    file: ${XCS_METRICS_TOKEN_FILE:-./ops/secrets/xcs_metrics_token}

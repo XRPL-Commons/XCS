@@ -31,6 +31,18 @@ jobs:
         with:
           persist-credentials: false
 
+      # Prometheus reads the metrics bearer token with `credentials_file` and runs
+      # read_only, so Compose can only supply it as a file secret. Creating it is an
+      # explicit step here exactly as docs/runbooks/monitoring.md asks operators to do.
+      - name: Materialize the monitoring Compose secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ops/secrets
+          install -m 600 /dev/null ops/secrets/xcs_metrics_token
+          printf '%s' "$XCS_METRICS_TOKEN" > ops/secrets/xcs_metrics_token
+          test -s ops/secrets/xcs_metrics_token
+
       - name: Render and validate every Compose profile
         shell: bash
         run: |
@@ -198,7 +210,16 @@ jobs:
                 );
             " | grep --fixed-strings --line-regexp t
 
-          "${COMPOSE[@]}" --profile monitoring up --no-build --detach --wait postgres-exporter
+          "${COMPOSE[@]}" --profile monitoring up --no-build --detach --wait postgres-exporter prometheus
+          PROMETHEUS_CONTAINER="$("${COMPOSE[@]}" --profile monitoring ps --quiet prometheus)"
+          PROMETHEUS_STATE="$(docker inspect --format '{{.State.Status}}' "$PROMETHEUS_CONTAINER")"
+          if [[ "$PROMETHEUS_STATE" != 'running' ]]; then
+            echo "prometheus is $PROMETHEUS_STATE, expected running" >&2
+            exit 1
+          fi
+          # The file secret must arrive verbatim, or the scrape would silently 401.
+          docker exec "$PROMETHEUS_CONTAINER" cat /run/secrets/xcs_metrics_token \
+            | grep --fixed-strings --line-regexp --quiet "$XCS_METRICS_TOKEN"
           "${COMPOSE[@]}" exec -T web node -e '
             const waitForExporter = async () => {
               for (let attempt = 0; attempt < 20; attempt += 1) {

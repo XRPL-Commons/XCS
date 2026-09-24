@@ -46,9 +46,20 @@ XCS_GRAFANA_ADMIN_PASSWORD=<a distinct random value; there is no default>
 XCS_GRAFANA_COOKIE_SECURE=false
 ```
 
-`XCS_METRICS_TOKEN` must exist in the environment, even empty, whenever the monitoring profile runs:
-an unset variable fails the Compose secret, not just the scrape. The web app and Prometheus read that
-same value — Compose materializes it as the file Prometheus reads as its scrape credential.
+The web app reads `XCS_METRICS_TOKEN` from the environment. Prometheus cannot: it only accepts a
+bearer token through `credentials_file`, and Compose refuses an environment-sourced secret for a
+`read_only` service. So the profile mounts the `xcs_metrics_token` Compose secret from a file that
+you create explicitly, with the same value:
+
+```sh
+install -m 600 /dev/null ops/secrets/xcs_metrics_token
+printf '%s' "$XCS_METRICS_TOKEN" > ops/secrets/xcs_metrics_token
+```
+
+Write no trailing newline: Prometheus sends the file's bytes verbatim. The file is never committed
+(`ops/secrets/` is ignored apart from its README) and its location can be moved with
+`XCS_METRICS_TOKEN_FILE`. Starting the profile without it fails with a missing-secret error rather
+than an unauthenticated scrape.
 
 The PostgreSQL exporter authenticates as the dedicated `xcs_monitor` role. Provisioning that role
 first requires the built-in `pg_monitor`, `pg_read_all_settings`, `pg_read_all_stats` and
@@ -137,6 +148,6 @@ external facts.
 
 `XCS_METRICS_RETENTION` defaults to 30 days, matching the readiness objective window. Retain incident
 records and drill evidence outside Prometheus according to Commons policy. To rotate the metrics
-token, update `XCS_METRICS_TOKEN` and restart both the web app and Prometheus; a partial rotation
-intentionally makes the scrape fail. Rotate the database and Grafana passwords through their normal
+token, update `XCS_METRICS_TOKEN`, rewrite `ops/secrets/xcs_metrics_token` from it and restart both
+the web app and Prometheus; a partial rotation intentionally makes the scrape fail. Rotate the database and Grafana passwords through their normal
 procedures and rerun `pnpm --dir apps/indexer db:bootstrap` after a database password change.
