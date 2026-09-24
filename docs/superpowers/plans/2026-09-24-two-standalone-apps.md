@@ -421,7 +421,7 @@ Expected as commented. Stop the dev server.
 **Files:**
 
 - Create: `db/schema/*.ts` (moved from `packages/db/src/schema/`), `db/migrations/` (moved from `packages/db/drizzle/`, including `meta/`), `db/drizzle.config.ts`, `db/README.md` (what the folder is, how to generate and apply migrations, "not a package").
-- Create: `apps/indexer/src/lib/db/{client,indexer-fencing,transactions,provision,bootstrap}.ts`, `apps/indexer/src/lib/db/bin/{bootstrap,migrate}.ts`, `apps/web/server/lib/db/{client,indexer-fencing,transactions}.ts` (copies with the header comment; imports of `./schema/index.js` rewritten to `#db/schema`).
+- Create: `apps/indexer/src/lib/db/{client,indexer-fencing,transactions,provision,bootstrap}.ts`, `apps/indexer/src/lib/db/bin/{bootstrap,migrate}.ts`, `apps/web/server/lib/db/{client,transactions}.ts` (no fencing copy: leases are indexer-only) (copies with the header comment; imports of `./schema/index.js` rewritten to `#db/schema`).
 - Modify: `apps/indexer/{package.json,tsconfig.json,tsup.config.ts}`, `apps/web/{nuxt.config.ts,tsconfig.json,vitest.config.ts}`, every `@xcs-protocol/db` import site in both apps and their tests (`grep -rn "@xcs-protocol/db" apps/`), `.github/workflows/ci.yml` (migrations-committed check → `pnpm --filter @xcs-protocol/indexer db:generate && git diff --exit-code -- db/migrations`), root `package.json` (`test:postgres` no longer builds db).
 - Delete: `packages/db/**`.
 

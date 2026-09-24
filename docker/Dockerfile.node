@@ -48,6 +48,9 @@ LABEL org.opencontainers.image.title="XCS ${XCS_PACKAGE}" \
       org.opencontainers.image.licenses="MIT"
 
 ENV NODE_ENV=production
+# The image carries db/migrations beside the built application, so the migrate
+# and bootstrap bins work for any caller without extra environment.
+ENV XCS_MIGRATIONS_DIR=/workspace/db/migrations
 WORKDIR /workspace
 
 COPY --from=build --chown=node:node /runtime/ ./

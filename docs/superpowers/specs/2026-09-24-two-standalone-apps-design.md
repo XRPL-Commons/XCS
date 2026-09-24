@@ -31,7 +31,7 @@ becomes Nitro server routes inside the Nuxt app with an identical `/v1` contract
 apps/
   web/            Nuxt app. app/ (UI), server/ (Nitro routes: /v1, health, metrics, documentation),
                   app/lib/xcs/ (copies of core + sdk used by browser and server),
-                  server/lib/ (copies of db client, fencing types, transactions), server/xcs/ (former
+                  server/lib/ (copies of the db client and transaction helpers), server/xcs/ (former
                   apps/api modules), test/, e2e/, Dockerfile, .env.example, package.json, pnpm-lock.yaml
   indexer/        Ingestion service. src/ (unchanged modules), src/lib/xcs/ (copy of core),
                   src/lib/db/ (copies of db client, fencing, transactions, provisioning),
@@ -63,7 +63,7 @@ app compiles it, and both apps pin the same `drizzle-orm` version.
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/web/app/lib/xcs/core/` | `packages/core/src/**` (all modules; the web app uses most of the surface)                                                                                                                                 |
 | `apps/web/app/lib/xcs/sdk/`  | `packages/sdk/src/**` with imports of `@xcs-protocol/core` rewritten to `../core`                                                                                                                          |
-| `apps/web/server/lib/db/`    | `packages/db/src/client.ts`, `indexer-fencing.ts` (types and readers only), `transactions.ts`                                                                                                              |
+| `apps/web/server/lib/db/`    | `packages/db/src/client.ts`, `transactions.ts` (no `indexer-fencing.ts`: leases are indexer-only, and the web app reads the status row types from `#db/schema`)                                            |
 | `apps/indexer/src/lib/xcs/`  | The `packages/core` modules reachable from `parseNetworkProfile`, `parsePayloadUri`, `computeSchemaUid`, `createIpfsPayloadUri` (schema, schema-uid, payload-uri, json, network, errors and their helpers) |
 | `apps/indexer/src/lib/db/`   | `packages/db/src/client.ts`, `indexer-fencing.ts`, `transactions.ts`, `provision.ts`, `bootstrap.ts`, `bin/bootstrap.ts`                                                                                   |
 

@@ -25,7 +25,8 @@ below is run from `apps/indexer` (or with `pnpm --filter @xcs-protocol/indexer`)
 pnpm --filter @xcs-protocol/indexer db:generate
 ```
 
-This runs `drizzle-kit generate --config ../../db/drizzle.config.ts` and writes a new SQL file plus
+This changes into this folder and runs `drizzle-kit generate --config ./drizzle.config.ts`
+(drizzle-kit resolves `schema` and `out` against the working directory), then writes a new SQL file plus
 an updated snapshot under `db/migrations/`. Commit them: CI regenerates and fails on any diff.
 
 ### Apply migrations

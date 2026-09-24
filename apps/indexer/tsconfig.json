@@ -1,6 +1,14 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    // Overrides `tsconfig.base.json`'s NodeNext pair on purpose. Under NodeNext,
+    // TypeScript resolves a specifier starting with `#` only through this
+    // package's own `package.json` "imports" field, which may not point outside
+    // the package, so `#db/*` could never reach the shared `db/` folder. Bundler
+    // resolution honours `paths` instead. Relative imports must still carry an
+    // explicit `.js` extension: `dev` runs `tsx watch`, which resolves at runtime.
+    "module": "Preserve",
+    "moduleResolution": "Bundler",
     "types": ["node", "vitest/globals"],
     "paths": {
       "#db/*": ["../../db/*"],
@@ -8,9 +16,7 @@
       "drizzle-orm/*": ["./node_modules/drizzle-orm/*"],
       "drizzle-kit": ["./node_modules/drizzle-kit"]
     },
-    "baseUrl": ".",
-    "module": "Preserve",
-    "moduleResolution": "Bundler"
+    "baseUrl": "."
   },
   "include": [
     "src/**/*.ts",
