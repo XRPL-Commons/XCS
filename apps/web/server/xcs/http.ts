@@ -25,6 +25,14 @@ export interface RouteSchema {
 export interface RouteRateLimit {
   max: number
   timeWindowMs: number
+  /**
+   * Which bucket the budget is counted in. The previous HTTP framework gave a
+   * route its own counter store only when the route declared its own
+   * `config.rateLimit`; every route that fell through to the global config
+   * shared one store keyed by the client alone. `'shared'` reproduces that
+   * single cross-route budget, `'route'` a per-route one.
+   */
+  scope: 'shared' | 'route'
 }
 
 export interface RouteDefinition {

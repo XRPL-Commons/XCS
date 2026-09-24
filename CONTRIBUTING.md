@@ -48,11 +48,14 @@ The copy locations are:
 ### How the rule is enforced
 
 CI runs `node ops/ci/check-vendored-copies.mjs` in the `packages` job. For every file under a
-vendored directory it reads the header, finds the source, and fails unless the copy matches it. Run
-it locally before pushing a mirrored change:
+vendored directory it reads the header, finds the source, and fails unless the copy matches it.
+`pnpm verify` runs it too, through `pnpm check:repo`, which also checks that the two applications'
+lockfiles resolve the same `drizzle-orm` — they compile the same vendored `db/schema` but install
+independently. Both checks use Node built-ins only and need no install, so you can also run them on
+their own before pushing a mirrored change:
 
 ```sh
-node ops/ci/check-vendored-copies.mjs
+pnpm check:repo
 ```
 
 Three things it will reject:

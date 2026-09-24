@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { IncomingMessage as MockIncomingMessage } from 'node-mock-http'
 
@@ -11,11 +11,14 @@ import {
   readBoundedBody,
   type BoundedBodySource,
 } from '../../server/xcs/body-limit'
-import { mapError } from '../../server/xcs/handlers'
-import { createLimiter } from '../../server/xcs/rate-limit'
+import { createApiHandlers, mapError } from '../../server/xcs/handlers'
+import { createLimiter, rateLimitBucketKey } from '../../server/xcs/rate-limit'
+import type { ApiHandlers, RouteDefinition } from '../../server/xcs/http'
+import type { DemoPinningService } from '../../server/xcs/pinning'
+import { StaticTrustPolicy } from '../../server/xcs/verification'
 import { rateLimitResponseSchema } from '../../server/xcs/http-schemas'
 
-const LIMIT = { max: 2, timeWindowMs: 60_000 }
+const LIMIT = { max: 2, timeWindowMs: 60_000, scope: 'shared' } as const
 
 function fakeClock(): { now: () => number; advance: (ms: number) => void } {
   let current = 1_000_000
@@ -47,7 +50,7 @@ describe('fixed-window rate limiter', () => {
 
   it('keeps separate budgets per key, so per-route limits do not share a bucket', () => {
     const limiter = createLimiter(fakeClock().now)
-    const verify = { max: 1, timeWindowMs: 60_000 }
+    const verify = { max: 1, timeWindowMs: 60_000, scope: 'route' } as const
     expect(limiter.hit('/v1/verify|198.51.100.10', verify).allowed).toBe(true)
     expect(limiter.hit('/v1/verify|198.51.100.10', verify).allowed).toBe(false)
     // A different route and a different client each keep their own budget.
@@ -69,7 +72,7 @@ describe('fixed-window rate limiter', () => {
     const clock = fakeClock()
     const limiter = createLimiter(clock.now)
     const trusted = ['127.0.0.1']
-    const single = { max: 1, timeWindowMs: 60_000 }
+    const single = { max: 1, timeWindowMs: 60_000, scope: 'route' } as const
     const requestFrom = (forwarded: string) =>
       limiter.hit(`/v1/networks|${resolveClientAddress('127.0.0.1', forwarded, trusted)}`, single)
         .allowed
@@ -84,6 +87,125 @@ describe('fixed-window rate limiter', () => {
         .allowed
     expect(untrusted('198.51.100.20')).toBe(true)
     expect(untrusted('198.51.100.21')).toBe(false)
+  })
+})
+
+describe('budgets over the real route table', () => {
+  /** The route table only; no assertion here reaches a handler, so the
+   * repository, resolver and pinning service are never called. */
+  function routeTable(): ApiHandlers {
+    return createApiHandlers({
+      repository: {} as never,
+      resolver: { resolve: async () => new Uint8Array() },
+      trustPolicy: new StaticTrustPolicy(),
+      pinningService: {} as unknown as DemoPinningService,
+    })
+  }
+
+  const CLIENT = '198.51.100.10'
+
+  /** Sends one request to `route` through the limiter, as the middleware does. */
+  function request(limiter: ReturnType<typeof createLimiter>, route: RouteDefinition): boolean {
+    if (route.rateLimit === undefined || route.rateLimit === false) return true
+    return limiter.hit(rateLimitBucketKey(route, CLIENT), route.rateLimit).allowed
+  }
+
+  let handlers: ApiHandlers
+  beforeAll(() => {
+    handlers = routeTable()
+  })
+  afterAll(async () => {
+    await handlers.close()
+  })
+
+  function route(method: 'GET' | 'POST', path: string): RouteDefinition {
+    const found = handlers.routes.find(
+      (candidate) => candidate.method === method && candidate.path === path,
+    )
+    expect(found, `${method} ${path} is not in the route table`).toBeDefined()
+    return found!
+  }
+
+  it('spends one 100-request budget across every default-limited route, not one each', () => {
+    const limiter = createLimiter(fakeClock().now)
+    const first = route('GET', '/v1/networks')
+    const second = route('GET', '/v1/networks/:network/schemas')
+    expect(first.rateLimit).toMatchObject({ max: 100, timeWindowMs: 60_000 })
+    expect(second.rateLimit).toMatchObject({ max: 100, timeWindowMs: 60_000 })
+
+    // 100 requests spread over the two paths exhaust the single shared budget.
+    for (let index = 0; index < 100; index += 1) {
+      expect(request(limiter, index % 2 === 0 ? first : second)).toBe(true)
+    }
+    expect(request(limiter, first)).toBe(false)
+    expect(request(limiter, second)).toBe(false)
+    // A third default-limited route is spending the same exhausted budget.
+    expect(request(limiter, route('GET', '/v1/networks/:network/stats'))).toBe(false)
+  })
+
+  it('keeps the routes that declared their own budget on their own counters', () => {
+    const limiter = createLimiter(fakeClock().now)
+    const verify = route('POST', '/v1/verify')
+    const pinning = route('POST', '/v1/pinning/challenges')
+    const pinningPins = route('POST', '/v1/pinning/pins')
+
+    // The shared budget is already spent; the declared ones are untouched by it.
+    for (let index = 0; index < 101; index += 1) request(limiter, route('GET', '/v1/networks'))
+
+    for (let index = 0; index < 20; index += 1) expect(request(limiter, verify)).toBe(true)
+    expect(request(limiter, verify)).toBe(false)
+
+    for (let index = 0; index < 10; index += 1) expect(request(limiter, pinning)).toBe(true)
+    expect(request(limiter, pinning)).toBe(false)
+    // The second pinning route counts separately, as its own declared budget did.
+    expect(request(limiter, pinningPins)).toBe(true)
+  })
+
+  it('gives every rate-limited route a scope, sharing all but the declared budgets', () => {
+    const limited = handlers.routes.filter(
+      (candidate) => candidate.rateLimit !== undefined && candidate.rateLimit !== false,
+    )
+    const declared = new Set(['/v1/verify', '/v1/pinning/challenges', '/v1/pinning/pins'])
+    expect(limited.length).toBeGreaterThan(10)
+    for (const candidate of limited) {
+      const rateLimit = candidate.rateLimit as { scope: string; max: number }
+      expect(rateLimit.scope).toBe(declared.has(candidate.path) ? 'route' : 'shared')
+      if (rateLimit.scope === 'shared') expect(rateLimit.max).toBe(100)
+    }
+  })
+})
+
+describe('limiter memory', () => {
+  it('stays bounded as distinct clients keep arriving', () => {
+    const clock = fakeClock()
+    const limiter = createLimiter(clock.now, 100)
+    for (let index = 0; index < 10_000; index += 1) {
+      limiter.hit(`default|198.51.100.${index}`, LIMIT)
+    }
+    expect(limiter.size()).toBeLessThanOrEqual(100)
+  })
+
+  it('does not drop a client still inside its window while there is room', () => {
+    const clock = fakeClock()
+    const limiter = createLimiter(clock.now, 100)
+    const victim = 'default|198.51.100.1'
+    expect(limiter.hit(victim, LIMIT).allowed).toBe(true)
+    expect(limiter.hit(victim, LIMIT)).toMatchObject({ allowed: true, remaining: 0 })
+    // Unrelated traffic, well under the cap, must not refund the spent budget.
+    for (let index = 0; index < 50; index += 1) limiter.hit(`default|203.0.113.${index}`, LIMIT)
+    expect(limiter.hit(victim, LIMIT).allowed).toBe(false)
+  })
+
+  it('reclaims windows that have expired before evicting live ones', () => {
+    const clock = fakeClock()
+    const limiter = createLimiter(clock.now, 10)
+    for (let index = 0; index < 10; index += 1) limiter.hit(`default|203.0.113.${index}`, LIMIT)
+    clock.advance(3_600_001)
+    const fresh = 'default|198.51.100.7'
+    expect(limiter.hit(fresh, LIMIT).allowed).toBe(true)
+    // Every stale entry went, so the new one is alone rather than crowding the cap.
+    expect(limiter.size()).toBe(1)
+    expect(limiter.hit(fresh, LIMIT)).toMatchObject({ allowed: true, remaining: 0 })
   })
 })
 

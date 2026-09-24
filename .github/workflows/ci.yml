@@ -43,6 +43,12 @@ jobs:
       - name: Check the vendored copies against their sources
         run: node ops/ci/check-vendored-copies.mjs
 
+      # Both applications compile the vendored db/schema copy, but they install
+      # from independent lockfiles, so nothing else would notice one of them
+      # moving to a different Drizzle.
+      - name: Check the two lockfiles agree on drizzle-orm
+        run: node ops/ci/check-drizzle-parity.mjs
+
   web:
     runs-on: ubuntu-24.04
     timeout-minutes: 30

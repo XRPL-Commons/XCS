@@ -168,7 +168,7 @@ services:
     ports:
       - '${XCS_BIND_ADDRESS:-127.0.0.1}:${XCS_WEB_PORT_PUBLISHED:-3000}:3000'
     networks: [edge, database, monitoring]
-    mem_limit: ${XCS_WEB_MEMORY_LIMIT:-512m}
+    mem_limit: ${XCS_WEB_MEMORY_LIMIT:-768m}
     cpus: ${XCS_WEB_CPU_LIMIT:-0.75}
 
   ipfs:

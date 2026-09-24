@@ -133,9 +133,13 @@ const DEFAULT_BODY_LIMIT_BYTES = 1024 * 1024
 // bounded transport allowance above that payload limit.
 const VERIFY_BODY_LIMIT_BYTES = DEFAULT_BODY_LIMIT_BYTES + 64 * 1024
 
-const DEFAULT_PUBLIC_RATE_LIMIT: RouteRateLimit = { max: 100, timeWindowMs: 60_000 }
-const VERIFY_RATE_LIMIT: RouteRateLimit = { max: 20, timeWindowMs: 60_000 }
-const PINNING_RATE_LIMIT: RouteRateLimit = { max: 10, timeWindowMs: 60_000 }
+const DEFAULT_PUBLIC_RATE_LIMIT: RouteRateLimit = {
+  max: 100,
+  timeWindowMs: 60_000,
+  scope: 'shared',
+}
+const VERIFY_RATE_LIMIT: RouteRateLimit = { max: 20, timeWindowMs: 60_000, scope: 'route' }
+const PINNING_RATE_LIMIT: RouteRateLimit = { max: 10, timeWindowMs: 60_000, scope: 'route' }
 
 // The previous HTTP framework compiled request schemas with these options; the
 // handler table keeps the same validation outcomes without a framework.

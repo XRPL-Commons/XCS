@@ -465,6 +465,7 @@ describe('read API', () => {
     expect(routeFor(instance, 'GET', '/v1/networks')?.rateLimit).toEqual({
       max: 100,
       timeWindowMs: 60_000,
+      scope: 'shared',
     })
   })
 
@@ -769,7 +770,7 @@ describe('read API', () => {
 
     const limitedInstance = await app()
     const readiness = routeFor(limitedInstance, 'GET', '/v1/networks/:network/readiness')
-    expect(readiness?.rateLimit).toEqual({ max: 100, timeWindowMs: 60_000 })
+    expect(readiness?.rateLimit).toEqual({ max: 100, timeWindowMs: 60_000, scope: 'shared' })
     expect(readiness?.cacheControl).toBe('private, no-store')
   })
 
@@ -2439,10 +2440,12 @@ describe('read API', () => {
     expect(routeFor(instance, 'POST', '/v1/verify')?.rateLimit).toEqual({
       max: 20,
       timeWindowMs: 60_000,
+      scope: 'route',
     })
     expect(routeFor(instance, 'GET', '/v1/networks')?.rateLimit).toEqual({
       max: 100,
       timeWindowMs: 60_000,
+      scope: 'shared',
     })
   })
 
@@ -2477,6 +2480,7 @@ describe('read API', () => {
       expect(routeFor(instance, 'POST', path)?.rateLimit).toEqual({
         max: 10,
         timeWindowMs: 60_000,
+        scope: 'route',
       })
     }
   })

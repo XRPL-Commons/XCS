@@ -29,6 +29,7 @@
     "clean": "turbo run clean && pnpm --dir apps/web clean && pnpm --dir apps/indexer clean",
     "dev": "turbo run dev --parallel",
     "format": "prettier --write .",
+    "check:repo": "node ops/ci/check-vendored-copies.mjs && node ops/ci/check-drizzle-parity.mjs",
     "format:check": "prettier --check .",
     "install:apps": "pnpm --dir apps/web install --ignore-workspace --frozen-lockfile && pnpm --dir apps/indexer install --ignore-workspace --frozen-lockfile",
     "lint": "turbo run lint && pnpm --dir apps/web lint && pnpm --dir apps/indexer lint",
@@ -37,7 +38,7 @@
     "test:e2e": "XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 pnpm --dir apps/web build && pnpm --dir apps/web test:e2e && pnpm --dir apps/web test:e2e:security",
     "test:postgres": "pnpm --dir apps/indexer test:postgres && pnpm --dir apps/web test:postgres",
     "typecheck": "turbo run typecheck && pnpm --dir apps/web typecheck && pnpm --dir apps/indexer typecheck",
-    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "verify": "pnpm format:check && pnpm check:repo && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

@@ -1,5 +1,5 @@
 import type { XcsApiContext } from '../xcs/context'
-import { createLimiter } from '../xcs/rate-limit'
+import { createLimiter, rateLimitBucketKey } from '../xcs/rate-limit'
 import type { HttpMethod } from '../xcs/http'
 import { isApiPath, matchesPath } from '../utils/apiPaths'
 import { requestClientAddress } from '../utils/dispatch'
@@ -21,7 +21,7 @@ export default defineEventHandler((event) => {
   )
   if (route === undefined || route.rateLimit === undefined || route.rateLimit === false) return
 
-  const key = `${route.path}|${requestClientAddress(event, trustedProxyCidrs)}`
+  const key = rateLimitBucketKey(route, requestClientAddress(event, trustedProxyCidrs))
   const decision = limiter.hit(key, route.rateLimit)
   setResponseHeader(event, 'x-ratelimit-limit', String(decision.limit))
   setResponseHeader(event, 'x-ratelimit-remaining', String(decision.remaining))
