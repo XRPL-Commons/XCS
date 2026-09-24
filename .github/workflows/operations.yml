@@ -25,44 +25,11 @@ jobs:
       XCS_NETWORK_PROFILE: /workspace/config/networks/testnet.example.json
       XCS_PUBLIC_RPC_URL: wss://submission.invalid.example
       XCS_INDEXER_IMAGE: xcs-indexer:ci
-      XCS_DB_IMAGE: xcs-db:ci
       XCS_WEB_IMAGE: xcs-web:ci
-      XCS_REVISION: ${{ github.sha }}
-      XCS_VERSION: 0.1.0-alpha.1-ci
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
-      - name: Prepare ephemeral Compose secrets
-        shell: bash
-        run: |
-          set -euo pipefail
-          SECRET_DIRECTORY="$RUNNER_TEMP/xcs-compose-secrets"
-          mkdir -p "$SECRET_DIRECTORY"
-          printf '%s' "$XCS_POSTGRES_ADMIN_PASSWORD" > "$SECRET_DIRECTORY/postgres_admin_password"
-          printf '%s' "$XCS_INDEXER_DATABASE_PASSWORD" > "$SECRET_DIRECTORY/indexer_database_password"
-          printf '%s' "$XCS_METRICS_TOKEN" > "$SECRET_DIRECTORY/xcs_metrics_token"
-          printf '%s' 'compose-ci-grafana-password-000001' > "$SECRET_DIRECTORY/grafana_admin_password"
-          printf '%s' "$XCS_API_DATABASE_PASSWORD" > "$SECRET_DIRECTORY/api_database_password"
-          printf '%s' "$XCS_MONITOR_DATABASE_PASSWORD" > "$SECRET_DIRECTORY/monitor_database_password"
-          printf '%s' "$XCS_RPC_URL_PRIMARY" > "$SECRET_DIRECTORY/rpc_url_primary"
-          printf '%s' "$XCS_RPC_URL_SECONDARY" > "$SECRET_DIRECTORY/rpc_url_secondary"
-          # Compose file-backed secrets retain the host mode. The directory is
-          # private while 0644 lets each image's distinct unprivileged UID read
-          # only the files explicitly mounted into that service.
-          chmod 700 "$SECRET_DIRECTORY"
-          chmod 644 "$SECRET_DIRECTORY"/*
-          {
-            echo "XCS_POSTGRES_ADMIN_PASSWORD_FILE=$SECRET_DIRECTORY/postgres_admin_password"
-            echo "XCS_INDEXER_DATABASE_PASSWORD_FILE=$SECRET_DIRECTORY/indexer_database_password"
-            echo "XCS_METRICS_TOKEN_FILE=$SECRET_DIRECTORY/xcs_metrics_token"
-            echo "XCS_GRAFANA_ADMIN_PASSWORD_FILE=$SECRET_DIRECTORY/grafana_admin_password"
-            echo "XCS_API_DATABASE_PASSWORD_FILE=$SECRET_DIRECTORY/api_database_password"
-            echo "XCS_MONITOR_DATABASE_PASSWORD_FILE=$SECRET_DIRECTORY/monitor_database_password"
-            echo "XCS_RPC_URL_PRIMARY_FILE=$SECRET_DIRECTORY/rpc_url_primary"
-            echo "XCS_RPC_URL_SECONDARY_FILE=$SECRET_DIRECTORY/rpc_url_secondary"
-          } >> "$GITHUB_ENV"
 
       - name: Render and validate every Compose profile
         shell: bash
@@ -71,7 +38,6 @@ jobs:
           docker compose config --quiet
           docker compose --profile site --profile monitoring --profile demo-pinning config --quiet
           docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile monitoring config --quiet
-          docker compose -f docker-compose.yml -f docker-compose.secrets.yml config --quiet
 
           mapfile -t DEFAULT_SERVICES < <(docker compose config --services | sort)
           EXPECTED=(db-bootstrap indexer postgres web)
@@ -108,36 +74,6 @@ jobs:
             ] | all(.host_ip == "127.0.0.1")
           ' "$RUNNER_TEMP/xcs-compose-dev.json"
 
-          docker compose -f docker-compose.yml -f docker-compose.secrets.yml \
-            --profile site --profile monitoring config --format json \
-            > "$RUNNER_TEMP/xcs-compose-secrets.json"
-          jq -e '
-            (.services["db-bootstrap"].command == ["node", "dist/lib/db/bin/bootstrap.js"]) and
-            (.services["db-bootstrap"].environment.XCS_DATABASE_URL_TARGET == "XCS_BOOTSTRAP_DATABASE_URL") and
-            (.services.postgres.environment.POSTGRES_PASSWORD == null) and
-            (.services.postgres.environment.POSTGRES_PASSWORD_FILE == "/run/secrets/postgres_admin_password") and
-            (.services["db-bootstrap"].environment.XCS_DATABASE_PASSWORD == null) and
-            (.services["db-bootstrap"].environment.XCS_DATABASE_PASSWORD_FILE == "/run/secrets/postgres_admin_password") and
-            (.services["db-bootstrap"].environment.XCS_DATABASE_CLUSTER_SCOPE == "dedicated") and
-            (.services["db-bootstrap"].environment.XCS_INDEXER_DATABASE_PASSWORD == null) and
-            (.services["db-bootstrap"].environment.XCS_INDEXER_DATABASE_PASSWORD_FILE == "/run/secrets/indexer_database_password") and
-            (.services["db-bootstrap"].environment.XCS_API_DATABASE_PASSWORD == null) and
-            (.services["db-bootstrap"].environment.XCS_API_DATABASE_PASSWORD_FILE == "/run/secrets/api_database_password") and
-            (.services["db-bootstrap"].environment.XCS_MONITOR_DATABASE_PASSWORD == null) and
-            (.services["db-bootstrap"].environment.XCS_MONITOR_DATABASE_PASSWORD_FILE == "/run/secrets/monitor_database_password") and
-            (.services.web.environment.XCS_DATABASE_PASSWORD == null) and
-            (.services.web.environment.XCS_DATABASE_PASSWORD_FILE == "/run/secrets/api_database_password") and
-            (.services.web.environment.XCS_METRICS_TOKEN == null) and
-            (.services.web.environment.XCS_METRICS_TOKEN_FILE == "/run/secrets/xcs_metrics_token") and
-            (.services.indexer.environment.XCS_DATABASE_PASSWORD == null) and
-            (.services.indexer.environment.XCS_RPC_URL_PRIMARY == null) and
-            (.services.indexer.environment.XCS_RPC_URL_PRIMARY_FILE == "/run/secrets/rpc_url_primary") and
-            (.services.indexer.environment.XCS_RPC_URL_SECONDARY == null) and
-            (.services.indexer.environment.XCS_RPC_URL_SECONDARY_FILE == "/run/secrets/rpc_url_secondary") and
-            (.services["postgres-exporter"].environment.DATA_SOURCE_USER == "xcs_monitor") and
-            (.services["postgres-exporter"].environment.DATA_SOURCE_PASS_FILE == "/run/secrets/monitor_database_password")
-          ' "$RUNNER_TEMP/xcs-compose-secrets.json"
-
       - name: Validate monitoring configuration with Prometheus
         shell: bash
         run: |
@@ -154,13 +90,13 @@ jobs:
           jq empty ops/monitoring/grafana/dashboards/*.json
 
       - name: Build production-only core images
-        run: docker compose build db-bootstrap web indexer
+        run: docker compose build web indexer
 
       - name: Assert runtime images exclude development tools
         shell: bash
         run: |
           set -euo pipefail
-          for IMAGE in "$XCS_DB_IMAGE" "$XCS_WEB_IMAGE" "$XCS_INDEXER_IMAGE"; do
+          for IMAGE in "$XCS_WEB_IMAGE" "$XCS_INDEXER_IMAGE"; do
             docker run --rm --entrypoint sh "$IMAGE" -c \
               'test ! -e node_modules/typescript && test ! -e node_modules/vitest && test ! -e node_modules/tsx'
           done
@@ -175,7 +111,7 @@ jobs:
           }
           trap cleanup EXIT
 
-          COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.secrets.yml)
+          COMPOSE=(docker compose -f docker-compose.yml)
           "${COMPOSE[@]}" up --no-build --detach --wait web
 
           # The bootstrap is deliberately restart-safe. Run it twice after the
@@ -273,15 +209,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep --fixed-strings -- "pnpm --filter \"\$XCS_PACKAGE\" --prod deploy" docker/Dockerfile.node
-          grep --fixed-strings -- 'USER node' docker/Dockerfile.node
-          grep --fixed-strings -- 'ENTRYPOINT ["/usr/local/bin/xcs-entrypoint"]' docker/Dockerfile.node
-          grep --fixed-strings -- '^node:24-alpine@sha256:[0-9a-f]{64}$' .github/workflows/release-artifacts.yml
-          RELEASE_NODE_BASE_USES="$(grep --count --fixed-strings -- "--build-arg XCS_NODE_IMAGE=\"\$XCS_RELEASE_NODE_IMAGE\"" .github/workflows/release-artifacts.yml)"
-          test "$RELEASE_NODE_BASE_USES" = '3'
-          sh -n docker/node-entrypoint.sh
-          sh ops/ci/test-node-entrypoint.sh
-          if grep --extended-regexp 'COPY --from=build /workspace($|/)' docker/Dockerfile.node; then
-            echo 'The production image must not copy the complete build workspace' >&2
-            exit 1
-          fi
+          for DOCKERFILE in apps/web/Dockerfile apps/indexer/Dockerfile; do
+            grep --fixed-strings -- 'USER node' "$DOCKERFILE"
+            grep --fixed-strings -- 'pnpm install --frozen-lockfile' "$DOCKERFILE"
+            if grep --extended-regexp 'RUN --mount|<<[A-Z]' "$DOCKERFILE"; then
+              echo "$DOCKERFILE uses BuildKit-only syntax" >&2
+              exit 1
+            fi
+            if grep --extended-regexp 'COPY --from=build( --chown=node:node)? /workspace/? ' "$DOCKERFILE"; then
+              echo 'The production image must not copy the complete build workspace' >&2
+              exit 1
+            fi
+          done
+          grep --fixed-strings -- 'pnpm install --frozen-lockfile --prod' apps/indexer/Dockerfile

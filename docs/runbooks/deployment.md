@@ -3,18 +3,18 @@
 The Compose stack is an alpha deployment template. It binds every published port to loopback by
 default and refuses to index with the placeholder network profile.
 
-A hosted deployment requires Docker Compose `2.24.4` or newer because the production overlay uses
-`!reset` to remove direct secret values before mounting files. All unqualified `docker compose`
-commands in this runbook assume this production context:
+> **Being rewritten (Task C2).** `docker-compose.yml` is now a local-development stack only: it
+> builds `apps/web/Dockerfile` and `apps/indexer/Dockerfile` with the repository root as context and
+> reads plain values from `.env`. The production secret-file overlay has been removed. A hosted
+> deployment runs the two app images directly against an external database; their environment
+> contracts are `apps/web/.env.example` and `apps/indexer/.env.example`.
+
+All unqualified `docker compose` commands in this runbook assume:
 
 ```sh
-export COMPOSE_FILE=docker-compose.yml:docker-compose.secrets.yml
 export COMPOSE_PROJECT_NAME=xcs-controlled-pilot
 docker compose version
 ```
-
-Do not omit `docker-compose.secrets.yml` on a hosted deployment. The base file alone is convenient
-for local development but places its configured values directly in container environment metadata.
 
 ## Required preparation
 
@@ -267,9 +267,8 @@ rollback plans.
    bootstrap derives the administrator password from `XCS_BOOTSTRAP_DATABASE_URL` and
    compares it with all three runtime passwords before executing SQL.
 
-   The two RPC files contain the complete WSS URLs and therefore also protect provider credentials
-   embedded in a path or query. `docker-compose.secrets.yml` removes all corresponding direct values
-   from the container model and mounts only these files. If the `monitoring` profile is enabled,
+   The two RPC values are complete WSS URLs and therefore also protect provider credentials
+   embedded in a path or query; keep them in the deployment's secret store. If the `monitoring` profile is enabled,
    also create the ninth, separate `XCS_GRAFANA_ADMIN_PASSWORD_FILE`. Compose implements file-backed
    secrets as bind mounts, so keep their parent directory mode `0700` and each file mode `0644` so
    the distinct unprivileged container UIDs can read only the secrets mounted into their service.
@@ -365,7 +364,7 @@ local HTTP session:
 
 ```sh
 XCS_GRAFANA_COOKIE_SECURE=false \
-  docker compose -f docker-compose.yml -f docker-compose.secrets.yml -f docker-compose.dev.yml \
+  docker compose -f docker-compose.yml -f docker-compose.dev.yml \
   --profile monitoring up --build
 ```
 
@@ -503,10 +502,9 @@ calling `signAndSubmit`: XCS must retain normalization, persistence and sole sub
 
 ## DigitalOcean App Platform for the web app
 
-The `gh deploy-setup` extension deploys a single Nuxt service from the repository root: the root
-`Dockerfile` builds `@xcs-protocol/web`, and the root `.env.example` is that service's environment
-contract (names only; values live in Passbolt). The Compose stack contract is
-`.env.compose.example`. Run `gh deploy-setup` from the repository root; accept port `3000`.
+The `gh deploy-setup` extension deploys a single Nuxt service from the repository root:
+`apps/web/Dockerfile` builds it, and `apps/web/.env.example` is that service's environment contract
+(names only; values live in Passbolt). The local Compose stack's contract is `.env.compose.example`. Run `gh deploy-setup` from the repository root; accept port `3000`.
 
 The App Platform service hosts only the web app. PostgreSQL, the indexer and the read API keep
 running from the Compose stack (or another host) in the same region and VPC:
@@ -539,8 +537,8 @@ Before the first deploy:
    App Platform domain: exactly one report-only CSP, one HSTS value, `private, no-store` on HTML,
    immutable caching on `/_nuxt/` assets.
 
-The Compose `web` service and the Dockerfile in `docker/` are unchanged; App Platform builds the
-root `Dockerfile` on every deploy from the configured branch.
+App Platform builds `apps/web/Dockerfile` with the repository root as build context on every deploy
+from the configured branch; the Compose `web` service builds the same file.
 
 ## Optional Testnet demo pinning
 

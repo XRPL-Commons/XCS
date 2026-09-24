@@ -49,9 +49,9 @@ line. The default paths are under `ops/secrets/`, whose contents are ignored by 
 Validate the fully rendered configuration without printing it, then start the profile:
 
 ```sh
-docker compose -f docker-compose.yml -f docker-compose.secrets.yml \
+docker compose -f docker-compose.yml \
   --profile monitoring config --quiet
-docker compose -f docker-compose.yml -f docker-compose.secrets.yml \
+docker compose -f docker-compose.yml \
   --profile monitoring up --build
 ```
 
@@ -85,13 +85,13 @@ The Grafana dashboard is provisioned from `ops/monitoring/grafana/dashboards/xcs
 configuration changes before deployment:
 
 ```sh
-docker compose -f docker-compose.yml -f docker-compose.secrets.yml \
+docker compose -f docker-compose.yml \
   --profile monitoring run --rm --no-deps \
   --entrypoint /bin/promtool prometheus check config /etc/prometheus/prometheus.yml
-docker compose -f docker-compose.yml -f docker-compose.secrets.yml \
+docker compose -f docker-compose.yml \
   --profile monitoring run --rm --no-deps \
   --entrypoint /bin/promtool prometheus check rules /etc/prometheus/rules/xcs-alerts.yml
-docker compose -f docker-compose.yml -f docker-compose.secrets.yml \
+docker compose -f docker-compose.yml \
   --profile monitoring run --rm --no-deps \
   --entrypoint /bin/promtool prometheus test rules /etc/prometheus/tests/xcs-alerts.test.yml
 jq empty ops/monitoring/grafana/dashboards/*.json

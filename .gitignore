@@ -7,8 +7,8 @@ coverage/
 .data/
 .env
 .env.*
-!.env.example
 !.env.compose.example
+!apps/*/.env.example
 *.log
 *.pem
 *.key

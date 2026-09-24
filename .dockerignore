@@ -9,6 +9,9 @@
 !**/.env.compose.example
 node_modules
 **/node_modules
+# Retired workspace packages are not part of any app image build context.
+packages
+packages/**
 **/dist
 **/.nuxt
 **/.output

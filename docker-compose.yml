@@ -1,12 +1,11 @@
 name: xcs
 
-x-node-build: &node-build
-  context: .
-  dockerfile: docker/Dockerfile.node
-  args:
-    XCS_NODE_IMAGE: ${XCS_NODE_IMAGE:-node:24-alpine}
-    XCS_REVISION: ${XCS_REVISION:-local}
-    XCS_VERSION: ${XCS_VERSION:-0.1.0-alpha.1}
+# Local development stack. Each application image is built from its own
+# Dockerfile with the repository root as the build context. Values come from a
+# local `.env` copied from `.env.compose.example`; there is no secret-file
+# overlay. Hosted deployments run the two app images directly (see
+# docs/runbooks/deployment.md) and read the per-app contracts in
+# apps/<name>/.env.example.
 
 x-runtime-hardening: &runtime-hardening
   init: true
@@ -39,6 +38,10 @@ x-one-shot-hardening: &one-shot-hardening
     options:
       max-size: ${XCS_LOG_MAX_SIZE:-10m}
       max-file: ${XCS_LOG_MAX_FILES:-5}
+
+x-indexer-build: &indexer-build
+  context: .
+  dockerfile: apps/indexer/Dockerfile
 
 services:
   postgres:
@@ -77,22 +80,15 @@ services:
         max-size: ${XCS_LOG_MAX_SIZE:-10m}
         max-file: ${XCS_LOG_MAX_FILES:-5}
 
+  # Migrations plus the xcs_indexer, xcs_api and xcs_monitor roles, from the
+  # indexer image. Restart-safe: running it again is a no-op.
   db-bootstrap:
     <<: *one-shot-hardening
-    image: ${XCS_DB_IMAGE:-xcs-db:local}
-    build:
-      <<: *node-build
-      args:
-        XCS_NODE_IMAGE: ${XCS_NODE_IMAGE:-node:24-alpine}
-        XCS_PACKAGE: '@xcs-protocol/indexer'
-        XCS_REVISION: ${XCS_REVISION:-local}
-        XCS_VERSION: ${XCS_VERSION:-0.1.0-alpha.1}
+    image: ${XCS_INDEXER_IMAGE:-xcs-indexer:local}
+    build: *indexer-build
     command: ['node', 'dist/lib/db/bin/bootstrap.js']
     environment:
-      XCS_DATABASE_URL_TARGET: XCS_BOOTSTRAP_DATABASE_URL
-      XCS_MIGRATIONS_DIR: /workspace/db/migrations
-      XCS_DATABASE_USER: xcs_admin
-      XCS_DATABASE_PASSWORD: ${XCS_POSTGRES_ADMIN_PASSWORD:-}
+      XCS_BOOTSTRAP_DATABASE_URL: postgres://xcs_admin:${XCS_POSTGRES_ADMIN_PASSWORD:-}@postgres:5432/xcs
       XCS_DATABASE_CLUSTER_SCOPE: dedicated
       XCS_INDEXER_DATABASE_PASSWORD: ${XCS_INDEXER_DATABASE_PASSWORD:-}
       XCS_API_DATABASE_PASSWORD: ${XCS_API_DATABASE_PASSWORD:-}
@@ -107,18 +103,10 @@ services:
   indexer:
     <<: *runtime-hardening
     image: ${XCS_INDEXER_IMAGE:-xcs-indexer:local}
-    build:
-      <<: *node-build
-      args:
-        XCS_NODE_IMAGE: ${XCS_NODE_IMAGE:-node:24-alpine}
-        XCS_PACKAGE: '@xcs-protocol/indexer'
-        XCS_REVISION: ${XCS_REVISION:-local}
-        XCS_VERSION: ${XCS_VERSION:-0.1.0-alpha.1}
+    build: *indexer-build
     environment:
-      XCS_DATABASE_URL_TARGET: XCS_INDEXER_DATABASE_URL
-      XCS_DATABASE_USER: xcs_indexer
-      XCS_DATABASE_PASSWORD: ${XCS_INDEXER_DATABASE_PASSWORD:-}
-      XCS_NETWORK_PROFILE: ${XCS_NETWORK_PROFILE:-/workspace/config/networks/testnet.json}
+      XCS_INDEXER_DATABASE_URL: postgres://xcs_indexer:${XCS_INDEXER_DATABASE_PASSWORD:-}@postgres:5432/xcs
+      XCS_NETWORK_PROFILE: ${XCS_NETWORK_PROFILE:-/workspace/config/networks/testnet.example.json}
       XCS_RPC_URL_PRIMARY: ${XCS_RPC_URL_PRIMARY:-}
       XCS_RPC_URL_SECONDARY: ${XCS_RPC_URL_SECONDARY:-}
       XCS_REGISTRY_POLICY: ${XCS_REGISTRY_POLICY:-blackholed}
@@ -140,19 +128,10 @@ services:
     <<: *runtime-hardening
     image: ${XCS_WEB_IMAGE:-xcs-web:local}
     build:
-      <<: *node-build
-      args:
-        XCS_NODE_IMAGE: ${XCS_NODE_IMAGE:-node:24-alpine}
-        XCS_PACKAGE: '@xcs-protocol/web'
-        XCS_REVISION: ${XCS_REVISION:-local}
-        XCS_VERSION: ${XCS_VERSION:-0.1.0-alpha.1}
-    command: ['node', '.output/server/index.mjs']
+      context: .
+      dockerfile: apps/web/Dockerfile
     environment:
-      NUXT_HOST: 0.0.0.0
-      NUXT_PORT: 3000
-      XCS_DATABASE_URL_TARGET: XCS_DATABASE_URL
-      XCS_DATABASE_USER: xcs_api
-      XCS_DATABASE_PASSWORD: ${XCS_API_DATABASE_PASSWORD:-}
+      XCS_DATABASE_URL: postgres://xcs_api:${XCS_API_DATABASE_PASSWORD:-}@postgres:5432/xcs
       XCS_METRICS_ENABLED: ${XCS_METRICS_ENABLED:-false}
       XCS_METRICS_TOKEN: ${XCS_METRICS_TOKEN:-}
       XCS_ALLOWED_ORIGINS: ${XCS_ALLOWED_ORIGINS:-http://localhost:3000}
@@ -188,8 +167,6 @@ services:
       start_period: 10s
     ports:
       - '${XCS_BIND_ADDRESS:-127.0.0.1}:${XCS_WEB_PORT_PUBLISHED:-3000}:3000'
-    volumes:
-      - ./config/networks:/workspace/config/networks:ro
     networks: [edge, database, monitoring]
     mem_limit: ${XCS_WEB_MEMORY_LIMIT:-512m}
     cpus: ${XCS_WEB_CPU_LIMIT:-0.75}
@@ -228,6 +205,8 @@ services:
     volumes:
       - ./ops/monitoring/prometheus:/etc/prometheus:ro
       - xcs-prometheus:/prometheus
+    # Prometheus reads the scrape credentials from a file; Compose materializes
+    # it from the same .env value the web service uses.
     secrets: [xcs_metrics_token]
     depends_on:
       web:
@@ -262,15 +241,14 @@ services:
       GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
       GF_AUTH_ANONYMOUS_ENABLED: 'false'
       GF_SECURITY_ADMIN_USER: ${XCS_GRAFANA_ADMIN_USER:-xcs_admin}
-      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+      GF_SECURITY_ADMIN_PASSWORD: ${XCS_GRAFANA_ADMIN_PASSWORD:-}
       GF_SECURITY_DISABLE_GRAVATAR: 'true'
-      GF_SECURITY_COOKIE_SECURE: ${XCS_GRAFANA_COOKIE_SECURE:-true}
+      GF_SECURITY_COOKIE_SECURE: ${XCS_GRAFANA_COOKIE_SECURE:-false}
       GF_USERS_ALLOW_SIGN_UP: 'false'
     volumes:
       - ./ops/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./ops/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - xcs-grafana:/var/lib/grafana
-    secrets: [grafana_admin_password]
     depends_on:
       prometheus:
         condition: service_started
@@ -298,8 +276,7 @@ services:
     environment:
       DATA_SOURCE_URI: postgres:5432/xcs?sslmode=disable
       DATA_SOURCE_USER: xcs_monitor
-      DATA_SOURCE_PASS_FILE: /run/secrets/monitor_database_password
-    secrets: [monitor_database_password]
+      DATA_SOURCE_PASS: ${XCS_MONITOR_DATABASE_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -370,8 +347,4 @@ volumes:
 
 secrets:
   xcs_metrics_token:
-    file: ${XCS_METRICS_TOKEN_FILE:-./ops/secrets/xcs_metrics_token}
-  grafana_admin_password:
-    file: ${XCS_GRAFANA_ADMIN_PASSWORD_FILE:-./ops/secrets/grafana_admin_password}
-  monitor_database_password:
-    file: ${XCS_MONITOR_DATABASE_PASSWORD_FILE:-./ops/secrets/monitor_database_password}
+    environment: XCS_METRICS_TOKEN
