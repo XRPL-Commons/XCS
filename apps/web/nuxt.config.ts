@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
+import { vendoredPrebundleDependencies } from './vendoredPrebundle'
+
 // The OpenAPI document's `info.version` is this package's version; reading it
 // here keeps the single source of truth in `package.json`.
 const apiVersion = (
@@ -107,27 +109,12 @@ export default defineNuxtConfig({
       // Force a fresh pre-bundle on each server start so a changed dependency
       // cannot be replaced by Nuxt's persistent dependency cache.
       force: true,
-      // These are all reached only from lazily loaded code: `xrpl` and
-      // `xrpl-connect` from the wallet adapters, the rest from the vendored
-      // protocol code under `app/lib/xcs`. Vite would otherwise discover them
-      // after the first page load and re-optimize mid-run, which 504s the
-      // in-flight module requests. Pre-bundle them up front. The entries are
-      // the exact specifiers those modules import, because that is what Vite
-      // optimizes; keep this list in step with `app/lib/xcs`.
-      include: [
-        '@noble/hashes/sha2.js',
-        '@noble/hashes/utils.js',
-        '@scure/base',
-        'canonicalize',
-        'jsonc-parser',
-        'multiformats/bases/base32',
-        'multiformats/cid',
-        'multiformats/codecs/raw',
-        'multiformats/hashes/digest',
-        'tr46',
-        'xrpl',
-        'xrpl-connect',
-      ],
+      // `xrpl-connect` is reached only from the lazily loaded wallet adapters,
+      // and `vendoredPrebundleDependencies` covers the vendored protocol code
+      // under `app/lib/xcs` (see that module, and the test that keeps it
+      // honest). Without pre-bundling, Vite discovers them after the first page
+      // load and re-optimizes mid-run, which 504s the in-flight requests.
+      include: [...vendoredPrebundleDependencies, 'xrpl-connect'],
       // Served unbundled so the CSS-injection strip above also runs in dev.
       exclude: ['vaul-vue'],
     },

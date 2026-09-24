@@ -1,14 +1,37 @@
 {
-  "extends": "../../tsconfig.base.json",
+  // Self-contained on purpose: this app owns its compiler options rather than
+  // extending the repository root's `tsconfig.base.json`. Nothing outside
+  // `apps/indexer`, `db/` and `config/` is available to it — that is what makes
+  // it a standalone project, and it is all its Dockerfile's build context
+  // copies. The options below are the former base config, with the two
+  // documented overrides folded in.
   "compilerOptions": {
-    // Overrides `tsconfig.base.json`'s NodeNext pair on purpose. Under NodeNext,
-    // TypeScript resolves a specifier starting with `#` only through this
-    // package's own `package.json` "imports" field, which may not point outside
-    // the package, so `#db/*` could never reach the shared `db/` folder. Bundler
-    // resolution honours `paths` instead. Relative imports must still carry an
-    // explicit `.js` extension: `dev` runs `tsx watch`, which resolves at runtime.
+    "allowJs": false,
+    "allowSyntheticDefaultImports": true,
+    "declaration": true,
+    "esModuleInterop": true,
+    "exactOptionalPropertyTypes": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    // Not the NodeNext pair the other projects use. Under NodeNext, TypeScript
+    // resolves a specifier starting with `#` only through this package's own
+    // `package.json` "imports" field, which may not point outside the package,
+    // so `#db/*` could never reach the shared `db/` folder. Bundler resolution
+    // honours `paths` instead. Relative imports must still carry an explicit
+    // `.js` extension: `dev` runs `tsx watch`, which resolves at runtime. That
+    // is what `eslint.config.mjs` enforces, since this pair no longer does.
     "module": "Preserve",
     "moduleResolution": "Bundler",
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2023",
+    "useDefineForClassFields": true,
+    "verbatimModuleSyntax": true,
     "types": ["node", "vitest/globals"],
     "paths": {
       "#db/*": ["../../db/*"],
