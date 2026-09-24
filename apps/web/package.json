@@ -24,6 +24,7 @@
     "@xcs-protocol/core": "workspace:*",
     "@xcs-protocol/db": "workspace:*",
     "@xcs-protocol/sdk": "workspace:*",
+    "ajv": "^8.20.0",
     "drizzle-orm": "^0.45.2",
     "ipaddr.js": "^2.2.0",
     "nuxt": "^4.5.2",
