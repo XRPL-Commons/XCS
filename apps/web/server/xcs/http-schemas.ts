@@ -19,10 +19,6 @@ export const MAX_UINT32 = 4_294_967_295
 export const SEARCH_QUERY_CONTENT = /[\p{L}\p{N}]/u
 // eslint-disable-next-line no-control-regex -- intentionally matches control characters to reject them
 export const SEARCH_QUERY_CONTROL = /[\u0000-\u001f\u007f]/u
-export const INTERNAL_SSR_TOKEN = /^[A-Za-z0-9_-]{32,256}$/u
-export const INTERNAL_SSR_CLIENT_KEY = /^[0-9a-f]{64}$/u
-export const INTERNAL_SSR_TOKEN_HEADER = 'x-xcs-internal-token'
-export const INTERNAL_SSR_CLIENT_KEY_HEADER = 'x-xcs-client-key'
 export const INTERNAL_METRICS_TOKEN_HEADER = 'authorization'
 export const INTERNAL_METRICS_TOKEN = /^[A-Za-z0-9_-]{32,256}$/u
 export const errorResponseSchema = {

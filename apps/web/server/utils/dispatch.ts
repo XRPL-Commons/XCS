@@ -1,9 +1,11 @@
 import type { H3Event } from 'h3'
 
+import { assertDeclaredLength, BodyTooLargeError, readBoundedBody } from '../xcs/body-limit'
 import type { XcsApiContext } from '../xcs/context'
 import { mapError } from '../xcs/handlers'
 import type { ApiReply, ApiRequest, HttpMethod, RouteDefinition } from '../xcs/http'
 import { resolveClientAddress } from './clientAddress'
+import { isInProcessRequest } from './inProcessRequest'
 
 const DEFAULT_BODY_LIMIT_BYTES = 1024 * 1024
 
@@ -27,20 +29,25 @@ function singleValueHeaders(event: H3Event): Record<string, string | undefined> 
 }
 
 async function readJsonBody(event: H3Event, limit: number): Promise<unknown> {
-  const declaredLength = Number(getRequestHeader(event, 'content-length') ?? '0')
-  if (Number.isFinite(declaredLength) && declaredLength > limit) {
-    throw Object.assign(new Error('Request body is too large'), { statusCode: 413 })
-  }
-  const raw = await readRawBody(event, 'utf8')
+  assertDeclaredLength(getRequestHeader(event, 'content-length'), limit)
+  // An in-process request carries its body in memory rather than on a stream,
+  // so there is nothing to abort early; h3 reads it and the size is checked once.
+  const raw = isInProcessRequest(event)
+    ? await bufferedBody(event, limit)
+    : await readBoundedBody(event.node.req, limit)
   if (raw === undefined || raw.length === 0) return undefined
-  if (Buffer.byteLength(raw, 'utf8') > limit) {
-    throw Object.assign(new Error('Request body is too large'), { statusCode: 413 })
-  }
   try {
     return JSON.parse(raw)
   } catch (error) {
     throw new BodyParseError(error instanceof Error ? error.message : 'Invalid JSON')
   }
+}
+
+async function bufferedBody(event: H3Event, limit: number): Promise<string | undefined> {
+  const raw = await readRawBody(event, 'utf8')
+  if (raw === undefined) return undefined
+  if (Buffer.byteLength(raw, 'utf8') > limit) throw new BodyTooLargeError()
+  return raw
 }
 
 function applyReply(event: H3Event, reply: ApiReply): unknown {
@@ -87,6 +94,15 @@ export async function dispatch(event: H3Event, method: HttpMethod, path: string)
     }
     return applyReply(event, await route.handle(request))
   } catch (error) {
+    if (error instanceof BodyTooLargeError) {
+      // The rest of the upload is never read. Cutting the request only once the
+      // response has flushed is what lets the client see the 413 rather than a
+      // reset connection.
+      const request = event.node?.req
+      event.node?.res?.once('finish', () => {
+        request?.destroy?.()
+      })
+    }
     if (error instanceof BodyParseError) {
       return applyReply(event, {
         statusCode: 400,

@@ -3,11 +3,16 @@ import { createLimiter } from '../xcs/rate-limit'
 import type { HttpMethod } from '../xcs/http'
 import { isApiPath, matchesPath } from '../utils/apiPaths'
 import { requestClientAddress } from '../utils/dispatch'
+import { isInProcessRequest } from '../utils/inProcessRequest'
 
 const limiter = createLimiter()
 
 export default defineEventHandler((event) => {
   if (!isApiPath(event.path)) return
+  // Server rendering reaches these routes in process. Such a call crosses no
+  // network and is already covered by the page request that spawned it, and it
+  // has no client address of its own to key a bucket by.
+  if (isInProcessRequest(event)) return
   const method = event.method as HttpMethod
   if (method !== 'GET' && method !== 'POST') return
   const { handlers, trustedProxyCidrs } = event.context.xcs as XcsApiContext
