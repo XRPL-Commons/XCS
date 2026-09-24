@@ -34,13 +34,17 @@ jobs:
       # Prometheus reads the metrics bearer token with `credentials_file` and runs
       # read_only, so Compose can only supply it as a file secret. Creating it is an
       # explicit step here exactly as docs/runbooks/monitoring.md asks operators to do.
+      # A file-backed Compose secret is a bind mount that keeps the host mode and
+      # owner, so the directory is 0700 (private to this host user) and the file 0644
+      # (readable by the container's unprivileged uid, which owns nothing here).
       - name: Materialize the monitoring Compose secret
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p ops/secrets
-          install -m 600 /dev/null ops/secrets/xcs_metrics_token
+          chmod 700 ops/secrets
           printf '%s' "$XCS_METRICS_TOKEN" > ops/secrets/xcs_metrics_token
+          chmod 644 ops/secrets/xcs_metrics_token
           test -s ops/secrets/xcs_metrics_token
 
       - name: Render and validate every Compose profile

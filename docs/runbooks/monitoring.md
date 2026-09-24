@@ -52,9 +52,15 @@ bearer token through `credentials_file`, and Compose refuses an environment-sour
 you create explicitly, with the same value:
 
 ```sh
-install -m 600 /dev/null ops/secrets/xcs_metrics_token
+mkdir -p ops/secrets
+chmod 700 ops/secrets
 printf '%s' "$XCS_METRICS_TOKEN" > ops/secrets/xcs_metrics_token
+chmod 644 ops/secrets/xcs_metrics_token
 ```
+
+Use exactly these modes: a file-backed Compose secret is a bind mount that keeps the host file's mode
+and owner, so a stricter file is unreadable by the container's unprivileged user and a looser
+directory exposes the token to other host users.
 
 Write no trailing newline: Prometheus sends the file's bytes verbatim. The file is never committed
 (`ops/secrets/` is ignored apart from its README) and its location can be moved with
@@ -148,6 +154,7 @@ external facts.
 
 `XCS_METRICS_RETENTION` defaults to 30 days, matching the readiness objective window. Retain incident
 records and drill evidence outside Prometheus according to Commons policy. To rotate the metrics
-token, update `XCS_METRICS_TOKEN`, rewrite `ops/secrets/xcs_metrics_token` from it and restart both
+token, update `XCS_METRICS_TOKEN`, rewrite `ops/secrets/xcs_metrics_token` from it (same `0644`
+mode) and restart both
 the web app and Prometheus; a partial rotation intentionally makes the scrape fail. Rotate the database and Grafana passwords through their normal
 procedures and rerun `pnpm --dir apps/indexer db:bootstrap` after a database password change.
