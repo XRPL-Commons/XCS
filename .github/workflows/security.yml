@@ -23,6 +23,10 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            apps/web/pnpm-lock.yaml
+            apps/indexer/pnpm-lock.yaml
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.x'
@@ -42,21 +46,37 @@ jobs:
         run: |
           set -euo pipefail
           pnpm audit --prod --audit-level high
-          pnpm --dir apps/web audit --prod --audit-level high
-          pnpm --dir apps/indexer audit --prod --audit-level high
+          pnpm --dir apps/web --ignore-workspace audit --prod --audit-level high
+          pnpm --dir apps/indexer --ignore-workspace audit --prod --audit-level high
       - name: Enforce production dependency license policy
         shell: bash
         run: |
           set -euo pipefail
-          for SCOPE in root apps/web apps/indexer; do
-            REPORT="$RUNNER_TEMP/xcs-licenses-${SCOPE//\//-}.json"
-            if [[ "$SCOPE" == 'root' ]]; then
-              pnpm licenses list --prod --json > "$REPORT"
-            else
-              pnpm --dir "$SCOPE" licenses list --prod --json > "$REPORT"
-            fi
-            node ops/ci/check-licenses.mjs "$REPORT" ops/security/license-overrides.json
-          done
+          # One report per lockfile. --ignore-workspace is mandatory on the app
+          # scopes: without it pnpm resolves the root workspace and reports the
+          # root dependency graph three times.
+          pnpm licenses list --prod --json > "$RUNNER_TEMP/xcs-licenses-root.json"
+          pnpm --dir apps/web --ignore-workspace licenses list --prod --json \
+            > "$RUNNER_TEMP/xcs-licenses-web.json"
+          pnpm --dir apps/indexer --ignore-workspace licenses list --prod --json \
+            > "$RUNNER_TEMP/xcs-licenses-indexer.json"
+          # The policy is evaluated once over the union of the three reports,
+          # because its stale-override rule is only meaningful across the whole
+          # production dependency surface: an override for a package that lives
+          # in one scope would be reported as unused by the other two.
+          jq --slurp '
+            reduce .[] as $report (
+              {};
+              reduce ($report | keys_unsorted[]) as $license (
+                .;
+                .[$license] = ((.[$license] // []) + $report[$license])
+              )
+            )
+          ' "$RUNNER_TEMP"/xcs-licenses-{root,web,indexer}.json \
+            > "$RUNNER_TEMP/xcs-licenses.json"
+          node ops/ci/check-licenses.mjs \
+            "$RUNNER_TEMP/xcs-licenses.json" \
+            ops/security/license-overrides.json
 
   repository-scan:
     runs-on: ubuntu-24.04

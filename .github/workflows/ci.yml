@@ -47,6 +47,8 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 24
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
       - run: pnpm --dir apps/web install --ignore-workspace --frozen-lockfile
       - run: pnpm --dir apps/web verify
       - name: Install Chromium
@@ -94,6 +96,10 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 24
+          cache: pnpm
+          cache-dependency-path: |
+            apps/indexer/pnpm-lock.yaml
+            apps/web/pnpm-lock.yaml
       - run: pnpm --dir apps/indexer install --ignore-workspace --frozen-lockfile
       - run: pnpm --dir apps/indexer verify
       - run: pnpm --dir apps/indexer test:postgres
