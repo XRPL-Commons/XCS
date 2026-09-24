@@ -18,14 +18,12 @@ jobs:
       XCS_INDEXER_DATABASE_PASSWORD: compose-ci-indexer-password-0001
       XCS_API_DATABASE_PASSWORD: compose-ci-api-password-000000001
       XCS_MONITOR_DATABASE_PASSWORD: compose-ci-monitor-password-000001
-      XCS_INTERNAL_API_TOKEN: compose-ci-internal-token-00000000001
       XCS_METRICS_ENABLED: 'true'
       XCS_METRICS_TOKEN: compose-ci-metrics-token-000000000001
       XCS_RPC_URL_PRIMARY: wss://primary.invalid.example
       XCS_RPC_URL_SECONDARY: wss://secondary.invalid.example
       XCS_NETWORK_PROFILE: /workspace/config/networks/testnet.example.json
       XCS_PUBLIC_RPC_URL: wss://submission.invalid.example
-      XCS_API_IMAGE: xcs-api:ci
       XCS_INDEXER_IMAGE: xcs-indexer:ci
       XCS_DB_IMAGE: xcs-db:ci
       XCS_WEB_IMAGE: xcs-web:ci
@@ -48,7 +46,6 @@ jobs:
           printf '%s' 'compose-ci-grafana-password-000001' > "$SECRET_DIRECTORY/grafana_admin_password"
           printf '%s' "$XCS_API_DATABASE_PASSWORD" > "$SECRET_DIRECTORY/api_database_password"
           printf '%s' "$XCS_MONITOR_DATABASE_PASSWORD" > "$SECRET_DIRECTORY/monitor_database_password"
-          printf '%s' "$XCS_INTERNAL_API_TOKEN" > "$SECRET_DIRECTORY/internal_api_token"
           printf '%s' "$XCS_RPC_URL_PRIMARY" > "$SECRET_DIRECTORY/rpc_url_primary"
           printf '%s' "$XCS_RPC_URL_SECONDARY" > "$SECRET_DIRECTORY/rpc_url_secondary"
           # Compose file-backed secrets retain the host mode. The directory is
@@ -63,7 +60,6 @@ jobs:
             echo "XCS_GRAFANA_ADMIN_PASSWORD_FILE=$SECRET_DIRECTORY/grafana_admin_password"
             echo "XCS_API_DATABASE_PASSWORD_FILE=$SECRET_DIRECTORY/api_database_password"
             echo "XCS_MONITOR_DATABASE_PASSWORD_FILE=$SECRET_DIRECTORY/monitor_database_password"
-            echo "XCS_INTERNAL_API_TOKEN_FILE=$SECRET_DIRECTORY/internal_api_token"
             echo "XCS_RPC_URL_PRIMARY_FILE=$SECRET_DIRECTORY/rpc_url_primary"
             echo "XCS_RPC_URL_SECONDARY_FILE=$SECRET_DIRECTORY/rpc_url_secondary"
           } >> "$GITHUB_ENV"
@@ -78,7 +74,7 @@ jobs:
           docker compose -f docker-compose.yml -f docker-compose.secrets.yml config --quiet
 
           mapfile -t DEFAULT_SERVICES < <(docker compose config --services | sort)
-          EXPECTED=(api db-bootstrap indexer postgres)
+          EXPECTED=(db-bootstrap indexer postgres web)
           if [[ "${DEFAULT_SERVICES[*]}" != "${EXPECTED[*]}" ]]; then
             printf 'Unexpected default services: %s\n' "${DEFAULT_SERVICES[*]}" >&2
             exit 1
@@ -93,7 +89,6 @@ jobs:
             (.services["postgres-exporter"].ports == null) and
             (.services["node-exporter"].ports == null) and
             (.services.ipfs.ports == null) and
-            (.services.web.profiles | index("site") != null) and
             (.services.prometheus.profiles | index("monitoring") != null) and
             (.services.grafana.profiles | index("monitoring") != null) and
             (.networks.database.internal == true) and
@@ -130,19 +125,15 @@ jobs:
             (.services["db-bootstrap"].environment.XCS_API_DATABASE_PASSWORD_FILE == "/run/secrets/api_database_password") and
             (.services["db-bootstrap"].environment.XCS_MONITOR_DATABASE_PASSWORD == null) and
             (.services["db-bootstrap"].environment.XCS_MONITOR_DATABASE_PASSWORD_FILE == "/run/secrets/monitor_database_password") and
-            (.services.api.environment.XCS_DATABASE_PASSWORD == null) and
-            (.services.api.environment.XCS_DATABASE_PASSWORD_FILE == "/run/secrets/api_database_password") and
-            (.services.api.environment.XCS_INTERNAL_API_TOKEN == null) and
-            (.services.api.environment.XCS_INTERNAL_API_TOKEN_FILE == "/run/secrets/internal_api_token") and
-            (.services.api.environment.XCS_METRICS_TOKEN == null) and
-            (.services.api.environment.XCS_METRICS_TOKEN_FILE == "/run/secrets/xcs_metrics_token") and
+            (.services.web.environment.XCS_DATABASE_PASSWORD == null) and
+            (.services.web.environment.XCS_DATABASE_PASSWORD_FILE == "/run/secrets/api_database_password") and
+            (.services.web.environment.XCS_METRICS_TOKEN == null) and
+            (.services.web.environment.XCS_METRICS_TOKEN_FILE == "/run/secrets/xcs_metrics_token") and
             (.services.indexer.environment.XCS_DATABASE_PASSWORD == null) and
             (.services.indexer.environment.XCS_RPC_URL_PRIMARY == null) and
             (.services.indexer.environment.XCS_RPC_URL_PRIMARY_FILE == "/run/secrets/rpc_url_primary") and
             (.services.indexer.environment.XCS_RPC_URL_SECONDARY == null) and
             (.services.indexer.environment.XCS_RPC_URL_SECONDARY_FILE == "/run/secrets/rpc_url_secondary") and
-            (.services.web.environment.NUXT_API_INTERNAL_TOKEN == null) and
-            (.services.web.environment.NUXT_API_INTERNAL_TOKEN_FILE == "/run/secrets/internal_api_token") and
             (.services["postgres-exporter"].environment.DATA_SOURCE_USER == "xcs_monitor") and
             (.services["postgres-exporter"].environment.DATA_SOURCE_PASS_FILE == "/run/secrets/monitor_database_password")
           ' "$RUNNER_TEMP/xcs-compose-secrets.json"
@@ -163,13 +154,13 @@ jobs:
           jq empty ops/monitoring/grafana/dashboards/*.json
 
       - name: Build production-only core images
-        run: docker compose build db-bootstrap api indexer
+        run: docker compose build db-bootstrap web indexer
 
       - name: Assert runtime images exclude development tools
         shell: bash
         run: |
           set -euo pipefail
-          for IMAGE in "$XCS_DB_IMAGE" "$XCS_API_IMAGE" "$XCS_INDEXER_IMAGE"; do
+          for IMAGE in "$XCS_DB_IMAGE" "$XCS_WEB_IMAGE" "$XCS_INDEXER_IMAGE"; do
             docker run --rm --entrypoint sh "$IMAGE" -c \
               'test ! -e node_modules/typescript && test ! -e node_modules/vitest && test ! -e node_modules/tsx'
           done
@@ -185,7 +176,7 @@ jobs:
           trap cleanup EXIT
 
           COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.secrets.yml)
-          "${COMPOSE[@]}" up --no-build --detach --wait api
+          "${COMPOSE[@]}" up --no-build --detach --wait web
 
           # The bootstrap is deliberately restart-safe. Run it twice after the
           # dependency chain has completed to prove repeated initialization and
@@ -193,17 +184,17 @@ jobs:
           "${COMPOSE[@]}" run --rm --no-deps db-bootstrap
           "${COMPOSE[@]}" run --rm --no-deps db-bootstrap
 
-          curl --fail --silent --show-error http://127.0.0.1:3001/health/live > /dev/null
-          READY_STATUS="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3001/health/ready)"
+          curl --fail --silent --show-error http://127.0.0.1:3000/health/live > /dev/null
+          READY_STATUS="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/health/ready)"
           test "$READY_STATUS" = '503'
-          UNAUTHENTICATED_STATUS="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3001/internal/metrics/prometheus)"
+          UNAUTHENTICATED_STATUS="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/internal/metrics/prometheus)"
           test "$UNAUTHENTICATED_STATUS" = '401'
           curl --fail --silent --show-error \
             --header "Authorization: Bearer $XCS_METRICS_TOKEN" \
-            http://127.0.0.1:3001/internal/metrics/prometheus \
+            http://127.0.0.1:3000/internal/metrics/prometheus \
             | grep --fixed-strings 'xcs_database_available'
 
-          if "${COMPOSE[@]}" ps --services --status running | grep --extended-regexp '^(web|prometheus|grafana|postgres-exporter|node-exporter)$'; then
+          if "${COMPOSE[@]}" ps --services --status running | grep --extended-regexp '^(prometheus|grafana|postgres-exporter|node-exporter)$'; then
             echo 'A non-core profile service started unexpectedly' >&2
             exit 1
           fi
@@ -249,7 +240,7 @@ jobs:
             " | grep --fixed-strings --line-regexp t
 
           "${COMPOSE[@]}" --profile monitoring up --no-build --detach --wait postgres-exporter
-          "${COMPOSE[@]}" exec -T api node -e '
+          "${COMPOSE[@]}" exec -T web node -e '
             const waitForExporter = async () => {
               for (let attempt = 0; attempt < 20; attempt += 1) {
                 try {

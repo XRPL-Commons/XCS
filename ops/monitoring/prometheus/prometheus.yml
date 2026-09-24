@@ -13,7 +13,7 @@ scrape_configs:
       type: Bearer
       credentials_file: /run/secrets/xcs_metrics_token
     static_configs:
-      - targets: ['api:3001']
+      - targets: ['web:3000']
 
   - job_name: xcs-postgres
     static_configs:

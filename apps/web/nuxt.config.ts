@@ -1,3 +1,14 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
+// The OpenAPI document's `info.version` is this package's version; reading it
+// here keeps the single source of truth in `package.json`.
+const apiVersion = (
+  JSON.parse(readFileSync(fileURLToPath(new URL('./package.json', import.meta.url)), 'utf8')) as {
+    version: string
+  }
+).version
+
 const browserE2eInput = process.env.XCS_BROWSER_E2E
 if (browserE2eInput !== undefined && browserE2eInput !== '0' && browserE2eInput !== '1') {
   throw new Error('XCS_BROWSER_E2E must be exactly "0" or "1".')
@@ -105,6 +116,7 @@ export default defineNuxtConfig({
     langDir: 'locales',
   },
   runtimeConfig: {
+    apiVersion,
     browserE2eMode,
     localPayloadStoreMode,
     public: {
