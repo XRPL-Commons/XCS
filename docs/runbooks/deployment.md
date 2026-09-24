@@ -8,6 +8,11 @@ default and refuses to index with the placeholder network profile.
 > reads plain values from `.env`. The production secret-file overlay has been removed. A hosted
 > deployment runs the two app images directly against an external database; their environment
 > contracts are `apps/web/.env.example` and `apps/indexer/.env.example`.
+>
+> **"Required preparation" below is unimplementable until Task C2 rewrites it.** Its instructions to
+> create eight `*_FILE` secret files, and its description of the overlay's bind-mount modes, refer to
+> `docker-compose.secrets.yml`, which no longer exists. Do not follow that section; take the variable
+> names from the two per-app contracts instead.
 
 All unqualified `docker compose` commands in this runbook assume:
 

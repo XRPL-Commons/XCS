@@ -346,5 +346,7 @@ volumes:
   xcs-grafana:
 
 secrets:
+  # XCS_METRICS_TOKEN must exist in the environment, even empty, whenever the
+  # monitoring profile runs: an unset variable fails the secret, not just the scrape.
   xcs_metrics_token:
     environment: XCS_METRICS_TOKEN
