@@ -114,13 +114,13 @@ export default defineNuxtConfig({
       // under `app/lib/xcs` (see that module, and the test that keeps it
       // honest). Without pre-bundling, Vite discovers them after the first page
       // load and re-optimizes mid-run, which 504s the in-flight requests.
-      include: [...vendoredPrebundleDependencies, 'xrpl-connect'],
+      include: [...vendoredPrebundleDependencies, 'xrpl-connect', 'ripple-keypairs'],
       // Served unbundled so the CSS-injection strip above also runs in dev.
       exclude: ['vaul-vue'],
     },
   },
   i18n: {
-    defaultLocale: 'fr',
+    defaultLocale: 'en',
     strategy: 'prefix_except_default',
     locales: [
       { code: 'fr', language: 'fr-FR', name: 'Français', file: 'fr.json' },
@@ -133,10 +133,11 @@ export default defineNuxtConfig({
     browserE2eMode,
     localPayloadStoreMode,
     public: {
+      issuerEnabled: '0',
+      payloadBaseUrl: '',
       profileId: '',
       rpcUrl: 'wss://s.altnet.rippletest.net:51233',
       xamanApiKey: '',
-      xamanRedirectUrl: '',
       walletConnectProjectId: '',
       browserE2eMode,
       localPayloadStoreMode,
@@ -155,7 +156,7 @@ export default defineNuxtConfig({
         'base-uri': ["'none'"],
         'connect-src': cspConnectSources,
         'font-src': ["'self'"],
-        'form-action': ["'self'"],
+        'form-action': ["'self'", 'https://account.xrpl.in'],
         'frame-ancestors': ["'none'"],
         'frame-src': ["'none'"],
         'img-src': ["'self'", 'data:'],

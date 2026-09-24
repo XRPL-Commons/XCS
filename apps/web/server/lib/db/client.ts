@@ -1,4 +1,4 @@
-// Copied from packages/db/src/client.ts at 5ce8eaa; keep in sync by hand (see CONTRIBUTING.md).
+// Copied from packages/db/src/client.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
 import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import postgres, { type Sql } from 'postgres'
 
@@ -12,7 +12,10 @@ export interface DatabaseClient {
   close: () => Promise<void>
 }
 
-export function createDatabaseClient(databaseUrl: string): DatabaseClient {
+export function createDatabaseClient(
+  databaseUrl: string,
+  options: { onNotice?: () => void } = {},
+): DatabaseClient {
   if (databaseUrl.trim().length === 0) {
     throw new Error('DATABASE_URL must not be empty')
   }
@@ -22,6 +25,7 @@ export function createDatabaseClient(databaseUrl: string): DatabaseClient {
     idle_timeout: 20,
     connect_timeout: 10,
     prepare: false,
+    ...(options.onNotice ? { onnotice: options.onNotice } : {}),
   })
 
   return {

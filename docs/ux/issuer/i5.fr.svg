@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844" role="img" aria-labelledby="title desc" xml:lang="fr">
+<title id="title">I5 — Vérifier et émettre</title>
+<desc id="desc">Confirmer le contenu, le destinataire et la visibilité. Hébergement privé requis. Adresse et cycle de vie restent publics sur XRPL. Détails techniques disponibles.</desc>
+<rect x="0" y="0" width="390" height="844" rx="3" fill="#ffffff" stroke="#777777"/>
+<rect x="0" y="0" width="390" height="42" rx="3" fill="#eeeeee" stroke="#777777"/>
+<text x="20" y="12" font-family="Arial, sans-serif" font-size="13" fill="#252525" dominant-baseline="text-before-edge"><tspan x="20" dy="0">XCS / Émetteur</tspan></text>
+<text x="24" y="62" font-family="Arial, sans-serif" font-size="23" fill="#252525" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Vérifier et émettre</tspan></text>
+<text x="24" y="103.9" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Confirmer le contenu, le destinataire et la</tspan><tspan x="24" dy="18.2">visibilité.</tspan></text>
+<rect x="24" y="155.3" width="342" height="37" rx="3" fill="#eeeeee" stroke="#b4b4b4"/>
+<text x="34" y="165.3" font-family="Arial, sans-serif" font-size="13" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Camille Exemple · Portefeuille lié</tspan></text>
+<rect x="24" y="208.3" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="217.3" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Attestation</tspan></text>
+<text x="34" y="237.3" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Fin de formation · Initiation XRPL</tspan></text>
+<rect x="24" y="277.5" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="286.5" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Champs à remplir</tspan></text>
+<text x="34" y="306.5" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Nom : Camille Exemple · Date : 23/09/2026</tspan></text>
+<rect x="24" y="346.7" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="355.7" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Visibilité : privée</tspan></text>
+<text x="34" y="375.7" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Public : formation · Restreint : nom, date</tspan></text>
+<rect x="24" y="415.9" width="342" height="77.4" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="424.9" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Signature</tspan></text>
+<text x="34" y="444.9" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Atelier Exemple · Testnet · Frais à</tspan><tspan x="34" dy="18.2">afficher</tspan></text>
+<rect x="24" y="509.29999999999995" width="342" height="44" rx="3" fill="#333333" stroke="#333333"/>
+<text x="36" y="522.1999999999999" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" dominant-baseline="text-before-edge"><tspan x="36" dy="0">Signer dans mon portefeuille</tspan></text>
+<rect x="24" y="563.3" width="342" height="44" rx="3" fill="#ffffff" stroke="#333333"/>
+<text x="36" y="576.1999999999999" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="36" dy="0">Modifier la visibilité</tspan></text>
+<text x="24" y="620.3" font-family="Arial, sans-serif" font-size="12" fill="#555555" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Hébergement privé requis. Adresse et cycle de vie</tspan><tspan x="24" dy="15.600000000000001">restent publics sur XRPL. Détails techniques</tspan><tspan x="24" dy="15.600000000000001">disponibles.</tspan></text>
+<text x="24" y="821" font-family="Arial, sans-serif" font-size="10" fill="#666666" dominant-baseline="text-before-edge"><tspan x="24" dy="0">MAQUETTE · Exemple fictif · Non fonctionnel</tspan></text>
+</svg>

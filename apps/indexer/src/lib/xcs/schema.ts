@@ -1,4 +1,4 @@
-// Copied from packages/core/src/schema.ts at 54c3486; keep in sync by hand (see CONTRIBUTING.md).
+// Copied from packages/core/src/schema.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
 import { fail } from './errors.js'
 import { encodeCanonicalJson, parseCanonicalJson, utf8ByteLength } from './json.js'
 

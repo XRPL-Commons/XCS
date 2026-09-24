@@ -29,6 +29,7 @@ export {
   createHttpsPayloadUri,
   createIpfsPayloadUri,
   parsePayloadUri,
+  payloadDigest,
   verifyPayloadIntegrity,
   type HttpsPayloadUri,
   type IpfsPayloadUri,

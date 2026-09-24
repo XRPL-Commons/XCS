@@ -1,4 +1,4 @@
-import { createDatabaseClient } from './lib/db/client.js'
+import { createDatabaseClient } from './lib/db/index.js'
 
 import { loadIndexerConfig } from './config.js'
 import { PostgresIndexerRepository } from './repository.js'

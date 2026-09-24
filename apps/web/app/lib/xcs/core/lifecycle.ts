@@ -1,4 +1,4 @@
-// Copied from packages/core/src/lifecycle.ts at 54c3486; keep in sync by hand (see CONTRIBUTING.md).
+// Copied from packages/core/src/lifecycle.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
 import { fail } from './errors.js'
 
 export type CredentialLifecycleState = 'pending' | 'active' | 'expired' | 'deleted'

@@ -1,37 +1,47 @@
+import { createXrplConnect } from '@xrpl-commons/xrpl-connect-vue'
 import { Client } from 'xrpl'
-import { WalletManager } from 'xrpl-connect'
+import type { WalletAdapter } from 'xrpl-connect'
 import { resolveBrowserE2eClientMode } from '~/utils/browserE2eMode'
 import { createXrplConnectAdapters } from '~/utils/walletAdapters'
 
-export default defineNuxtPlugin(async () => {
+export default defineNuxtPlugin(async (nuxtApp) => {
   const config = useRuntimeConfig()
   const browserE2e = resolveBrowserE2eClientMode(config.public.browserE2eMode, import.meta.dev)
+  let adapters: WalletAdapter[]
   if (import.meta.dev && browserE2e) {
-    const { createBrowserE2eLedgerClient, createBrowserE2eWalletManager } =
+    const { createBrowserE2eLedgerClient, createBrowserE2eWalletAdapters } =
       await import('~/utils/browserE2eHarness')
+    adapters = createBrowserE2eWalletAdapters()
+    nuxtApp.vueApp.use(
+      createXrplConnect({
+        adapters,
+        network: 'testnet',
+        autoConnect: false,
+        logger: { level: 'error' },
+      }),
+    )
     return {
       provide: {
-        walletManager: createBrowserE2eWalletManager(),
         xrplClientFactory: () => createBrowserE2eLedgerClient(),
       },
     }
   }
 
-  const adapters = createXrplConnectAdapters({
+  adapters = createXrplConnectAdapters({
     xamanApiKey: config.public.xamanApiKey,
-    xamanRedirectUrl: config.public.xamanRedirectUrl,
     walletConnectProjectId: config.public.walletConnectProjectId,
   })
-  const walletManager = new WalletManager({
-    adapters,
-    network: 'testnet',
-    autoConnect: false,
-    logger: { level: import.meta.dev ? 'warn' : 'error' },
-  })
+  nuxtApp.vueApp.use(
+    createXrplConnect({
+      adapters,
+      network: 'testnet',
+      autoConnect: false,
+      logger: { level: import.meta.dev ? 'warn' : 'error' },
+    }),
+  )
 
   return {
     provide: {
-      walletManager,
       xrplClientFactory: (rpcUrl: string) => new Client(rpcUrl),
     },
   }

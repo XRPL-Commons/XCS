@@ -1,4 +1,4 @@
-// Copied from packages/db/src/indexer-fencing.ts at 5ce8eaa; keep in sync by hand (see CONTRIBUTING.md).
+// Copied from packages/db/src/indexer-fencing.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
 import { and, eq, gt, isNull, lte, or, sql } from 'drizzle-orm'
 
 import type { XcsDatabase } from './client.js'
@@ -8,7 +8,7 @@ import {
   indexerStatuses,
   type IndexerStatusRow,
   type IndexerStatusState,
-} from '#db/schema'
+} from '#db/schema/index.js'
 
 const UINT32_MAX = 4_294_967_295
 const MAX_SAFE_EPOCH = Number.MAX_SAFE_INTEGER

@@ -1,6 +1,4 @@
-import type { JsonValue } from '#xcs/core/index.js'
-
-import { parseJson } from './serialization'
+import { parseJson, type JsonValue } from '#xcs/core/index.js'
 
 const GENERATION_ID_PATTERN = /^[0-9a-f]{64}$/u
 const PROFILE_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,127}$/u
@@ -220,7 +218,7 @@ import {
   credentialHexToUri,
   parseCredentialPayload,
   verifyPayloadIntegrity,
-} from '#xcs/sdk/index.js'
+} from '@xcs-protocol/sdk'
 
 const API_BASE = ${typescriptLiteral(apiBaseUrl)}
 const PROFILE_ID = ${typescriptLiteral(profileId)}
@@ -322,7 +320,7 @@ printf '%s' "$cli_report" | jq '{onChain,schema,payload,issuerTrust}'`
   connectAndValidateNetwork,
   signPreparedAndSubmit,
   type Signer,
-} from '#xcs/sdk/index.js'
+} from '@xcs-protocol/sdk'
 
 await connectAndValidateNetwork(xrplClient, profile)
 const unsigned = buildCredentialCreate({ issuer, subject, schemaUid, uri })

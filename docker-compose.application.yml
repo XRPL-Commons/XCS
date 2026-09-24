@@ -1,0 +1,72 @@
+# Optional LOCAL auth/admin/issuer validation, on top of docker-compose.yml.
+# These are additional processes of the two standalone images, not a production topology.
+services:
+  db-bootstrap:
+    environment:
+      XCS_APP_DATABASE_PASSWORD: ${XCS_APP_DATABASE_PASSWORD:?Set XCS_APP_DATABASE_PASSWORD}
+      XCS_ADMIN_DATABASE_PASSWORD: ${XCS_ADMIN_DATABASE_PASSWORD:?Set XCS_ADMIN_DATABASE_PASSWORD}
+      XCS_NOTIFIER_DATABASE_PASSWORD: ${XCS_NOTIFIER_DATABASE_PASSWORD:?Set XCS_NOTIFIER_DATABASE_PASSWORD}
+      XCS_ISSUER_DATABASE_PASSWORD: ${XCS_ISSUER_DATABASE_PASSWORD:?Set XCS_ISSUER_DATABASE_PASSWORD}
+  web:
+    environment:
+      XCS_AUTH_ENABLED: '1'
+      XCS_AUTH_ORIGIN: ${XCS_AUTH_ORIGIN:?Set exact local HTTPS origin}
+      XCS_IDENTITY_CLIENT_ID: ${XCS_IDENTITY_CLIENT_ID:?Set identity client ID}
+      XCS_IDENTITY_CLIENT_SECRET: ${XCS_IDENTITY_CLIENT_SECRET:?Set identity client secret}
+      NUXT_APP_DATABASE_URL: postgres://xcs_app:${XCS_APP_DATABASE_PASSWORD}@postgres:5432/xcs
+      XCS_ADMIN_ENABLED: '1'
+      NUXT_ADMIN_DATABASE_URL: postgres://xcs_admin_app:${XCS_ADMIN_DATABASE_PASSWORD}@postgres:5432/xcs
+      XCS_ADMIN_DOCUMENT_KEY: ${XCS_ADMIN_DOCUMENT_KEY:?Set document signing key}
+      XCS_ADMIN_DOCUMENT_DIRECTORY: /var/lib/xcs-review
+      XCS_ISSUER_ENABLED: '1'
+      NUXT_PUBLIC_ISSUER_ENABLED: '1'
+      NUXT_ISSUER_DATABASE_URL: postgres://xcs_issuer:${XCS_ISSUER_DATABASE_PASSWORD}@postgres:5432/xcs
+      XCS_ISSUER_DOCUMENT_DIRECTORY: /var/lib/xcs-review
+      XCS_ISSUER_INVITE_DAYS: ${XCS_ISSUER_INVITE_DAYS:-7}
+      XCS_SMTP_HOST: mailpit
+      XCS_SMTP_PORT: '1025'
+    volumes:
+      - xcs-review-documents:/var/lib/xcs-review
+    networks: [edge, database, monitoring, application-mail]
+  admin-notifier:
+    image: ${XCS_WEB_IMAGE:-xcs-web:local}
+    command: ['node', 'dist/admin/admin-notifier.js']
+    user: node
+    environment:
+      XCS_NOTIFIER_DATABASE_URL: postgres://xcs_notifier:${XCS_NOTIFIER_DATABASE_PASSWORD}@postgres:5432/xcs
+      XCS_SMTP_HOST: mailpit
+      XCS_SMTP_PORT: '1025'
+    depends_on:
+      db-bootstrap:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_healthy
+    networks: [database, application-mail]
+    init: true
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=64m']
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    pids_limit: 100
+    stop_grace_period: 75s
+    restart: unless-stopped
+  mailpit:
+    image: axllent/mailpit:v1.29.2
+    user: '1000:1000'
+    environment:
+      MP_DISABLE_VERSION_CHECK: 'true'
+      MP_SMTP_DISABLE_RDNS: 'true'
+      MP_MAX_MESSAGES: '0'
+    ports: ['127.0.0.1:${XCS_MAILPIT_PORT:-8025}:8025']
+    networks: [application-mail, mail-ui]
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=64m,uid=1000,gid=1000']
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    restart: unless-stopped
+networks:
+  application-mail:
+    internal: true
+  mail-ui:
+volumes:
+  xcs-review-documents:

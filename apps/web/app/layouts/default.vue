@@ -1,7 +1,16 @@
 <script setup lang="ts">
 const { locale, locales, setLocale, t } = useI18n()
 const localePath = useLocalePath()
+const { account } = useWallet()
+const auth = useAuth()
+const issuerEnabled = String(useRuntimeConfig().public.issuerEnabled) === '1'
+await auth.load()
 const clientReady = ref(false)
+const route = useRoute()
+const simpleNavigation = computed(() => issuerEnabled && auth.enabled.value)
+const walletFreePage = computed(
+  () => simpleNavigation.value && /^\/(?:fr\/?)?(?:presentations|verifier)?\/?$/.test(route.path),
+)
 
 const localeItems = computed(() =>
   locales.value.map((item) =>
@@ -11,12 +20,62 @@ const localeItems = computed(() =>
   ),
 )
 
-const navigation = computed(() => [
+const protocolNavigation = computed(() => [
   { label: t('nav.explorer'), to: localePath('/schemas') },
   { label: t('nav.create'), to: localePath('/studio') },
   { label: t('nav.verify'), to: localePath('/verify') },
+  ...(account.value
+    ? [
+        {
+          label: t('nav.wallet'),
+          to: localePath('/credentials'),
+          'data-testid': 'wallet-space-link',
+        },
+      ]
+    : []),
   { label: t('nav.docs'), to: localePath('/developers') },
+  ...(auth.hasRole('admin') ? [{ label: t('admin.title'), to: localePath('/admin') }] : []),
+  ...(issuerEnabled && auth.user.value
+    ? [
+        { label: t('recipient.title'), to: localePath('/recipient') },
+        { label: t('verifier.title'), to: localePath('/verifier') },
+        {
+          label: t('auth.issuerSpace'),
+          to: localePath(auth.hasRole('issuer') ? '/issuer' : '/issuer/application'),
+        },
+      ]
+    : []),
 ])
+
+const navigation = computed(() =>
+  simpleNavigation.value
+    ? [
+        { label: t('simpleNavigation.receive'), to: localePath('/recipient') },
+        {
+          label: t('simpleNavigation.issue'),
+          to: localePath(auth.hasRole('issuer') ? '/issuer' : '/issuer/application'),
+        },
+        { label: t('simpleNavigation.verify'), to: localePath('/presentations') },
+        {
+          label: t('simpleNavigation.more'),
+          children: [
+            ...(auth.user.value
+              ? [{ label: t('verifier.title'), to: localePath('/verifier') }]
+              : []),
+            ...(auth.hasRole('admin')
+              ? [{ label: t('admin.title'), to: localePath('/admin') }]
+              : []),
+            { label: t('nav.explorer'), to: localePath('/schemas') },
+            { label: t('nav.create'), to: localePath('/studio') },
+            { label: t('simpleNavigation.protocolVerify'), to: localePath('/verify') },
+            ...(account.value ? [{ label: t('nav.wallet'), to: localePath('/credentials') }] : []),
+            { label: t('nav.docs'), to: localePath('/developers') },
+            { label: t('nav.status'), to: localePath('/status') },
+          ],
+        },
+      ]
+    : protocolNavigation.value,
+)
 
 const footerLinks = computed(() => [
   { label: t('nav.schemas'), to: localePath('/schemas') },
@@ -65,7 +124,7 @@ onMounted(() => {
       <UNavigationMenu :items="navigation" data-testid="primary-nav" :aria-label="$t('nav.main')" />
 
       <template #right>
-        <ExplorerSearch compact class="hidden md:flex" />
+        <ExplorerSearch v-if="!simpleNavigation" compact class="hidden md:flex" />
         <div class="hidden md:block">
           <label class="sr-only" for="locale">{{ $t('nav.language') }}</label>
           <USelect
@@ -77,12 +136,22 @@ onMounted(() => {
             @update:model-value="setLocale($event as 'fr' | 'en')"
           />
         </div>
-        <WalletButton />
+        <WalletButton v-if="!walletFreePage" />
+        <UButton
+          v-if="auth.enabled.value"
+          :to="localePath(auth.user.value ? '/account' : '/auth/login')"
+          color="neutral"
+          variant="outline"
+          size="sm"
+          data-testid="auth-account-link"
+        >
+          {{ $t(auth.user.value ? 'auth.account' : 'auth.signIn') }}
+        </UButton>
       </template>
 
       <template #body>
         <UNavigationMenu :items="navigation" orientation="vertical" class="-mx-2.5" />
-        <ExplorerSearch compact class="mt-4" />
+        <ExplorerSearch v-if="!simpleNavigation" compact class="mt-4" />
         <div class="mt-4 md:hidden">
           <label class="sr-only" for="locale-mobile">{{ $t('nav.language') }}</label>
           <USelect
@@ -103,7 +172,9 @@ onMounted(() => {
 
     <UFooter>
       <template #left>
-        <p class="text-sm text-muted">{{ $t('footer.summary') }}</p>
+        <p class="text-sm text-muted">
+          {{ $t(simpleNavigation ? 'simpleNavigation.footer' : 'footer.summary') }}
+        </p>
       </template>
       <nav class="flex flex-wrap gap-x-5 gap-y-2 text-sm" :aria-label="$t('footer.navigation')">
         <NuxtLink

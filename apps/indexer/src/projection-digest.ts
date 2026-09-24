@@ -6,8 +6,8 @@ import {
   networkProfiles,
   schemaEvents,
   schemas,
-} from '#db/schema'
-import { type XcsDatabase } from './lib/db/client.js'
+  type XcsDatabase,
+} from './lib/db/index.js'
 import { asc, eq } from 'drizzle-orm'
 
 import { canonicalJson, encodeUtf8, sha256Hex } from './serialization.js'

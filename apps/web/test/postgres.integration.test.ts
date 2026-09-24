@@ -1,13 +1,18 @@
 import { randomUUID } from 'node:crypto'
 
 import { computeSchemaUid, parseSchema, type SchemaDefinition } from '#xcs/core/index.js'
-import { schemaEvents, schemas } from '#db/schema'
-import { type DatabaseClient, createDatabaseClient } from '../server/lib/db/client.js'
-import { bootstrapDatabase, databasePasswordFromUrl } from './lib/db/bootstrap.js'
+import {
+  createDatabaseClient,
+  schemaEvents,
+  schemas,
+  type DatabaseClient,
+} from '../server/lib/db/index.js'
+import { bootstrapDatabase, databasePasswordFromUrl } from '../server/lib/db/bootstrap.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { PostgresOperationalMetricsRepository } from '../server/xcs/operational-metrics-repository.js'
 import { PostgresPinningRepository } from '../server/xcs/pinning-repository.js'
+import { PostgresHostedPayloadRepository } from '../server/xcs/hosted-payloads-repository.js'
 import { PostgresApiRepository } from '../server/xcs/repository.js'
 import {
   authoritativeSchemaCatalogBundle,
@@ -31,11 +36,13 @@ const CATALOG_NETWORK_ID = 2
 const PUBLISHER = 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh'
 const INDEXER_DATABASE_PASSWORD = 'indexer-metrics-integration-password-01'
 const API_DATABASE_PASSWORD = 'api-metrics-integration-password-000001'
+const PAYLOAD_DATABASE_PASSWORD = 'payload-metrics-integration-password-01'
 const MONITOR_DATABASE_PASSWORD = 'monitor-metrics-integration-password-01'
 
 let adminClient: DatabaseClient | undefined
 let databaseClient: DatabaseClient | undefined
 let runtimeApiClient: DatabaseClient | undefined
+let runtimePayloadClient: DatabaseClient | undefined
 let temporaryDatabaseName: string | undefined
 let temporaryDatabaseUrl: string | undefined
 let runtimeRoleCleanupAllowed = false
@@ -143,10 +150,14 @@ describePostgres('PostgreSQL 18 API integration', () => {
       administratorPassword: databasePasswordFromUrl(temporaryDatabaseUrl),
       indexerPassword: INDEXER_DATABASE_PASSWORD,
       apiPassword: API_DATABASE_PASSWORD,
+      payloadWriterPassword: PAYLOAD_DATABASE_PASSWORD,
       monitorPassword: MONITOR_DATABASE_PASSWORD,
     } as const
     await bootstrapDatabase(databaseClient, bootstrapPasswords)
     await bootstrapDatabase(databaseClient, bootstrapPasswords)
+    runtimePayloadClient = createDatabaseClient(
+      runtimeDatabaseUrl(temporaryDatabaseUrl, 'xcs_payload_writer', PAYLOAD_DATABASE_PASSWORD),
+    )
     runtimeApiClient = createDatabaseClient(
       runtimeDatabaseUrl(temporaryDatabaseUrl, 'xcs_api', API_DATABASE_PASSWORD),
     )
@@ -154,6 +165,15 @@ describePostgres('PostgreSQL 18 API integration', () => {
 
   afterAll(async () => {
     const cleanupErrors: unknown[] = []
+    if (runtimePayloadClient !== undefined) {
+      try {
+        await runtimePayloadClient.close()
+      } catch (error) {
+        cleanupErrors.push(error)
+      } finally {
+        runtimePayloadClient = undefined
+      }
+    }
     if (runtimeApiClient !== undefined) {
       try {
         await runtimeApiClient.close()
@@ -191,6 +211,7 @@ describePostgres('PostgreSQL 18 API integration', () => {
             DROP ROLE IF EXISTS
               xcs_indexer,
               xcs_api,
+              xcs_payload_writer,
               xcs_monitor
           `
           runtimeRoleCleanupAllowed = false
@@ -209,6 +230,63 @@ describePostgres('PostgreSQL 18 API integration', () => {
     if (cleanupErrors.length > 0) {
       throw new AggregateError(cleanupErrors, 'Failed to clean API PostgreSQL integration database')
     }
+  })
+
+  it('preserves hosted payload compatibility, idempotency, quotas and append-only runtime grants', async () => {
+    if (databaseClient === undefined || runtimePayloadClient === undefined)
+      throw new Error('PostgreSQL test database is not initialized')
+    const profile = 'hosted-testnet'
+    const uid = '9'.repeat(64)
+    const txHash = '8'.repeat(64)
+    await databaseClient.sql`INSERT INTO network_profiles (profile_id,xcs_version,network_id,required_amendment,registry_address,registration_amount_drops,activation_ledger_index,activation_ledger_hash,enabled) VALUES (${profile},'0.1',1,${HASH},${PUBLISHER},1,1,${HASH},true)`
+    await databaseClient.sql`INSERT INTO schema_events (profile_id,transaction_hash,ledger_index,ledger_hash,transaction_index,publisher,status,schema_uid,memo_json) VALUES (${profile},${txHash},1,${HASH},0,${PUBLISHER},'accepted',${uid},'{}')`
+    await databaseClient.sql`INSERT INTO schemas (profile_id,schema_uid,publisher,name,description,definition,resolved_definition,registration_transaction_hash,ledger_index,transaction_index) VALUES (${profile},${uid},${PUBLISHER},'Hosted','Synthetic','{}','{}',${txHash},1,0)`
+    const repository = new PostgresHostedPayloadRepository(runtimePayloadClient.db)
+    const input = {
+      locator: '1'.repeat(18),
+      digestHex: '1'.repeat(64),
+      content: '{}',
+      transactionHash: '2'.repeat(64),
+      profileId: profile,
+      issuer: PUBLISHER,
+      subject: PUBLISHER,
+      schemaUid: uid,
+      requesterIpHash: '3'.repeat(64),
+      now: new Date(),
+      dailyLimit: 2,
+    }
+    const stored = await repository.publish(input)
+    expect(await repository.publish(input)).toEqual(stored)
+    const legacy = { ...input, locator: '1'.repeat(20), transactionHash: '4'.repeat(64) }
+    expect(await repository.publish(legacy)).toMatchObject({ locator: legacy.locator })
+    await expect(
+      repository.publish({ ...input, transactionHash: '5'.repeat(64) }),
+    ).rejects.toMatchObject({ code: 'PAYLOAD_PUBLICATION_QUOTA_EXCEEDED' })
+    await expect(
+      repository.publish({ ...input, subject: 'rLs1MzkFWCxTbuAHgjeTZK4fcCDDnf2KRv' }),
+    ).rejects.toMatchObject({ code: 'PAYLOAD_PUBLICATION_CONFLICT' })
+    await expect(
+      repository.publish({
+        ...input,
+        transactionHash: '6'.repeat(64),
+        content: '{"changed":true}',
+        dailyLimit: 50,
+      }),
+    ).rejects.toMatchObject({ code: 'PAYLOAD_LOCATOR_COLLISION' })
+    await expect(
+      runtimePayloadClient.sql`UPDATE hosted_payloads SET content='changed' WHERE locator=${input.locator}`,
+    ).rejects.toMatchObject({ code: '42501' })
+    await expect(
+      runtimePayloadClient.sql`DELETE FROM hosted_payloads WHERE locator=${input.locator}`,
+    ).rejects.toMatchObject({ code: '42501' })
+    await expect(
+      databaseClient.sql`INSERT INTO hosted_payloads (locator,digest_hex,content) VALUES (${'a'.repeat(18)},${'a'.repeat(64)},${'x'.repeat(65537)})`,
+    ).rejects.toMatchObject({ code: '23514' })
+    await databaseClient.sql`DELETE FROM hosted_payload_publications WHERE profile_id=${profile}`
+    await databaseClient.sql`DELETE FROM hosted_payloads WHERE locator IN (${input.locator}, ${legacy.locator})`
+    await databaseClient.sql`DELETE FROM schemas WHERE profile_id=${profile}`
+    await databaseClient.sql`DELETE FROM schema_events WHERE profile_id=${profile}`
+    await databaseClient.sql`DELETE FROM network_profiles WHERE profile_id=${profile}`
   })
 
   it('decodes database time inside an authoritative read snapshot', async () => {
@@ -327,7 +405,7 @@ describePostgres('PostgreSQL 18 API integration', () => {
   })
 
   it('serializes concurrent pin quota reservations without raw advisory locks', async () => {
-    if (databaseClient === undefined || runtimeApiClient === undefined) {
+    if (databaseClient === undefined || runtimePayloadClient === undefined) {
       throw new Error('PostgreSQL test database is not initialized')
     }
     await databaseClient.sql`
@@ -340,7 +418,7 @@ describePostgres('PostgreSQL 18 API integration', () => {
         ${PUBLISHER}, 1, 100, ${HASH}, true
       ) ON CONFLICT (profile_id) DO NOTHING
     `
-    const repository = new PostgresPinningRepository(runtimeApiClient.db)
+    const repository = new PostgresPinningRepository(runtimePayloadClient.db)
     const now = new Date('2030-01-01T00:00:00.000Z')
     const wallet = PUBLISHER
     const requesterIpHash = '6'.repeat(64)
@@ -381,7 +459,7 @@ describePostgres('PostgreSQL 18 API integration', () => {
       status: 'rejected',
       reason: { statusCode: 429 },
     })
-    const [storedPins] = await runtimeApiClient.sql<Array<{ count: number }>>`
+    const [storedPins] = await runtimePayloadClient.sql<Array<{ count: number }>>`
       SELECT count(*)::integer AS count
       FROM demo_pins
       WHERE requester_ip_hash = ${requesterIpHash}

@@ -5,7 +5,7 @@ const baseURL = `http://127.0.0.1:${port}`
 
 export default defineConfig({
   testDir: './e2e',
-  testIgnore: 'security.production.spec.ts',
+  testIgnore: ['security.production.spec.ts', 'crossmark.production.spec.ts', 'auth.spec.ts'],
   outputDir: './test-results',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),

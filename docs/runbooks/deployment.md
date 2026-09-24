@@ -244,7 +244,7 @@ five are read by `db:bootstrap` alone and must not be given to the service.
   genuinely public endpoint with no embedded credentials — never a private indexer source. The
   server rejects userinfo and non-TLS public endpoints at startup (`ws://` is loopback-only), but it
   cannot tell whether an opaque path or query parameter is a provider secret.
-- `NUXT_PUBLIC_XAMAN_API_KEY`, `NUXT_PUBLIC_XAMAN_REDIRECT_URL` and
+- `NUXT_PUBLIC_XAMAN_API_KEY` and
   `NUXT_PUBLIC_WALLET_CONNECT_PROJECT_ID` are optional public application identifiers, visible in
   browser JavaScript. Register the exact redirect URL — this deployment's HTTPS origin with a
   trailing slash — in the Xaman Developer Console; each self-hosted origin needs its own Xaman
@@ -429,3 +429,25 @@ secrets or production credentials.
 - Record the deployed revision of each application separately: they are versioned and deployed
   independently, and a protocol change mirrored into only one of them is a real failure mode (see
   [`CONTRIBUTING.md`](../../CONTRIBUTING.md)).
+
+## Optional authenticated workspaces and hosted payloads
+
+The same web app can enable auth, admin review and issuer workflows through its per-app environment
+contract. Apply migrations 0000–0006 first, then provision the optional `xcs_app`, `xcs_admin_app`,
+`xcs_notifier`, and `xcs_issuer` roles with their explicit bootstrap passwords. The API uses
+`xcs_api`; hosted publication uses a separate `xcs_payload_writer` connection. Never grant any of
+these roles to another runtime role. Omitting optional passwords on bootstrap disables those roles.
+
+The optional notification worker runs `node dist/admin/admin-notifier.js` from the web image.
+It is a separate process of that application with its own restricted connection, not an additional
+application package. It requires no XRPL signing keys. Mount persistent private document storage
+writable by UID1000 when enabling uploads. Database backups can contain private claims; they require
+the same access protection as live application data.
+
+For local use only, add `docker-compose.application.yml` for auth/admin/issuer/Mailpit, and/or
+`docker-compose.hosted-payloads.yml` for public hosted publication. Supply variables through a private
+local environment file. Mailpit is a synthetic test destination, not a qualified external provider.
+Live Identity registration, wallet consent and managed-database rollout remain operator release checks.
+
+See [authentication](authentication.md), [admin](admin.md) and [issuer](issuer.md) for authorization,
+review, invitation, notification and recovery semantics.

@@ -1,0 +1,10 @@
+# Optional public hosted payloads for local validation; never private issuer claims.
+services:
+  web:
+    environment:
+      XCS_HOSTED_PAYLOADS_ENABLED: 'true'
+      XCS_PAYLOAD_DATABASE_URL: postgres://xcs_payload_writer:${XCS_PAYLOAD_DATABASE_PASSWORD:?Set payload role password}@postgres:5432/xcs
+      XCS_PUBLIC_PAYLOAD_BASE_URL: ${XCS_PUBLIC_PAYLOAD_BASE_URL:?Set HTTPS payload origin}
+      XCS_PAYLOAD_STORAGE_IP_HASH_SECRET: ${XCS_PAYLOAD_STORAGE_IP_HASH_SECRET:?Set quota hashing secret}
+      XCS_HOSTED_PAYLOAD_NETWORKS: ${XCS_HOSTED_PAYLOAD_NETWORKS:?Set allowed profiles}
+      NUXT_PUBLIC_PAYLOAD_BASE_URL: ${XCS_PUBLIC_PAYLOAD_BASE_URL}

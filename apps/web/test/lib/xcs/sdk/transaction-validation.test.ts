@@ -1,4 +1,4 @@
-// Copied from packages/sdk/test/transaction-validation.test.ts at 54c3486; keep in sync by hand (see CONTRIBUTING.md).
+// Copied from packages/sdk/test/transaction-validation.test.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
 import { createHttpsPayloadUri, encodeSchema } from '#xcs/core/index.js'
 import type { CredentialAccept, CredentialCreate, CredentialDelete, Payment } from 'xrpl'
 import { describe, expect, it } from 'vitest'

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844" role="img" aria-labelledby="title desc" xml:lang="en">
+<title id="title">F3 — Cannot verify now</title>
+<desc id="desc">The current attestation state cannot be confirmed. New signatures wait for reliable evidence. Your keys always stay in your wallet.</desc>
+<rect x="0" y="0" width="390" height="844" rx="3" fill="#ffffff" stroke="#777777"/>
+<rect x="0" y="0" width="390" height="42" rx="3" fill="#eeeeee" stroke="#777777"/>
+<text x="20" y="12" font-family="Arial, sans-serif" font-size="13" fill="#252525" dominant-baseline="text-before-edge"><tspan x="20" dy="0">XCS / Shared states</tspan></text>
+<text x="24" y="62" font-family="Arial, sans-serif" font-size="23" fill="#252525" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Cannot verify now</tspan></text>
+<text x="24" y="103.9" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="24" dy="0">The current attestation state cannot be</tspan><tspan x="24" dy="18.2">confirmed.</tspan></text>
+<rect x="24" y="155.3" width="342" height="37" rx="3" fill="#eeeeee" stroke="#b4b4b4"/>
+<text x="34" y="165.3" font-family="Arial, sans-serif" font-size="13" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Waiting for current evidence</tspan></text>
+<rect x="24" y="208.3" width="342" height="77.4" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="217.3" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">What this means</tspan></text>
+<text x="34" y="237.3" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">This is neither a valid nor an invalid</tspan><tspan x="34" dy="18.2">result</tspan></text>
+<rect x="24" y="295.70000000000005" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="304.70000000000005" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Already signed an operation?</tspan></text>
+<text x="34" y="324.70000000000005" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Resume tracking without signing again</tspan></text>
+<rect x="24" y="364.90000000000003" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="373.90000000000003" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">What can I do?</tspan></text>
+<text x="34" y="393.90000000000003" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Retry later or check service status</tspan></text>
+<rect x="24" y="440.1" width="342" height="44" rx="3" fill="#333333" stroke="#333333"/>
+<text x="36" y="453" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" dominant-baseline="text-before-edge"><tspan x="36" dy="0">Retry verification</tspan></text>
+<rect x="24" y="494.1" width="342" height="44" rx="3" fill="#ffffff" stroke="#333333"/>
+<text x="36" y="507" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="36" dy="0">View service status</tspan></text>
+<text x="24" y="551.1" font-family="Arial, sans-serif" font-size="12" fill="#555555" dominant-baseline="text-before-edge"><tspan x="24" dy="0">New signatures wait for reliable evidence. Your</tspan><tspan x="24" dy="15.600000000000001">keys always stay in your wallet.</tspan></text>
+<text x="24" y="821" font-family="Arial, sans-serif" font-size="10" fill="#666666" dominant-baseline="text-before-edge"><tspan x="24" dy="0">WIREFRAME · Fictional example · Non-functional</tspan></text>
+</svg>

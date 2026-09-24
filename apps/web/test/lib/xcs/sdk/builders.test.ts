@@ -1,4 +1,4 @@
-// Copied from packages/sdk/test/builders.test.ts at 54c3486; keep in sync by hand (see CONTRIBUTING.md).
+// Copied from packages/sdk/test/builders.test.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
 import { computeSchemaUid, createHttpsPayloadUri, encodeSchema } from '#xcs/core/index.js'
 import { decode, encode, type Payment } from 'xrpl'
 import { describe, expect, it } from 'vitest'

@@ -27,11 +27,27 @@ only a signed blob and transaction hash. Hosts integrating a wallet that refresh
 non-signature field remains bound to the reviewed transaction, and submission uses the signed expiry
 value.
 
+After signing, the SDK checks the current ledger before invoking `onValidatedSignature`. An
+already-expired fresh signature is rejected without persisting recovery material or relaying it;
+the journal records a failed preparation so the host can offer a fresh review. It checks again
+after `beforeSubmit`, immediately before relay. If expiry occurs after recovery material was
+exposed to host hooks, the operation remains signed and recoverable. These first-submission
+guards do not establish historical absence for `submitSignedTransaction` retries.
+
 The optional operation journal records hashes and lifecycle stages, never signed blobs, payloads,
 seeds, or private keys. Browser and service hosts can persist a validated signed blob through
 `onValidatedSignature` before the first relay attempt. Volatile checks belong in `beforeSubmit`; if
 that hook rejects, the SDK keeps the journal stage `signed` so the host's persisted artifact remains
 recoverable instead of being mislabeled as a terminal signing failure.
+
+`getTransactionStatus` returns `not_found`, not `expired`, when the node cannot find a hash.
+An open ledger beyond `LastLedgerSequence` does not prove that the transaction failed: it may
+still validate in the preceding ledger or be missing from this node's history. Polling keeps
+reconciling until a validated result or the timeout; a timeout remains `pending`. The current
+journal does not store the submission-window start needed to prove final absence, so it does
+not automatically release an unresolved operation's business lock. `LastLedgerSequence` still
+prevents XRPL from validating the signed blob in a later ledger. See
+[XRPL reliable submission](https://xrpl.org/docs/concepts/transactions/reliable-transaction-submission).
 
 ## Network safety
 

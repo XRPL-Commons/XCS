@@ -13,7 +13,7 @@
     "build": "tsup",
     "clean": "rm -rf dist coverage",
     "db:bootstrap": "tsx src/lib/db/bin/bootstrap.ts",
-    "db:generate": "cd ../../db && drizzle-kit generate --config ./drizzle.config.ts",
+    "db:generate": "NODE_PATH=./node_modules drizzle-kit generate --config ../../db/drizzle.config.ts",
     "db:migrate": "tsx src/lib/db/bin/migrate.ts",
     "dev": "tsx watch src/main.ts",
     "fixture:capture": "tsx src/fixture-cli.ts capture",
@@ -27,9 +27,11 @@
     "start": "node dist/main.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:postgres": "XCS_REQUIRE_POSTGRES_TESTS=1 vitest run test/postgres.integration.test.ts",
+    "test:postgres": "XCS_REQUIRE_POSTGRES_TESTS=1 vitest run --no-file-parallelism test/db/migrations.integration.test.ts test/db/app-model.integration.test.ts test/db/auth.integration.test.ts test/db/admin.integration.test.ts test/postgres.integration.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "verify": "pnpm format:check && pnpm lint && pnpm test && pnpm build"
+    "verify": "pnpm format:check && pnpm lint && pnpm test && pnpm build",
+    "db:status": "tsx src/lib/db/bin/status.ts",
+    "admin:bootstrap": "tsx src/lib/db/bin/admin-bootstrap.ts"
   },
   "dependencies": {
     "@noble/hashes": "2.3.0",
@@ -39,6 +41,7 @@
     "jsonc-parser": "3.3.1",
     "multiformats": "14.0.5",
     "postgres": "^3.4.7",
+    "ripple-binary-codec": "2.11.0",
     "tr46": "4.1.1",
     "xrpl": "^5.0.0"
   },

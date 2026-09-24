@@ -8,6 +8,62 @@
       "when": 1788476248914,
       "tag": "0000_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788803750924,
+      "tag": "0001_hosted_payloads",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788959680306,
+      "tag": "0002_hosted_payload_locator_compatibility",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790192599816,
+      "tag": "0003_application_model",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790194700162,
+      "tag": "0004_auth_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790195791971,
+      "tag": "0005_admin_review",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790199613077,
+      "tag": "0006_issuer_workspace",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790254197326,
+      "tag": "0007_recipient_verifier",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790268969419,
+      "tag": "0008_presentation_wallet_proof",
+      "breakpoints": true
     }
   ]
 }

@@ -17,7 +17,16 @@ jobs:
       XCS_POSTGRES_ADMIN_PASSWORD: compose-ci-admin-password-00000001
       XCS_INDEXER_DATABASE_PASSWORD: compose-ci-indexer-password-0001
       XCS_API_DATABASE_PASSWORD: compose-ci-api-password-000000001
+      XCS_PAYLOAD_DATABASE_PASSWORD: compose-ci-payload-password-000001
       XCS_MONITOR_DATABASE_PASSWORD: compose-ci-monitor-password-000001
+      XCS_APP_DATABASE_PASSWORD: compose-ci-app-password-0000000001
+      XCS_ADMIN_DATABASE_PASSWORD: compose-ci-admin-app-password-0001
+      XCS_NOTIFIER_DATABASE_PASSWORD: compose-ci-notifier-password-00001
+      XCS_ISSUER_DATABASE_PASSWORD: compose-ci-issuer-password-0000001
+      XCS_AUTH_ORIGIN: https://compose.invalid
+      XCS_IDENTITY_CLIENT_ID: compose-ci-client
+      XCS_IDENTITY_CLIENT_SECRET: compose-ci-identity-secret-000001
+      XCS_ADMIN_DOCUMENT_KEY: compose-ci-document-signing-key-000001
       XCS_METRICS_ENABLED: 'true'
       XCS_METRICS_TOKEN: compose-ci-metrics-token-000000000001
       XCS_RPC_URL_PRIMARY: wss://primary.invalid.example
@@ -47,48 +56,8 @@ jobs:
           chmod 644 ops/secrets/xcs_metrics_token
           test -s ops/secrets/xcs_metrics_token
 
-      - name: Render and validate every Compose profile
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker compose config --quiet
-          docker compose --profile monitoring --profile demo-pinning config --quiet
-          docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile monitoring config --quiet
-
-          mapfile -t DEFAULT_SERVICES < <(docker compose config --services | sort)
-          EXPECTED=(db-bootstrap indexer postgres web)
-          if [[ "${DEFAULT_SERVICES[*]}" != "${EXPECTED[*]}" ]]; then
-            printf 'Unexpected default services: %s\n' "${DEFAULT_SERVICES[*]}" >&2
-            exit 1
-          fi
-
-          docker compose --profile monitoring --profile demo-pinning config --format json \
-            > "$RUNNER_TEMP/xcs-compose.json"
-          jq -e '
-            (.services.postgres.ports == null) and
-            (.services.prometheus.ports == null) and
-            (.services.grafana.ports == null) and
-            (.services["postgres-exporter"].ports == null) and
-            (.services["node-exporter"].ports == null) and
-            (.services.ipfs.ports == null) and
-            (.services.prometheus.profiles | index("monitoring") != null) and
-            (.services.grafana.profiles | index("monitoring") != null) and
-            (.networks.database.internal == true) and
-            (.networks.monitoring.internal == true) and
-            ([.services[] | select(.image | endswith(":latest"))] | length == 0)
-          ' "$RUNNER_TEMP/xcs-compose.json"
-
-          docker compose -f docker-compose.yml -f docker-compose.dev.yml \
-            --profile monitoring --profile demo-pinning config --format json \
-            > "$RUNNER_TEMP/xcs-compose-dev.json"
-          jq -e '
-            [
-              .services.postgres.ports[],
-              .services.prometheus.ports[],
-              .services.grafana.ports[],
-              .services.ipfs.ports[]
-            ] | all(.host_ip == "127.0.0.1")
-          ' "$RUNNER_TEMP/xcs-compose-dev.json"
+      - name: Render and validate every Compose overlay and profile
+        run: node ops/ci/check-compose-overlays.mjs
 
       - name: Validate monitoring configuration with Prometheus
         shell: bash
@@ -173,8 +142,12 @@ jobs:
             echo 'A non-core profile service started unexpectedly' >&2
             exit 1
           fi
-          if PUBLISHED_POSTGRES="$("${COMPOSE[@]}" port postgres 5432 2>/dev/null)" && [[ -n "$PUBLISHED_POSTGRES" ]]; then
-            echo "PostgreSQL was unexpectedly published at $PUBLISHED_POSTGRES" >&2
+          POSTGRES_CONTAINER="$("${COMPOSE[@]}" ps --quiet postgres)"
+          # Compose versions can report "invalid IP:0" for an exposed but
+          # unpublished port. Inspect the actual Engine bindings instead.
+          if ! docker inspect --format '{{json .NetworkSettings.Ports}}' "$POSTGRES_CONTAINER" \
+            | jq --exit-status '[.[]? | select(. != null) | .[]?] | length == 0' > /dev/null; then
+            echo 'PostgreSQL unexpectedly has published host ports' >&2
             exit 1
           fi
 
@@ -212,6 +185,36 @@ jobs:
                       OR has_table_privilege('xcs_monitor', relation.oid, 'TRUNCATE')
                     )
                 );
+            " | grep --fixed-strings --line-regexp t
+
+          # Provision optional roles with the exact application overlay, without
+          # starting OAuth, SMTP or application processes in the base-stack smoke.
+          docker compose -f docker-compose.yml -f docker-compose.application.yml \
+            run --rm --no-deps db-bootstrap
+          "${COMPOSE[@]}" exec -T postgres psql -U xcs_admin -d xcs --no-psqlrc --tuples-only --no-align \
+            --command "
+              SELECT
+                has_table_privilege('xcs_payload_writer', 'hosted_payloads', 'INSERT')
+                AND has_table_privilege('xcs_issuer', 'app_issuer_payloads', 'INSERT')
+                AND has_table_privilege('xcs_app', 'app_sessions', 'INSERT')
+                AND has_column_privilege('xcs_admin_app', 'app_organization_applications', 'status', 'UPDATE')
+                AND has_column_privilege('xcs_notifier', 'app_admin_notifications', 'status', 'UPDATE')
+                AND NOT EXISTS (
+                  SELECT 1 FROM pg_roles
+                  WHERE rolname IN ('xcs_app', 'xcs_admin_app', 'xcs_notifier', 'xcs_issuer', 'xcs_payload_writer')
+                    AND (NOT rolcanlogin OR rolsuper OR rolcreaterole OR rolcreatedb OR rolbypassrls)
+                )
+                AND NOT EXISTS (
+                  SELECT 1 FROM pg_class relation
+                  JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+                  CROSS JOIN (VALUES ('xcs_api'), ('xcs_indexer'), ('xcs_payload_writer')) AS runtime(role_name)
+                  WHERE namespace.nspname = 'public' AND relation.relname LIKE 'app_%'
+                    AND relation.relkind IN ('r', 'p')
+                    AND has_table_privilege(runtime.role_name, relation.oid, 'SELECT,INSERT,UPDATE,DELETE')
+                )
+                AND NOT has_table_privilege('xcs_admin_app', 'app_issuer_payloads', 'SELECT')
+                AND NOT has_table_privilege('xcs_notifier', 'app_issuer_payloads', 'SELECT')
+                AND NOT has_table_privilege('xcs_app', 'app_issuer_payloads', 'SELECT');
             " | grep --fixed-strings --line-regexp t
 
           "${COMPOSE[@]}" --profile monitoring up --no-build --detach --wait postgres-exporter prometheus

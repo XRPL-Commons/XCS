@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const props = defineProps<{ value: string }>()
+const props = defineProps<{ value: string; label?: string }>()
 const color = computed(() => {
   if (['active', 'valid', 'trusted', 'ready', 'accepted', 'created'].includes(props.value)) {
     return 'success'
@@ -25,5 +25,5 @@ const color = computed(() => {
 </script>
 
 <template>
-  <UBadge :color="color" variant="subtle" :label="value" :data-tone="color" />
+  <UBadge :color="color" variant="subtle" :label="label ?? value" :data-tone="color" />
 </template>

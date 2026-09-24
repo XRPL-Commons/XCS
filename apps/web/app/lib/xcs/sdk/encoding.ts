@@ -1,4 +1,4 @@
-// Copied from packages/sdk/src/encoding.ts at 54c3486; keep in sync by hand (see CONTRIBUTING.md).
+// Copied from packages/sdk/src/encoding.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { parsePayloadUri } from '../core/index.js'
 import { encode, type Memo, type Payment } from 'xrpl'

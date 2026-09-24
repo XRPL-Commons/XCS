@@ -1,5 +1,5 @@
-// Copied from packages/db/src/transactions.ts at 5ce8eaa; keep in sync by hand (see CONTRIBUTING.md).
-// Diverges by design (the web app's ESLint config enables preserve-caught-error, which the package config does not, so this copy carries the disable comment); source sha256:b367ac3f9b4388ba910cc2cd03d32b17325e71fa5d8a6982b120f8cd2dd13e1e.
+// Copied from packages/db/src/transactions.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
+// Diverges by design (the web ESLint rule requires an explicit distinction for an unrelated retry configuration error); source sha256:b367ac3f9b4388ba910cc2cd03d32b17325e71fa5d8a6982b120f8cd2dd13e1e.
 import type { XcsDatabase } from './client.js'
 
 const RETRYABLE_TRANSACTION_ERROR_CODES = new Set(['40001', '40P01'])
@@ -82,8 +82,7 @@ export async function runSerializableTransaction<T>(
 
       const randomValue = random()
       if (!Number.isFinite(randomValue) || randomValue < 0 || randomValue >= 1) {
-        // This rejects a caller-supplied `random`; the caught transaction error is
-        // unrelated and must not be attached as its cause.
+        // Caller configuration errors are unrelated to the caught database failure.
         // eslint-disable-next-line preserve-caught-error
         throw new Error('random must return a finite number in [0, 1)')
       }

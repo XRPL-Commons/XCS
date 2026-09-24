@@ -25,9 +25,13 @@ not a workspace member, so every command below uses `--dir` rather than `--filte
 pnpm --dir apps/indexer db:generate
 ```
 
-This changes into this folder and runs `drizzle-kit generate --config ./drizzle.config.ts`
-(drizzle-kit resolves `schema` and `out` against the working directory), then writes a new SQL file plus
-an updated snapshot under `db/migrations/`. Commit them: CI regenerates and fails on any diff.
+This runs Drizzle Kit from the indexer application with its own `node_modules` on `NODE_PATH`.
+The config resolves schema paths from this folder and computes the output path relative to the
+command's working directory; no root or shared-folder dependency installation is required. It writes
+a new SQL file and snapshot under `db/migrations/`. Commit them: CI regenerates and fails on any diff.
+
+Install the indexer's dependencies independently with
+`pnpm --dir apps/indexer install --ignore-workspace --frozen-lockfile` before using these commands.
 
 ### Apply migrations
 
@@ -36,10 +40,13 @@ XCS_BOOTSTRAP_DATABASE_URL=postgres://xcs_admin:…@host:5432/xcs \
   pnpm --dir apps/indexer db:migrate
 ```
 
-Idempotent: `drizzle-orm`'s migrator records applied migrations in `drizzle.__drizzle_migrations`
-and a second run applies nothing. The migration folder defaults to `../../db/migrations` relative to
-the indexer application and can be overridden with `XCS_MIGRATIONS_DIR` (the container image sets it
-to the copy of `db/migrations` beside the built application).
+The runner validates the ordered journal and applied SQL hashes, rejects migration ownership
+conflicts, and records applied migrations in `drizzle.__drizzle_migrations`. A second run applies
+nothing. Migration DDL does not provision or rotate runtime roles. The folder is resolved from the
+source or compiled application and can be overridden with `XCS_MIGRATIONS_DIR` for container layouts.
+The bootstrap URL supports the `_FILE` secret convention as well as a direct environment value.
+
+Inspect applied and pending migrations without DDL using `pnpm --dir apps/indexer db:status`.
 
 ### Bootstrap a fresh database
 
@@ -47,10 +54,30 @@ to the copy of `db/migrations` beside the built application).
 pnpm --dir apps/indexer db:bootstrap
 ```
 
-Applies the migrations and then provisions the cluster-wide runtime roles (`xcs_indexer`, `xcs_api`,
-`xcs_monitor`) from `XCS_INDEXER_DATABASE_PASSWORD`, `XCS_API_DATABASE_PASSWORD` and
-`XCS_MONITOR_DATABASE_PASSWORD`. It requires `XCS_DATABASE_CLUSTER_SCOPE=dedicated` because those
-roles are cluster-wide.
+Applies migrations and provisions the cluster-wide roles `xcs_indexer`, `xcs_api`,
+`xcs_payload_writer` and `xcs_monitor`. Set `XCS_INDEXER_DATABASE_PASSWORD`,
+`XCS_API_DATABASE_PASSWORD`, `XCS_PAYLOAD_DATABASE_PASSWORD` and `XCS_MONITOR_DATABASE_PASSWORD`,
+directly or through their `_FILE` variants. `XCS_DATABASE_CLUSTER_SCOPE=dedicated` is required
+because these roles are cluster-wide.
+
+Optional `XCS_APP_DATABASE_PASSWORD`, `XCS_ADMIN_DATABASE_PASSWORD`,
+`XCS_NOTIFIER_DATABASE_PASSWORD` and `XCS_ISSUER_DATABASE_PASSWORD` enable the restricted
+`xcs_app`, `xcs_admin_app`, `xcs_notifier` and `xcs_issuer` roles respectively. Omitted optional
+passwords disable those roles and remove their privileges. All passwords must be distinct.
+The operator-only `pnpm --dir apps/indexer admin:bootstrap` command grants the first administrator
+to an existing exact OIDC issuer/subject and writes an audit record; it never matches by email.
+
+## Preserved application migrations and validation
+
+Migrations 0000–0006, their snapshots and the journal retain the exact bytes from the previous
+application implementation. They include public payload storage, application organizations and
+invitations, sessions, administrator decisions and private issuer payload storage. The schemas are
+shared here; clients, grants and application helpers remain local to each application.
+
+`pnpm --dir apps/indexer test:postgres` runs the migrated DB suites and indexer suite sequentially.
+Use only an isolated disposable cluster configured through `XCS_TEST_DATABASE_URL`: bootstrap
+tests change cluster-wide role passwords. The regular `test` command runs the unit suites and skips
+database integration when that URL is absent.
 
 ### Never edit an applied migration
 

@@ -16,6 +16,8 @@ COPY config ./config
 WORKDIR /workspace/apps/web
 RUN pnpm install --frozen-lockfile
 RUN NODE_ENV=production pnpm build
+# The optional notification worker uses the same web image and production dependencies.
+RUN pnpm install --frozen-lockfile --prod
 
 FROM ${XCS_NODE_IMAGE} AS runtime
 
@@ -34,7 +36,11 @@ ENV NITRO_PORT=3000
 
 WORKDIR /workspace
 COPY --from=build --chown=node:node /workspace/apps/web/.output ./.output
+COPY --from=build --chown=node:node /workspace/apps/web/dist ./dist
+COPY --from=build --chown=node:node /workspace/apps/web/node_modules ./node_modules
+COPY --from=build --chown=node:node /workspace/apps/web/package.json ./package.json
 COPY --chown=node:node config ./config
+RUN mkdir -p /var/lib/xcs-review && chown node:node /var/lib/xcs-review
 
 USER node
 EXPOSE 3000

@@ -35,10 +35,11 @@
     "lint": "turbo run lint && pnpm --dir apps/web lint && pnpm --dir apps/indexer lint",
     "test": "turbo run test && pnpm --dir apps/web test && pnpm --dir apps/indexer test",
     "test:coverage": "turbo run test:coverage && pnpm --dir apps/web test:coverage && pnpm --dir apps/indexer test:coverage",
-    "test:e2e": "XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 pnpm --dir apps/web build && pnpm --dir apps/web test:e2e && pnpm --dir apps/web test:e2e:security",
+    "test:e2e": "XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 pnpm --dir apps/web build && pnpm --dir apps/web test:e2e && pnpm --dir apps/web test:e2e:security && pnpm --dir apps/web test:e2e:auth",
     "test:postgres": "pnpm --dir apps/indexer test:postgres && pnpm --dir apps/web test:postgres",
     "typecheck": "turbo run typecheck && pnpm --dir apps/web typecheck && pnpm --dir apps/indexer typecheck",
-    "verify": "pnpm format:check && pnpm check:repo && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "verify": "pnpm format:check && pnpm check:repo && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "test:runtime": "pnpm --dir apps/web build && pnpm --dir apps/web test:runtime"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

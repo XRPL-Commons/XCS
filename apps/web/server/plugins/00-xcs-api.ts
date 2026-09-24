@@ -10,6 +10,9 @@ import { IndexerUnavailableError } from '../xcs/ledger-freshness'
 import { PostgresOperationalMetricsRepository } from '../xcs/operational-metrics-repository'
 import { DisabledPayloadResolver, SafePayloadResolver } from '../xcs/payload-resolver'
 import { DemoPinningService } from '../xcs/pinning'
+import { HostedPayloadService } from '../xcs/hosted-payloads'
+import { PostgresHostedPayloadRepository } from '../xcs/hosted-payloads-repository'
+import { HostedPayloadResolver } from '../xcs/hosted-payload-resolver'
 import { PostgresPinningRepository } from '../xcs/pinning-repository'
 import { PostgresApiRepository } from '../xcs/repository'
 import type { ApiRepository } from '../xcs/types'
@@ -44,6 +47,7 @@ function createBrowserE2eContext(): XcsApiContext {
     XCS_DATABASE_URL: process.env.XCS_DATABASE_URL ?? 'postgres://127.0.0.1:1/xcs-browser-e2e',
     XCS_DEMO_PINNING_ENABLED: 'false',
     XCS_METRICS_ENABLED: 'false',
+    XCS_HOSTED_PAYLOADS_ENABLED: 'false',
   })
   const real = createApiHandlers({
     repository: unavailableRepository,
@@ -91,21 +95,42 @@ function createBrowserE2eContext(): XcsApiContext {
 function createProductionContext(): XcsApiContext {
   const config = loadApiConfig(process.env)
   const database = createDatabaseClient(config.databaseUrl)
-  const repository = new PostgresApiRepository(database.db)
-  const pinningService = config.demoPinning.enabled
-    ? new DemoPinningService({
-        repository: new PostgresPinningRepository(database.db),
-        apiRepository: repository,
-        store: new KuboPinStore(config.demoPinning.kuboRpcUrl),
-        ipHashSecret: config.demoPinning.ipHashSecret,
-        enabledNetworks: new Set(config.demoPinning.networks),
-        maxLedgerAgeSeconds: config.readinessMaxLedgerAgeSeconds,
-      })
+  const payloadDatabase = config.payloadDatabaseUrl
+    ? createDatabaseClient(config.payloadDatabaseUrl)
     : undefined
+  const repository = new PostgresApiRepository(database.db)
+  const pinningService =
+    config.demoPinning.enabled && payloadDatabase
+      ? new DemoPinningService({
+          repository: new PostgresPinningRepository(payloadDatabase.db),
+          apiRepository: repository,
+          store: new KuboPinStore(config.demoPinning.kuboRpcUrl),
+          ipHashSecret: config.demoPinning.ipHashSecret,
+          enabledNetworks: new Set(config.demoPinning.networks),
+          maxLedgerAgeSeconds: config.readinessMaxLedgerAgeSeconds,
+        })
+      : undefined
+  const hostedPayloadService =
+    config.hostedPayloads.enabled && payloadDatabase
+      ? new HostedPayloadService({
+          repository: new PostgresHostedPayloadRepository(payloadDatabase.db),
+          apiRepository: repository,
+          publicBaseUrl: config.hostedPayloads.publicBaseUrl,
+          ipHashSecret: config.hostedPayloads.ipHashSecret,
+          enabledNetworks: new Set(config.hostedPayloads.networks),
+          maxLedgerAgeSeconds: config.readinessMaxLedgerAgeSeconds,
+        })
+      : undefined
   const handlers = createApiHandlers({
     repository,
     resolver: config.payloadFetchEnabled
-      ? new SafePayloadResolver(config.ipfsGateway)
+      ? config.hostedPayloads.enabled && hostedPayloadService
+        ? new HostedPayloadResolver(
+            config.hostedPayloads.publicBaseUrl,
+            hostedPayloadService,
+            new SafePayloadResolver(config.ipfsGateway),
+          )
+        : new SafePayloadResolver(config.ipfsGateway)
       : new DisabledPayloadResolver(),
     trustPolicy: new StaticTrustPolicy({
       trusted: config.trustedIssuers,
@@ -123,14 +148,15 @@ function createProductionContext(): XcsApiContext {
         }
       : {}),
     ...(pinningService === undefined ? {} : { pinningService }),
+    ...(hostedPayloadService === undefined ? {} : { hostedPayloadService }),
   })
   const janitor =
     pinningService === undefined
       ? undefined
       : setInterval(
           () => {
-            void pinningService.unpinExpired().catch((error: unknown) => {
-              console.error('demo pin cleanup failed', String(error))
+            void pinningService.unpinExpired().catch(() => {
+              console.error('Demo pin cleanup failed')
             })
           },
           60 * 60 * 1_000,
@@ -145,6 +171,7 @@ function createProductionContext(): XcsApiContext {
       if (janitor !== undefined) clearInterval(janitor)
       await handlers.close()
       await database.close()
+      await payloadDatabase?.close()
     },
   }
 }

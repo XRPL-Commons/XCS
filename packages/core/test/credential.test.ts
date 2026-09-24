@@ -59,4 +59,28 @@ describe('credential payload', () => {
       verifyCredentialPayload({ status: 'retrieved', content: encoded.bytes }, uri, context),
     ).toBe('valid')
   })
+
+  it.each([{ courseId: '\ud800', passed: true }, { '\ud800': 'xcs-101' }])(
+    'reports malformed Unicode in payload values or keys as invalid',
+    (claims) => {
+      const content = JSON.stringify({
+        claims,
+        issuer: context.issuer,
+        schema: context.schemaUid,
+        subject: context.subject,
+        xcsVersion: '0.1',
+      })
+      const uri = createIpfsPayloadUri(content)
+
+      expect(verifyCredentialPayload({ status: 'retrieved', content }, uri, context)).toBe(
+        'invalid',
+      )
+    },
+  )
+
+  it('preserves valid Unicode including surrogate pairs', () => {
+    const encoded = encodeCredentialPayload({ courseId: 'Cours réussi 🎓', passed: true }, context)
+
+    expect(parseCredentialPayload(encoded.bytes, context).claims.courseId).toBe('Cours réussi 🎓')
+  })
 })

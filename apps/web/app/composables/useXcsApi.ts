@@ -1,4 +1,5 @@
 import type { NetworkProfile, ResolvedSchema, SchemaDefinition } from '#xcs/core/index.js'
+import type { FetchOptions } from 'ofetch'
 import type { VerificationDimensions } from '../utils/credentialReview'
 import {
   exactCredentialEventPath,
@@ -173,12 +174,26 @@ export interface ApiTransactionDetail {
 
 export type VerificationResponse = VerificationDimensions
 
+export interface HostedPayloadPublicationResponse {
+  readonly uri: string
+  readonly fetchUrl: string
+  readonly digestHex: string
+  readonly byteLength: number
+  readonly transactionHash: string
+}
+
 export function useXcsApi() {
   const config = useRuntimeConfig()
-  // The read API is served by this application's own server routes, so the same
-  // relative paths work in the browser and, in process, during server rendering.
+  // Read routes belong to this Nuxt app in production and in the browser harness.
   const baseURL = ''
-  const apiFetch = $fetch
+  // Nitro dispatches relative SSR requests in process with native request context.
+  // The server exempts these local requests using its own request-object identity.
+  // This REST boundary declares its response types below, rather than asking
+  // Nitro to infer them from the catch-all route's dynamic schema dispatcher.
+  type ApiFetch = <T>(url: string, options?: FetchOptions<'json'>) => Promise<T>
+  const apiFetch: ApiFetch = import.meta.server
+    ? (useRequestFetch() as unknown as ApiFetch)
+    : ($fetch as unknown as ApiFetch)
 
   function listNetworks() {
     return apiFetch<{ items: NetworkProfile[] }>('/v1/networks', { baseURL })
@@ -401,6 +416,28 @@ export function useXcsApi() {
     })
   }
 
+  async function publishHostedPayload(input: {
+    network: string
+    locator: string
+    payloadBase64: string
+    signedTransactionBlob: string
+  }): Promise<HostedPayloadPublicationResponse> {
+    return apiFetch<HostedPayloadPublicationResponse>(
+      `/v1/payloads/${encodeURIComponent(input.locator)}`,
+      {
+        baseURL,
+        method: 'POST',
+        body: {
+          network: input.network,
+          payloadBase64: input.payloadBase64,
+          signedTransactionBlob: input.signedTransactionBlob,
+        },
+        retry: 0,
+        timeout: 15_000,
+      },
+    )
+  }
+
   return {
     listNetworks,
     getActiveNetworkProfile,
@@ -416,6 +453,7 @@ export function useXcsApi() {
     getCredential,
     getCredentialEventByTransaction,
     getSchemaRegistrationByTransaction,
+    publishHostedPayload,
     verify,
   }
 }

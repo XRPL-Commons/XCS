@@ -1,0 +1,59 @@
+diff --git a/xrpl-connect.mjs b/xrpl-connect.mjs
+index 0b6a7a43cdc52c2e1683db6b8c7ca68c52afd6ac..694a1ce8198c127b05e0448092e157ed2f777dc3 100644
+--- a/xrpl-connect.mjs
++++ b/xrpl-connect.mjs
+@@ -11113,7 +11113,11 @@ var Gn = class {
+ 			if (!a || !a.response || !a.response.data) throw Error("Failed to sign in with Crossmark");
+ 			let { address: o, publicKey: s } = a.response.data;
+ 			if (!o) throw Error("No address returned from Crossmark");
+-			let c = await this.getLiveNetwork();
++			// Crossmark 0.2.19 returns the selected node with this approval.
++			// Its separate background NETWORK replica may not be hydrated yet.
++			let c = a.response.data.network === void 0
++				? await this.getLiveNetwork()
++				: this.parseNetwork(a.response.data.network);
+ 			if (t !== this.connectionGeneration) throw L.notConnected();
+ 			if (r && r.id !== c.id) throw L.networkMismatch(r.id, c.id);
+ 			return this.currentAccount = {
+@@ -11144,7 +11148,7 @@ var Gn = class {
+ 		if (!this.currentAccount) return null;
+ 		let r = n.response?.data?.address;
+ 		if (!r) return this.currentAccount = null, null;
+-		let i = await this.getLiveNetwork();
++		let i = this.getSessionNetwork();
+ 		if (e !== this.connectionGeneration) throw L.notConnected();
+ 		if (t !== this.accountRefreshRevision) return this.currentAccount;
+ 		if (!this.currentAccount) return null;
+@@ -11162,8 +11166,13 @@ var Gn = class {
+ 		} catch (e) {
+ 			throw L.connectionFailed(this.name, e);
+ 		}
+-		let t = e?.response?.data?.network;
+-		if (!t?.type || !t.label || !t.wss) throw L.connectionFailed(this.name, /* @__PURE__ */ Error("Crossmark returned incomplete network information"));
++		return this.parseNetwork(e?.response?.data?.network);
++	}
++	parseNetwork(t) {
++		if (!t || typeof t !== "object" ||
++			![t.type, t.label, t.wss].every((value) => typeof value === "string" && value.trim().length > 0) ||
++			[t.protocol, t.rpc].some((value) => value !== void 0 && typeof value !== "string"))
++			throw L.connectionFailed(this.name, /* @__PURE__ */ Error("Crossmark returned incomplete network information"));
+ 		return this.toNetworkInfo({
+ 			protocol: t.protocol,
+ 			type: t.type,
+@@ -11172,9 +11181,15 @@ var Gn = class {
+ 			rpc: t.rpc
+ 		});
+ 	}
++	getSessionNetwork() {
++		// The SDK updates this from approval and network-change events.
++		// Crossmark 0.2.19's raw NETWORK getter reads a stale Base.flat.
++		// Never fall back to the adapter's previously approved network.
++		return this.parseNetwork(Bn.session.network);
++	}
+ 	async assertCurrentNetwork() {
+ 		if (!this.currentAccount) throw L.notConnected();
+-		let e = this.connectionGeneration, t = await this.getLiveNetwork();
++		let e = this.connectionGeneration, t = this.getSessionNetwork();
+ 		if (e !== this.connectionGeneration || !this.currentAccount) throw L.notConnected();
+ 		if (t.id !== this.currentAccount.network.id) throw L.networkMismatch(this.currentAccount.network.id, t.id);
+ 	}

@@ -40,14 +40,22 @@ The indexer owns every database command. `drizzle-kit` and the migration runner 
 devDependencies; the web app has none of them.
 
 ```sh
-pnpm --dir apps/indexer db:generate    # regenerate db/migrations after editing db/schema — commit the result
+pnpm --dir apps/indexer db:generate    # add a migration after editing db/schema — retain applied files
 pnpm --dir apps/indexer db:migrate     # apply migrations to an existing database (idempotent)
 pnpm --dir apps/indexer db:bootstrap   # migrate + provision xcs_indexer / xcs_api / xcs_monitor
 ```
 
-`db:bootstrap` runs once against a fresh database and needs `XCS_BOOTSTRAP_DATABASE_URL`,
-`XCS_DATABASE_CLUSTER_SCOPE=dedicated` and the three runtime passwords. It is idempotent, which is
-also how a runtime password is rotated. PostgreSQL is provisioned outside this repository; see
+Use `db:bootstrap` for initial provisioning on a dedicated cluster. It needs
+`XCS_BOOTSTRAP_DATABASE_URL`, `XCS_DATABASE_CLUSTER_SCOPE=dedicated` and the required runtime
+passwords; optional application-role passwords enable the auth/admin/issuer services. Re-running
+bootstrap applies the supported migration history and updates grants/passwords. Supply all enabled
+role passwords: omitting an optional password disables that role.
+
+`db:migrate` applies pending migrations without provisioning roles. The committed 0000–0006 history
+supports populated-baseline upgrades and repeated runs; integration tests check preservation of
+profiles and legacy payload bytes/locators. Never rewrite an applied migration. This is not an
+upgrader for arbitrary schema drift or the former Nuxt MVP. See the [shared database contract](../../db/README.md).
+PostgreSQL is provisioned outside this repository; see
 [`docs/database.md`](../../docs/database.md) and the
 [deployment runbook](../../docs/runbooks/deployment.md).
 
@@ -66,6 +74,22 @@ Preflight checks network ID, contiguous retained history, the amendment, the act
 the selected registry policy on both sources, and prints no endpoint or credential. The full
 procedures — healthy state, recovery, deterministic rebuild and evidence capture — are in the
 [indexer runbook](../../docs/runbooks/indexer.md).
+
+Ledger transport requests the complete transaction set with `transactions: true`, `expand: true`
+and `binary: true`. Large expanded JSON responses can exceed a provider's WebSocket limit even
+when that provider retains the ledger. The official binary codec decodes the header, transaction
+bytes and metadata locally; XRPL hash helpers validate the header and derive transaction IDs.
+Protocol pseudo-transactions use the standard unsigned transaction-ID domain. Canonical serialized
+fields such as `Payment.Amount` are preserved instead of API v2 JSON aliases such as `DeliverMax`.
+See the [XRPL ledger API](https://xrpl.org/docs/references/http-websocket-apis/public-api-methods/ledger-methods/ledger).
+
+Both independently operated sources must still agree on the complete normalized header and every
+transaction/metadata object. Malformed blobs, conflicting hashes, missing transactions and a source
+without the required history remain fatal. The transport change neither skips checkpoints nor
+resets a projection or reduces the quorum. `ripple-binary-codec@2.11.0` is a direct dependency for
+its official ledger-header decoder, matching the version already used transitively by `xrpl`.
+An existing database with a different migration journal still requires its own reviewed upgrade;
+rebuilding the indexer image does not authorize rewriting that history.
 
 ## Tests
 

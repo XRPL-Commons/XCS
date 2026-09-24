@@ -4,7 +4,7 @@ const STRICT_DIRECTIVES = {
   'default-src': ["'none'"],
   'base-uri': ["'none'"],
   'font-src': ["'self'"],
-  'form-action': ["'self'"],
+  'form-action': ["'self'", 'https://account.xrpl.in'],
   'frame-ancestors': ["'none'"],
   'frame-src': ["'none'"],
   'img-src': ["'self'", 'data:'],

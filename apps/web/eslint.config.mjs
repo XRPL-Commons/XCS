@@ -5,7 +5,7 @@ import withNuxt from './.nuxt/eslint.config.mjs'
 export default withNuxt(
   eslintConfigPrettier,
   {
-    ignores: ['.output/**', 'playwright-report/**', 'test-results/**'],
+    ignores: ['dist/**', '.output/**', 'playwright-report/**', 'test-results/**'],
   },
   {
     // The protocol code under `app/lib/xcs` and its suite under `test/lib/xcs`

@@ -82,22 +82,22 @@ applications.
 - Each lockfile describes exactly one deployable, so `pnpm audit` and `pnpm licenses list` report on
   what actually ships.
 - An image contains only its own application, `db/` and `config/`.
-- Removing the production Compose overlay removed every `*_FILE` secret variable and the class of
-  bind-mount permission problems that came with them.
+- Removing the production Compose overlay removes its prescribed secret-file bind mounts.
+  Hosted secret provisioning now belongs to the deployment operator; local Compose is not a
+  production secret-management contract.
 
 ### What it costs
 
-- **The copies are maintained by hand, and nothing enforces it.** A protocol fix in `packages/core`
-  with a green package suite changes nothing in either application until a human mirrors it — no
-  build, type check or test will say so. The rule (land in `packages/core` first, mirror into both
-  applications in the same pull request, keep the header comments current) lives in
-  `CONTRIBUTING.md`, and code review is the only control. For a security-relevant fix this is a real
-  correctness risk, accepted deliberately in exchange for independent deployability.
-- Drift can also run the other way: a change made only in an application copy leaves the published
-  library stale.
-- The same third-party dependency now appears in two lockfiles. `drizzle-orm` in particular must stay
-  identical in both, because `db/schema/` is compiled by each application against its own copy, and
-  nothing checks this automatically.
+- **The copies are maintained by hand.** CI's `ops/ci/check-vendored-copies.mjs` checks parity with
+  the reference source, allowing import rewrites and explicitly reviewed divergences pinned to a
+  source digest. It detects an unmirrored source change or an unreviewed application-only edit,
+  but does not generate the copies or validate deployed behavior. Follow `CONTRIBUTING.md`: land
+  protocol changes in the reference source, mirror both applications and run the owning app gates.
+- A change made only in an application copy does not update the published library. The parity gate
+  and review must accompany independent application builds and tests.
+- The same third-party dependency appears in two lockfiles. `drizzle-orm` must stay identical because
+  `db/schema/` is compiled by each application against its own copy;
+  `ops/ci/check-drizzle-parity.mjs` enforces this in CI.
 - **`--ignore-workspace` is mandatory** on every per-app pnpm command that resolves dependencies
   (`install`, `audit`, `licenses list`). Without it pnpm silently operates on the root workspace and
   still exits 0, so a report can look green while covering the wrong lockfile.

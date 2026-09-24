@@ -59,6 +59,10 @@ export type OperationBusinessContext =
       readonly credentialUri?: string | undefined
       readonly payloadDigestHex?: string | undefined
       readonly expiration?: string | undefined
+      /** Links consented hosted-payload bytes to this exact signed operation. */
+      readonly publicationJobId?: string | undefined
+      /** Portal invitation UUID; never its bearer token. Adds cross-tab exclusion across wallets. */
+      readonly issuerInviteId?: string | undefined
     }
   | {
       readonly action:
@@ -82,6 +86,7 @@ export interface StoredOperation extends OperationSeed {
   readonly message?: string | undefined
   readonly businessConfirmation?: BusinessConfirmation | undefined
   readonly businessEvidence?: BusinessEvidence | undefined
+  readonly publicationCompleted?: boolean | undefined
 }
 
 export interface SignedOperationRecord {
@@ -119,6 +124,7 @@ const CREDENTIAL_ACTIONS = new Set([
   'credential-revoke',
 ])
 const TRANSACTION_HASH = /^[0-9a-f]{64}$/i
+const PUBLICATION_JOB_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const REASON_CODE = /^[A-Z0-9_]{1,128}$/
 const BUSINESS_DELETION_CAUSES = new Set<BusinessDeletionCause>([
   'issuer_revoked',
@@ -214,6 +220,20 @@ export function validateOperationBusinessContext(input: unknown): OperationBusin
       }
     }
     const expiration = optionalExpiration(candidate.expiration)
+    const publicationJobId = candidate.publicationJobId
+    const issuerInviteId = candidate.issuerInviteId
+    if (
+      issuerInviteId !== undefined &&
+      (typeof issuerInviteId !== 'string' || !PUBLICATION_JOB_ID.test(issuerInviteId))
+    ) {
+      throw new Error('OPERATION_ISSUER_INVITE_ID_INVALID')
+    }
+    if (
+      publicationJobId !== undefined &&
+      (typeof publicationJobId !== 'string' || !PUBLICATION_JOB_ID.test(publicationJobId))
+    ) {
+      throw new Error('OPERATION_PUBLICATION_JOB_ID_INVALID')
+    }
     return {
       action,
       issuer: candidate.issuer,
@@ -222,6 +242,12 @@ export function validateOperationBusinessContext(input: unknown): OperationBusin
       ...(typeof credentialUri === 'string' ? { credentialUri } : {}),
       ...(payloadDigestHex ? { payloadDigestHex } : {}),
       ...(expiration ? { expiration } : {}),
+      ...(typeof publicationJobId === 'string'
+        ? { publicationJobId: publicationJobId.toLowerCase() }
+        : {}),
+      ...(typeof issuerInviteId === 'string'
+        ? { issuerInviteId: issuerInviteId.toLowerCase() }
+        : {}),
     }
   }
   return {
@@ -521,16 +547,41 @@ export function applyJournalEntry(
 ): StoredOperation {
   if (['validated', 'expired', 'failed'].includes(operation.stage)) return operation
   const terminal = ['validated', 'expired', 'failed'].includes(entry.stage)
+  const publicationPending =
+    operation.business?.action === 'credential-issue' &&
+    operation.business.publicationJobId !== undefined &&
+    operation.publicationCompleted !== true
   return {
     ...operation,
     updatedAt: entry.at,
     stage: entry.stage,
     txHash: entry.txHash ?? operation.txHash,
-    txBlob: terminal ? undefined : operation.txBlob,
+    txBlob: terminal && !publicationPending ? undefined : operation.txBlob,
     lastLedgerSequence: entry.lastLedgerSequence ?? operation.lastLedgerSequence,
     engineResult: entry.engineResult ?? operation.engineResult,
     ledgerIndex: entry.ledgerIndex ?? operation.ledgerIndex,
     message: entry.message,
+  }
+}
+
+/** Publication verification and ledger reconciliation can finish in either order. */
+export function completeOperationPublication(
+  operation: StoredOperation,
+  jobId: string,
+): StoredOperation {
+  if (!PUBLICATION_JOB_ID.test(jobId)) throw new Error('OPERATION_PUBLICATION_JOB_ID_INVALID')
+  if (
+    operation.business?.action !== 'credential-issue' ||
+    operation.business.publicationJobId !== jobId.toLowerCase()
+  )
+    return operation
+  return {
+    ...operation,
+    publicationCompleted: true,
+    // Keep nonterminal recovery until the SDK reconciles its final ledger state.
+    txBlob: ['validated', 'expired', 'failed'].includes(operation.stage)
+      ? undefined
+      : operation.txBlob,
   }
 }
 
@@ -614,6 +665,35 @@ function holdsBusinessLock(operation: StoredOperation): boolean {
   return confirmation === 'pending' || confirmation === 'timeout'
 }
 
+/** Preserve public tuple locks, with an additional invitation lock for the managed issuer flow. */
+export function operationConflictsWith(
+  existing: StoredOperation,
+  candidate: OperationSeed,
+): boolean {
+  if (existing.profileId !== candidate.profileId) return false
+  const previous = sanitizeOperationBusinessContext(existing.business)
+  const next = sanitizeOperationBusinessContext(candidate.business)
+  const key = operationBusinessKey(candidate.profileId, next)
+  if (
+    key &&
+    holdsBusinessLock(existing) &&
+    operationBusinessKey(existing.profileId, previous) === key
+  )
+    return true
+  if (
+    previous?.action !== 'credential-issue' ||
+    next?.action !== 'credential-issue' ||
+    !previous.issuerInviteId ||
+    previous.issuerInviteId !== next.issuerInviteId
+  )
+    return false
+  // A confirmed issue consumes this invitation even before portal metadata has been saved.
+  return (
+    holdsBusinessLock(existing) ||
+    (existing.stage === 'validated' && existing.engineResult === 'tesSUCCESS')
+  )
+}
+
 export class IndexedDbOperationJournal implements OperationJournal {
   readonly #factory: IDBFactory
   #databasePromise: Promise<IDBDatabase> | undefined
@@ -641,17 +721,7 @@ export class IndexedDbOperationJournal implements OperationJournal {
           if (existing.some((operation) => operation.operationId === seed.operationId)) {
             throw new Error('OPERATION_ID_ALREADY_EXISTS')
           }
-          const businessKey = operationBusinessKey(seed.profileId, business)
-          if (
-            businessKey &&
-            existing.some((operation) => {
-              const existingBusiness = sanitizeOperationBusinessContext(operation.business)
-              return (
-                holdsBusinessLock(operation) &&
-                operationBusinessKey(operation.profileId, existingBusiness) === businessKey
-              )
-            })
-          ) {
+          if (existing.some((operation) => operationConflictsWith(operation, normalizedSeed))) {
             throw new Error('OPERATION_BUSINESS_LOCKED')
           }
           store.put({
@@ -686,18 +756,11 @@ export class IndexedDbOperationJournal implements OperationJournal {
           )
           if (!existing) throw new Error('OPERATION_NOT_FOUND')
           if (existing.stage !== 'prepared') throw new Error('OPERATION_LOCK_OWNERSHIP_LOST')
-          const business = sanitizeOperationBusinessContext(existing.business)
-          const businessKey = operationBusinessKey(existing.profileId, business)
           if (
-            businessKey &&
             operations.some(
               (operation) =>
                 operation.operationId !== existing.operationId &&
-                holdsBusinessLock(operation) &&
-                operationBusinessKey(
-                  operation.profileId,
-                  sanitizeOperationBusinessContext(operation.business),
-                ) === businessKey,
+                operationConflictsWith(operation, existing),
             )
           ) {
             throw new Error('OPERATION_LOCK_OWNERSHIP_LOST')
@@ -809,6 +872,23 @@ export class IndexedDbOperationJournal implements OperationJournal {
     })
   }
 
+  /** Call only after both the hosted receipt and public payload bytes are verified. */
+  public async completePublication(jobId: string): Promise<void> {
+    if (!PUBLICATION_JOB_ID.test(jobId)) throw new Error('OPERATION_PUBLICATION_JOB_ID_INVALID')
+    const operations = await this.list()
+    for (const operation of operations) {
+      if (
+        operation.business?.action !== 'credential-issue' ||
+        operation.business.publicationJobId !== jobId.toLowerCase()
+      )
+        continue
+      await this.#mutate(operation.operationId, (existing) => {
+        if (!existing) throw new Error('OPERATION_NOT_FOUND')
+        return completeOperationPublication(existing, jobId)
+      })
+    }
+  }
+
   public async list(): Promise<StoredOperation[]> {
     const database = await this.#open()
     return new Promise((resolve, reject) => {
@@ -828,20 +908,11 @@ export class IndexedDbOperationJournal implements OperationJournal {
     const operations = await this.list()
     const existing = operations.find((operation) => operation.operationId === operationId)
     if (!existing || !holdsBusinessLock(existing)) throw new Error('OPERATION_LOCK_OWNERSHIP_LOST')
-    const businessKey = operationBusinessKey(
-      existing.profileId,
-      sanitizeOperationBusinessContext(existing.business),
-    )
     if (
-      businessKey &&
       operations.some(
         (operation) =>
           operation.operationId !== existing.operationId &&
-          holdsBusinessLock(operation) &&
-          operationBusinessKey(
-            operation.profileId,
-            sanitizeOperationBusinessContext(operation.business),
-          ) === businessKey,
+          operationConflictsWith(operation, existing),
       )
     ) {
       throw new Error('OPERATION_LOCK_OWNERSHIP_LOST')

@@ -1,35 +1,37 @@
-import { randomUUID } from 'node:crypto'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { createHash, randomUUID } from 'node:crypto'
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import {
+  acquireIndexerLease,
   credentialEvents,
   credentialGenerations,
+  createDatabaseClient,
+  haltIndexer,
   indexerIncidents,
   indexerStatuses,
   ledgerCheckpoints,
-  schemaEvents,
-  schemas,
-} from '#db/schema'
-import { type DatabaseClient, createDatabaseClient } from '../src/lib/db/client.js'
-import {
-  acquireIndexerLease,
-  haltIndexer,
   releaseIndexerLease,
   renewIndexerLease,
+  schemaEvents,
+  schemas,
   updateIndexerStatus,
-} from '../src/lib/db/indexer-fencing.js'
+  type DatabaseClient,
+} from '../src/lib/db/index.js'
 import {
-  XCS_API_DATABASE_CONNECTION_LIMIT,
-  XCS_INDEXER_DATABASE_CONNECTION_LIMIT,
-  XCS_MONITOR_DATABASE_CONNECTION_LIMIT,
   databasePasswordFromUrl,
   initializeDatabase,
   provisionRuntimeDatabaseRoles,
+  XCS_API_DATABASE_CONNECTION_LIMIT,
+  XCS_PAYLOAD_WRITER_DATABASE_CONNECTION_LIMIT,
+  XCS_INDEXER_DATABASE_CONNECTION_LIMIT,
+  XCS_MONITOR_DATABASE_CONNECTION_LIMIT,
 } from '../src/lib/db/bootstrap.js'
 import { computeSchemaUid, createIpfsPayloadUri, type JsonValue } from '../src/lib/xcs/index.js'
 import { and, asc, eq } from 'drizzle-orm'
+import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { captureLedgerFixtureBundle, ledgerFixtureBundleDigest } from '../src/fixture-bundle.js'
@@ -111,6 +113,7 @@ let runtimeRoleCleanupAllowed = false
 
 const INDEXER_DATABASE_PASSWORD = 'indexer-integration-password-000001'
 const API_DATABASE_PASSWORD = 'api-integration-password-0000000001'
+const PAYLOAD_DATABASE_PASSWORD = 'payload-integration-password-00000001'
 const MONITOR_DATABASE_PASSWORD = 'monitor-integration-password-00000001'
 
 function temporaryDatabaseName(): string {
@@ -163,6 +166,7 @@ async function closeAndDropTemporaryDatabases(): Promise<void> {
           DROP ROLE IF EXISTS
             xcs_indexer,
             xcs_api,
+            xcs_payload_writer,
             xcs_monitor
         `
         runtimeRoleCleanupAllowed = false
@@ -823,6 +827,58 @@ describePostgres('PostgreSQL 18 indexer integration', () => {
     expect(integrityConstraints.every((constraint) => constraint.validated)).toBe(true)
   })
 
+  it('upgrades the baseline and legacy hosted storage without losing profiles or payloads', async () => {
+    if (adminDatabaseUrl === undefined) throw new Error('PostgreSQL admin URL is not initialized')
+    const database = await createTemporaryDatabase(adminDatabaseUrl, { initialize: false })
+    const source = fileURLToPath(new URL('../../../db/migrations/', import.meta.url))
+    const fixture = await mkdtemp(join(tmpdir(), 'xcs-migration-upgrade-'))
+    const journal = JSON.parse(await readFile(join(source, 'meta/_journal.json'), 'utf8'))
+    const content = '{"course":"test-upgrade"}'
+    const digest = createHash('sha256').update(content).digest('hex')
+    try {
+      await mkdir(join(fixture, 'meta'))
+      for (const count of [1, 2]) {
+        const entries = journal.entries.slice(0, count)
+        for (const entry of entries) {
+          await copyFile(join(source, `${entry.tag}.sql`), join(fixture, `${entry.tag}.sql`))
+        }
+        await writeFile(
+          join(fixture, 'meta/_journal.json'),
+          JSON.stringify({ ...journal, entries }),
+        )
+        await migrate(database.client.db, { migrationsFolder: fixture })
+        if (count === 1) {
+          await new PostgresIndexerRepository(database.client.db).initializeProfile(
+            profile('upgrade'),
+          )
+        } else {
+          await database.client.sql`
+            INSERT INTO hosted_payloads (locator, digest_hex, content)
+            VALUES (${digest.slice(0, 20)}, ${digest}, ${content})
+          `
+        }
+      }
+      await initializeDatabase(database.client)
+      await initializeDatabase(database.client)
+      const profiles = await database.client.sql`SELECT profile_id FROM network_profiles`
+      expect(profiles.map((row) => row.profile_id)).toEqual(['upgrade'])
+      // The same bytes may have an old 20-character link and a new 18-character link.
+      await database.client.sql`
+        INSERT INTO hosted_payloads (locator, digest_hex, content)
+        VALUES (${digest.slice(0, 18)}, ${digest}, ${content})
+      `
+      const payloads = await database.client.sql`
+        SELECT locator, content FROM hosted_payloads ORDER BY length(locator)
+      `
+      expect(payloads).toEqual([
+        { locator: digest.slice(0, 18), content },
+        { locator: digest.slice(0, 20), content },
+      ])
+    } finally {
+      await rm(fixture, { recursive: true, force: true })
+    }
+  })
+
   it('allows exact restarts but rejects another profile in exclusive database scope', async () => {
     if (adminDatabaseUrl === undefined) throw new Error('PostgreSQL admin URL is not initialized')
     const database = await createTemporaryDatabase(adminDatabaseUrl)
@@ -860,7 +916,7 @@ describePostgres('PostgreSQL 18 indexer integration', () => {
     })
   })
 
-  it('provisions idempotent least-privilege indexer, API and monitor roles', async () => {
+  it('provisions idempotent least-privilege indexer, read API, payload writer and monitor roles', async () => {
     const database = temporaryDatabases[0]
     if (database === undefined) throw new Error('First temporary database was not created')
     if (adminClient === undefined) throw new Error('PostgreSQL admin client is not initialized')
@@ -870,10 +926,18 @@ describePostgres('PostgreSQL 18 indexer integration', () => {
       administratorPassword: databasePasswordFromUrl(database.url),
       indexerPassword: INDEXER_DATABASE_PASSWORD,
       apiPassword: API_DATABASE_PASSWORD,
+      payloadWriterPassword: PAYLOAD_DATABASE_PASSWORD,
       monitorPassword: MONITOR_DATABASE_PASSWORD,
     } as const
     runtimeRoleCleanupAllowed = true
     await provisionRuntimeDatabaseRoles(database.client, passwords)
+    // Simulate the pre-split API grants: reprovisioning must remove them, not just add a writer.
+    await database.client.sql`
+      GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE pin_challenges, demo_pins TO xcs_api
+    `
+    await database.client.sql`
+      GRANT SELECT, INSERT ON TABLE hosted_payloads, hosted_payload_publications TO xcs_api
+    `
     await provisionRuntimeDatabaseRoles(database.client, passwords)
 
     const roleProperties = await adminClient.sql<
@@ -906,7 +970,7 @@ describePostgres('PostgreSQL 18 indexer integration', () => {
           ORDER BY setting
         ) AS configuration
       FROM pg_roles
-      WHERE rolname IN ('xcs_indexer', 'xcs_api', 'xcs_monitor')
+      WHERE rolname IN ('xcs_indexer', 'xcs_api', 'xcs_monitor', 'xcs_payload_writer')
       ORDER BY rolname
     `
     expect(roleProperties).toEqual([
@@ -958,6 +1022,22 @@ describePostgres('PostgreSQL 18 indexer integration', () => {
           'statement_timeout=30s',
         ],
       },
+      {
+        roleName: 'xcs_payload_writer',
+        canLogin: true,
+        isSuperuser: false,
+        canCreateDatabase: false,
+        canCreateRole: false,
+        canReplicate: false,
+        canBypassRls: false,
+        inheritsPrivileges: false,
+        connectionLimit: XCS_PAYLOAD_WRITER_DATABASE_CONNECTION_LIMIT,
+        configuration: [
+          'idle_in_transaction_session_timeout=30s',
+          'lock_timeout=15s',
+          'statement_timeout=30s',
+        ],
+      },
     ])
 
     const runtimeMemberships = await adminClient.sql<
@@ -978,7 +1058,7 @@ describePostgres('PostgreSQL 18 indexer integration', () => {
       FROM pg_auth_members membership
       JOIN pg_roles granted_role ON granted_role.oid = membership.roleid
       JOIN pg_roles member_role ON member_role.oid = membership.member
-      WHERE member_role.rolname IN ('xcs_indexer', 'xcs_api', 'xcs_monitor')
+      WHERE member_role.rolname IN ('xcs_indexer', 'xcs_api', 'xcs_monitor', 'xcs_payload_writer')
       ORDER BY granted_role.rolname, member_role.rolname
     `
     expect(runtimeMemberships).toEqual([
@@ -1012,173 +1092,48 @@ describePostgres('PostgreSQL 18 indexer integration', () => {
       JOIN pg_roles grantee_role ON grantee_role.oid = privilege.grantee
       WHERE namespace_object.nspname = 'public'
         AND relation.relkind IN ('r', 'p')
-        AND grantee_role.rolname IN ('xcs_indexer', 'xcs_api', 'xcs_monitor')
+        AND grantee_role.rolname IN ('xcs_indexer', 'xcs_api', 'xcs_monitor', 'xcs_payload_writer')
       ORDER BY grantee_role.rolname, relation.relname, privilege.privilege_type
     `
-    expect(tableGrants).toEqual([
-      {
-        grantee: 'xcs_api',
-        tableName: 'credential_events',
-        privilegeType: 'SELECT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_api',
-        tableName: 'credential_generations',
-        privilegeType: 'SELECT',
-        grantable: false,
-      },
-      { grantee: 'xcs_api', tableName: 'demo_pins', privilegeType: 'DELETE', grantable: false },
-      { grantee: 'xcs_api', tableName: 'demo_pins', privilegeType: 'INSERT', grantable: false },
-      { grantee: 'xcs_api', tableName: 'demo_pins', privilegeType: 'SELECT', grantable: false },
-      { grantee: 'xcs_api', tableName: 'demo_pins', privilegeType: 'UPDATE', grantable: false },
-      {
-        grantee: 'xcs_api',
-        tableName: 'indexer_incidents',
-        privilegeType: 'SELECT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_api',
-        tableName: 'indexer_status',
-        privilegeType: 'SELECT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_api',
-        tableName: 'ledger_checkpoints',
-        privilegeType: 'SELECT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_api',
-        tableName: 'network_profiles',
-        privilegeType: 'SELECT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_api',
-        tableName: 'pin_challenges',
-        privilegeType: 'DELETE',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_api',
-        tableName: 'pin_challenges',
-        privilegeType: 'INSERT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_api',
-        tableName: 'pin_challenges',
-        privilegeType: 'SELECT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_api',
-        tableName: 'pin_challenges',
-        privilegeType: 'UPDATE',
-        grantable: false,
-      },
-      { grantee: 'xcs_api', tableName: 'schema_events', privilegeType: 'SELECT', grantable: false },
-      { grantee: 'xcs_api', tableName: 'schemas', privilegeType: 'SELECT', grantable: false },
-      {
-        grantee: 'xcs_indexer',
-        tableName: 'credential_events',
-        privilegeType: 'INSERT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_indexer',
-        tableName: 'credential_events',
-        privilegeType: 'SELECT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_indexer',
-        tableName: 'credential_generations',
-        privilegeType: 'INSERT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_indexer',
-        tableName: 'credential_generations',
-        privilegeType: 'SELECT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_indexer',
-        tableName: 'indexer_incidents',
-        privilegeType: 'INSERT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_indexer',
-        tableName: 'indexer_incidents',
-        privilegeType: 'SELECT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_indexer',
-        tableName: 'indexer_status',
-        privilegeType: 'INSERT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_indexer',
-        tableName: 'indexer_status',
-        privilegeType: 'SELECT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_indexer',
-        tableName: 'ledger_checkpoints',
-        privilegeType: 'INSERT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_indexer',
-        tableName: 'ledger_checkpoints',
-        privilegeType: 'SELECT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_indexer',
-        tableName: 'network_profiles',
-        privilegeType: 'INSERT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_indexer',
-        tableName: 'network_profiles',
-        privilegeType: 'SELECT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_indexer',
-        tableName: 'schema_events',
-        privilegeType: 'INSERT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_indexer',
-        tableName: 'schema_events',
-        privilegeType: 'SELECT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_indexer',
-        tableName: 'schemas',
-        privilegeType: 'INSERT',
-        grantable: false,
-      },
-      {
-        grantee: 'xcs_indexer',
-        tableName: 'schemas',
-        privilegeType: 'SELECT',
-        grantable: false,
-      },
-    ])
+    const projectionTables = [
+      'credential_events',
+      'credential_generations',
+      'indexer_incidents',
+      'indexer_status',
+      'ledger_checkpoints',
+      'network_profiles',
+      'schema_events',
+      'schemas',
+    ]
+    const expectedTableGrants = [
+      ...projectionTables.flatMap((tableName) => [
+        { grantee: 'xcs_api', tableName, privilegeType: 'SELECT', grantable: false },
+        ...['SELECT', 'INSERT'].map((privilegeType) => ({
+          grantee: 'xcs_indexer',
+          tableName,
+          privilegeType,
+          grantable: false,
+        })),
+      ]),
+      ...['demo_pins', 'pin_challenges'].flatMap((tableName) =>
+        ['SELECT', 'INSERT', 'UPDATE', 'DELETE'].map((privilegeType) => ({
+          grantee: 'xcs_payload_writer',
+          tableName,
+          privilegeType,
+          grantable: false,
+        })),
+      ),
+      ...['hosted_payloads', 'hosted_payload_publications'].flatMap((tableName) =>
+        ['SELECT', 'INSERT'].map((privilegeType) => ({
+          grantee: 'xcs_payload_writer',
+          tableName,
+          privilegeType,
+          grantable: false,
+        })),
+      ),
+    ]
+    expect(tableGrants).toHaveLength(expectedTableGrants.length)
+    expect(tableGrants).toEqual(expect.arrayContaining(expectedTableGrants))
 
     const columnGrants = await database.client.sql<
       Array<{
@@ -1203,7 +1158,7 @@ describePostgres('PostgreSQL 18 indexer integration', () => {
       WHERE namespace_object.nspname = 'public'
         AND attribute_object.attnum > 0
         AND NOT attribute_object.attisdropped
-        AND grantee_role.rolname IN ('xcs_indexer', 'xcs_api', 'xcs_monitor')
+        AND grantee_role.rolname IN ('xcs_indexer', 'xcs_api', 'xcs_monitor', 'xcs_payload_writer')
       ORDER BY grantee_role.rolname, relation.relname, attribute_object.attname, privilege.privilege_type
     `
     expect(columnGrants).toEqual([
@@ -1319,6 +1274,9 @@ describePostgres('PostgreSQL 18 indexer integration', () => {
     )
     const apiClient = createDatabaseClient(
       runtimeDatabaseUrl(database.url, 'xcs_api', API_DATABASE_PASSWORD),
+    )
+    const payloadClient = createDatabaseClient(
+      runtimeDatabaseUrl(database.url, 'xcs_payload_writer', PAYLOAD_DATABASE_PASSWORD),
     )
     const monitorClient = createDatabaseClient(
       runtimeDatabaseUrl(database.url, 'xcs_monitor', MONITOR_DATABASE_PASSWORD),
@@ -1505,7 +1463,7 @@ describePostgres('PostgreSQL 18 indexer integration', () => {
 
       const challengeId = '1'.repeat(64)
       const pinId = '2'.repeat(64)
-      await apiClient.sql`
+      await payloadClient.sql`
         INSERT INTO pin_challenges (
           challenge_id, profile_id, wallet, requester_ip_hash, message, expires_at
         ) VALUES (
@@ -1513,7 +1471,7 @@ describePostgres('PostgreSQL 18 indexer integration', () => {
           ${'3'.repeat(64)}, 'authorized', CURRENT_TIMESTAMP + interval '5 minutes'
         )
       `
-      await apiClient.sql`
+      await payloadClient.sql`
         INSERT INTO demo_pins (
           pin_id, challenge_id, profile_id, wallet, requester_ip_hash,
           cid, byte_length, status, expires_at
@@ -1523,20 +1481,58 @@ describePostgres('PostgreSQL 18 indexer integration', () => {
           CURRENT_TIMESTAMP + interval '1 hour'
         )
       `
-      const [pinRead] = await apiClient.sql<{ status: string }[]>`
+      const [pinRead] = await payloadClient.sql<{ status: string }[]>`
         SELECT status FROM demo_pins WHERE pin_id = ${pinId}
       `
       expect(pinRead?.status).toBe('pending')
-      await apiClient.sql`
+      await payloadClient.sql`
         UPDATE demo_pins SET status = 'pinned' WHERE pin_id = ${pinId}
       `
-      await apiClient.sql`DELETE FROM demo_pins WHERE pin_id = ${pinId}`
-      await apiClient.sql`DELETE FROM pin_challenges WHERE challenge_id = ${challengeId}`
+      await payloadClient.sql`DELETE FROM demo_pins WHERE pin_id = ${pinId}`
+      await payloadClient.sql`DELETE FROM pin_challenges WHERE challenge_id = ${challengeId}`
 
+      for (const runtimeClient of [apiClient, payloadClient]) {
+        for (const tableName of projectionTables) {
+          await expectPermissionDenied(
+            runtimeClient.sql`DELETE FROM ${runtimeClient.sql(tableName)} WHERE false`,
+          )
+          await expectPermissionDenied(
+            runtimeClient.sql`INSERT INTO ${runtimeClient.sql(tableName)} DEFAULT VALUES`,
+          )
+        }
+        await expectPermissionDenied(runtimeClient.sql`SET ROLE xcs_indexer`)
+        await expectPermissionDenied(runtimeClient.sql`SET ROLE xcs_monitor`)
+      }
+      await expectPermissionDenied(apiClient.sql`SET ROLE xcs_payload_writer`)
+      await expectPermissionDenied(payloadClient.sql`SET ROLE xcs_api`)
+      await expectPermissionDenied(payloadClient.sql`SELECT * FROM schemas`)
+      await expectPermissionDenied(
+        payloadClient.sql`UPDATE credential_generations SET accepted = true WHERE false`,
+      )
+      for (const tableName of [
+        'demo_pins',
+        'pin_challenges',
+        'hosted_payloads',
+        'hosted_payload_publications',
+      ]) {
+        await expectPermissionDenied(apiClient.sql`SELECT * FROM ${apiClient.sql(tableName)}`)
+        await expectPermissionDenied(
+          apiClient.sql`INSERT INTO ${apiClient.sql(tableName)} DEFAULT VALUES`,
+        )
+        await expectPermissionDenied(
+          apiClient.sql`DELETE FROM ${apiClient.sql(tableName)} WHERE false`,
+        )
+      }
+      await expectPermissionDenied(payloadClient.sql`CREATE TABLE forbidden_payload (id integer)`)
       await expectPermissionDenied(apiClient.sql`CREATE TABLE forbidden_api (id integer)`)
       await expectPermissionDenied(indexerClient.sql`CREATE TABLE forbidden_indexer (id integer)`)
     } finally {
-      await Promise.allSettled([indexerClient.close(), apiClient.close(), monitorClient.close()])
+      await Promise.allSettled([
+        indexerClient.close(),
+        apiClient.close(),
+        payloadClient.close(),
+        monitorClient.close(),
+      ])
     }
   }, 120_000)
 

@@ -1,4 +1,4 @@
-// Copied from packages/core/test/network-lifecycle.test.ts at 54c3486; keep in sync by hand (see CONTRIBUTING.md).
+// Copied from packages/core/test/network-lifecycle.test.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
 import { describe, expect, it } from 'vitest'
 
 import {

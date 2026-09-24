@@ -1,4 +1,5 @@
 import type { NetworkProfile } from '#xcs/core/index.js'
+import { useWallet as useXrplConnectWallet } from '@xrpl-commons/xrpl-connect-vue'
 import {
   autofillXcsTransaction,
   connectAndValidateNetwork,
@@ -6,14 +7,10 @@ import {
   signPreparedAndSubmit,
   submitSignedTransaction,
   type ReliableSubmissionResult,
+  type ValidatedSignature,
 } from '#xcs/sdk/index.js'
-import type { SubmittableTransaction } from 'xrpl'
-import {
-  supportsFetchAccount,
-  type AccountInfo,
-  type NetworkInfo,
-  type Transaction,
-} from 'xrpl-connect'
+import { encode, type SubmittableTransaction } from 'xrpl'
+import { supportsFetchAccount, type AccountInfo, type Transaction } from 'xrpl-connect'
 import {
   reconfirmValidatedBusinessOperation,
   waitForIndexedBusinessEvidence,
@@ -32,39 +29,31 @@ import {
 import { assertCredentialGenerationCurrent } from '~/utils/credentialReview'
 import { assertPublicRpcUrl } from '~/utils/publicRpcUrl'
 import { assertTransactionSigner } from '~/utils/transactions'
+import { closeWalletRpc, finishWalletOperation } from '~/utils/walletOperationCleanup'
+import { refreshWalletAccount } from '~/utils/walletConnection'
+import { requiresGemWalletRawSigning, signGemWalletCredential } from '~/utils/gemWalletRawSigning'
 import {
-  assertWalletSupportsXcsTransaction,
+  OTSU_SIGNING_ACCOUNT_UNAVAILABLE,
   normalizeWalletTransactionError,
-  walletCredentialSupport,
-  type WalletCredentialSupport,
 } from '~/utils/walletCompatibility'
 import {
   assertValidatedTesSuccess,
   createWalletSigner,
+  transactionForWalletSigning,
   validateStoredRecoveryMaterial,
 } from '~/utils/walletSubmission'
 
-const account = shallowRef<AccountInfo | null>(null)
-const walletError = ref<string | null>(null)
+const serverAccount = shallowRef<AccountInfo | null>(null)
 const walletBusy = ref(false)
-const listenersInstalled = ref(false)
 const operations = shallowRef<StoredOperation[]>([])
 const preparedProfiles = new WeakMap<object, NetworkProfile>()
-const preparedWalletSessions = new WeakMap<object, number>()
-let walletSession = 0
+const preparedWalletSessions = new WeakMap<object, string>()
+const rawSigningConsents = new WeakMap<object, string>()
 let journal: IndexedDbOperationJournal | undefined
 
 export interface WalletSubmissionResult extends ReliableSubmissionResult {
   readonly businessConfirmation?: Exclude<BusinessConfirmation, 'pending'> | undefined
   readonly businessEvidence?: BusinessEvidence | undefined
-}
-
-export interface WalletChoice {
-  readonly id: string
-  readonly name: string
-  readonly available: boolean
-  readonly credentialSupport: WalletCredentialSupport
-  readonly url?: string | undefined
 }
 
 function operationJournal(): IndexedDbOperationJournal {
@@ -77,17 +66,25 @@ function assertWalletTestnet(connectedAccount: AccountInfo): void {
   if (connectedAccount.network.id !== 'testnet') throw new Error('WALLET_TESTNET_REQUIRED')
 }
 
-function replaceAccount(nextAccount: AccountInfo | null): void {
-  walletSession += 1
-  account.value = nextAccount
+function walletSessionKey(account: AccountInfo | null, walletId: string | undefined): string {
+  if (!account || !walletId) return ''
+  return `${walletId}:${account.address}:${account.network.id}`
 }
 
-function assertWalletContext(transaction: Transaction, address: string, session: number): void {
-  if (walletSession !== session) throw new Error('WALLET_CHANGED_AFTER_PREVIEW')
-  if (!account.value || account.value.address !== address) {
+function assertWalletContext(
+  transaction: Transaction,
+  address: string,
+  expectedSessionKey: string,
+  account: AccountInfo | null,
+  walletId: string | undefined,
+): void {
+  if (walletSessionKey(account, walletId) !== expectedSessionKey) {
     throw new Error('WALLET_CHANGED_AFTER_PREVIEW')
   }
-  assertWalletTestnet(account.value)
+  if (!account || account.address !== address) {
+    throw new Error('WALLET_CHANGED_AFTER_PREVIEW')
+  }
+  assertWalletTestnet(account)
   assertTransactionSigner(transaction, address)
 }
 
@@ -105,7 +102,31 @@ function sameProfile(left: NetworkProfile, right: NetworkProfile): boolean {
 }
 
 export function useWallet() {
-  const { $walletManager, $xrplClientFactory } = useNuxtApp()
+  const { $xrplClientFactory } = useNuxtApp()
+  const xrplConnect = import.meta.client ? useXrplConnectWallet() : undefined
+  const walletManager = xrplConnect?.manager
+  const disconnecting = ref(walletManager?.connected !== true)
+  // rc.2's Vue binding waits for provider teardown before clearing its account.
+  // Stop presenting that old account as usable as soon as disconnect starts.
+  const invalidateSession = () => {
+    disconnecting.value = true
+  }
+  const approveSession = () => {
+    disconnecting.value = false
+  }
+  if (walletManager) {
+    walletManager.on('disconnecting', invalidateSession)
+    walletManager.on('connect', approveSession)
+    onScopeDispose(() => {
+      walletManager.off('disconnecting', invalidateSession)
+      walletManager.off('connect', approveSession)
+    })
+  }
+  const account = computed(() =>
+    disconnecting.value ? null : (xrplConnect?.account.value ?? serverAccount.value),
+  )
+  const error = computed(() => xrplConnect?.error.value?.message ?? null)
+  const busy = computed(() => walletBusy.value || xrplConnect?.connecting.value === true)
   const config = useRuntimeConfig()
   const {
     getActiveNetworkProfile,
@@ -184,155 +205,84 @@ export function useWallet() {
     }
   }
 
-  if (import.meta.client && !listenersInstalled.value) {
-    listenersInstalled.value = true
-    $walletManager.on('connect', (connectedAccount) => {
-      const nextAccount = connectedAccount as AccountInfo
-      try {
-        assertWalletTestnet(nextAccount)
-        replaceAccount(nextAccount)
-        walletError.value = null
-      } catch (error) {
-        replaceAccount(null)
-        walletError.value = error instanceof Error ? error.message : String(error)
-      }
-    })
-    $walletManager.on('disconnect', () => {
-      replaceAccount(null)
-    })
-    $walletManager.on('accountChanged', (changedAccount) => {
-      const nextAccount = changedAccount as AccountInfo
-      try {
-        assertWalletTestnet(nextAccount)
-        replaceAccount(nextAccount)
-        walletError.value = null
-      } catch (error) {
-        replaceAccount(null)
-        walletError.value = error instanceof Error ? error.message : String(error)
-      }
-    })
-    $walletManager.on('networkChanged', (changedNetwork) => {
-      if (!account.value) return
-      const nextAccount = {
-        ...account.value,
-        network: changedNetwork as NetworkInfo,
-      }
-      try {
-        assertWalletTestnet(nextAccount)
-        replaceAccount(nextAccount)
-        walletError.value = null
-      } catch (error) {
-        replaceAccount(null)
-        walletError.value = error instanceof Error ? error.message : String(error)
-      }
-    })
-    $walletManager.on('error', (error) => {
-      walletError.value = error instanceof Error ? error.message : String(error)
-    })
-  }
-
-  function safeWalletUrl(value: string | undefined): string | undefined {
-    if (!value) return undefined
-    try {
-      const url = new URL(value)
-      return url.protocol === 'https:' ? url.href : undefined
-    } catch {
-      return undefined
-    }
+  function requireWalletManager() {
+    if (!walletManager) throw new Error('WALLET_BROWSER_REQUIRED')
+    return walletManager
   }
 
   async function refreshConnectedWallet(): Promise<void> {
-    const adapter = $walletManager.wallet
+    const manager = requireWalletManager()
+    const adapter = manager.wallet
     if (!adapter || !supportsFetchAccount(adapter)) return
-    const refreshed = await $walletManager.fetchAccount()
-    if (!refreshed) {
-      replaceAccount(null)
-      throw new Error('WALLET_NOT_CONNECTED')
+    // Xaman already binds every signature to the connected account. Its live
+    // ping can omit optional network metadata, so the rc.2 adapter must not be
+    // used as a second connection gate after the initial OAuth result.
+    if (adapter.id === 'xaman') {
+      if (!account.value) throw new Error('WALLET_NOT_CONNECTED')
+      assertWalletTestnet(account.value)
+      return
     }
+    const refreshed = await refreshWalletAccount({
+      manager,
+      disconnect: () => xrplConnect!.disconnect(),
+    })
+    if (!refreshed) throw new Error('WALLET_NOT_CONNECTED')
     assertWalletTestnet(refreshed)
     if (
       !account.value ||
       account.value.address !== refreshed.address ||
       account.value.network.id !== refreshed.network.id
     ) {
-      replaceAccount(refreshed)
-      return
+      throw new Error('WALLET_CHANGED_AFTER_PREVIEW')
     }
-    account.value = refreshed
-  }
-
-  async function walletChoices(): Promise<WalletChoice[]> {
-    let availableIds = new Set<string>()
-    try {
-      availableIds = new Set(
-        (await $walletManager.getAvailableWallets()).map((wallet) => wallet.id),
-      )
-    } catch (error) {
-      walletError.value = error instanceof Error ? error.message : String(error)
-    }
-
-    return $walletManager.wallets.map((wallet) => {
-      const url = safeWalletUrl(wallet.url)
-      return {
-        id: wallet.id,
-        name: wallet.name,
-        available: availableIds.has(wallet.id),
-        credentialSupport: walletCredentialSupport(wallet.id),
-        ...(url ? { url } : {}),
-      }
-    })
-  }
-
-  async function connect(walletId: string) {
-    walletBusy.value = true
-    walletError.value = null
-    try {
-      const connectedAccount = await $walletManager.connect(walletId, { network: 'testnet' })
-      assertWalletTestnet(connectedAccount)
-      replaceAccount(connectedAccount)
-    } catch (error) {
-      replaceAccount(null)
-      walletError.value = error instanceof Error ? error.message : String(error)
-      if ($walletManager.connected) await $walletManager.disconnect().catch(() => undefined)
-      throw error
-    } finally {
-      walletBusy.value = false
-    }
-  }
-
-  async function disconnect() {
-    await $walletManager.disconnect()
-    replaceAccount(null)
   }
 
   async function prepare(
     transaction: Transaction,
     expectedProfile?: NetworkProfile,
   ): Promise<Transaction> {
+    const manager = requireWalletManager()
     await refreshConnectedWallet()
     if (!account.value) throw new Error('WALLET_NOT_CONNECTED')
     assertWalletTestnet(account.value)
     assertTransactionSigner(transaction, account.value.address)
-    assertWalletSupportsXcsTransaction($walletManager.wallet, transaction.TransactionType)
-    const preparingSession = walletSession
+    const preparingSession = walletSessionKey(account.value, manager.wallet?.id)
     const preparingAddress = account.value.address
 
     const profile = await getActiveNetworkProfile()
-    assertWalletContext(transaction, preparingAddress, preparingSession)
+    assertWalletContext(
+      transaction,
+      preparingAddress,
+      preparingSession,
+      account.value,
+      manager.wallet?.id,
+    )
     if (expectedProfile !== undefined && !sameProfile(expectedProfile, profile)) {
       throw new Error('NETWORK_PROFILE_CHANGED_BEFORE_PREVIEW')
     }
     const client = $xrplClientFactory(assertPublicRpcUrl(config.public.rpcUrl))
     try {
       await connectAndValidateNetwork(client, profile)
-      assertWalletContext(transaction, preparingAddress, preparingSession)
+      assertWalletContext(
+        transaction,
+        preparingAddress,
+        preparingSession,
+        account.value,
+        manager.wallet?.id,
+      )
       const prepared = await autofillXcsTransaction(client, transaction)
-      assertWalletContext(prepared.transaction, preparingAddress, preparingSession)
+      assertWalletContext(
+        prepared.transaction,
+        preparingAddress,
+        preparingSession,
+        account.value,
+        manager.wallet?.id,
+      )
       preparedProfiles.set(prepared.transaction, profile)
-      preparedWalletSessions.set(prepared.transaction, walletSession)
+      preparedWalletSessions.set(prepared.transaction, preparingSession)
       return prepared.transaction
     } finally {
-      if (client.isConnected()) await client.disconnect()
+      await closeWalletRpc(client)
     }
   }
 
@@ -340,9 +290,10 @@ export function useWallet() {
     transaction: Transaction,
     business?: OperationBusinessContext,
     assertCurrent?: () => void,
-    afterSignatureValidated?: () => void | Promise<void>,
+    afterSignatureValidated?: (signature: ValidatedSignature) => void | Promise<void>,
     afterLedgerValidated?: (result: ReliableSubmissionResult) => void | Promise<void>,
   ): Promise<WalletSubmissionResult> {
+    const manager = requireWalletManager()
     await refreshConnectedWallet()
     if (!account.value) throw new Error('WALLET_NOT_CONNECTED')
     assertWalletTestnet(account.value)
@@ -350,32 +301,53 @@ export function useWallet() {
 
     const preparedProfile = preparedProfiles.get(transaction)
     if (!preparedProfile) throw new Error('TRANSACTION_PREVIEW_REQUIRED')
-    if (preparedWalletSessions.get(transaction) !== walletSession) {
+    const preparedWalletSession = preparedWalletSessions.get(transaction)
+    if (
+      !preparedWalletSession ||
+      preparedWalletSession !== walletSessionKey(account.value, manager.wallet?.id)
+    ) {
       throw new Error('WALLET_CHANGED_AFTER_PREVIEW')
     }
-    assertWalletSupportsXcsTransaction($walletManager.wallet, transaction.TransactionType)
-    const signingSession = walletSession
+    const rawSigning = requiresGemWalletRawSigning(manager.wallet?.id, transaction.TransactionType)
+    const rawConsent = rawSigningConsents.get(transaction)
+    rawSigningConsents.delete(transaction)
+    if (rawSigning && rawConsent !== encode(transaction)) {
+      throw new Error('GEMWALLET_RAW_SIGNING_CONSENT_REQUIRED')
+    }
+    const signingSession = preparedWalletSession
     const signingAddress = account.value.address
     const normalizedBusiness = business ? validateOperationBusinessContext(business) : undefined
     assertCurrent?.()
     const activeProfile = await getActiveNetworkProfile()
-    assertWalletContext(transaction, signingAddress, signingSession)
+    assertWalletContext(
+      transaction,
+      signingAddress,
+      signingSession,
+      account.value,
+      manager.wallet?.id,
+    )
     assertCurrent?.()
     if (!sameProfile(preparedProfile, activeProfile)) {
       throw new Error('NETWORK_PROFILE_CHANGED_AFTER_PREVIEW')
     }
 
     walletBusy.value = true
-    walletError.value = null
-    const operationId = crypto.randomUUID()
-    const operationStore = operationJournal()
-    const client = $xrplClientFactory(assertPublicRpcUrl(config.public.rpcUrl))
+    let client: ReturnType<typeof $xrplClientFactory> | undefined
 
     try {
+      const operationId = crypto.randomUUID()
+      const operationStore = operationJournal()
+      client = $xrplClientFactory(assertPublicRpcUrl(config.public.rpcUrl))
       // Network identity is known before the wallet is asked to sign. The SDK
       // will refuse to sign or submit through an unvalidated client.
       await connectAndValidateNetwork(client, activeProfile)
-      assertWalletContext(transaction, signingAddress, signingSession)
+      assertWalletContext(
+        transaction,
+        signingAddress,
+        signingSession,
+        account.value,
+        manager.wallet?.id,
+      )
       assertCurrent?.()
       const createdAt = new Date().toISOString()
       await operationStore.create({
@@ -388,10 +360,16 @@ export function useWallet() {
         ...(normalizedBusiness ? { business: normalizedBusiness } : {}),
       })
 
-      const walletSigner = createWalletSigner($walletManager)
+      const walletSigner = createWalletSigner({ sign: (request) => manager.sign(request) })
       const signer = {
         sign: async (preparedTransaction: Readonly<SubmittableTransaction>) => {
-          assertWalletContext(transaction, signingAddress, signingSession)
+          assertWalletContext(
+            transaction,
+            signingAddress,
+            signingSession,
+            account.value,
+            manager.wallet?.id,
+          )
           assertCurrent?.()
           const latestProfile = await getActiveNetworkProfile()
           if (!sameProfile(activeProfile, latestProfile)) {
@@ -399,16 +377,43 @@ export function useWallet() {
           }
           await getNetworkReadiness(activeProfile.profileId)
           await refreshConnectedWallet()
-          assertWalletContext(transaction, signingAddress, signingSession)
+          assertWalletContext(
+            transaction,
+            signingAddress,
+            signingSession,
+            account.value,
+            manager.wallet?.id,
+          )
           assertCurrent?.()
           try {
-            return await walletSigner.sign(preparedTransaction)
+            if (rawSigning) {
+              if (rawConsent !== encode(preparedTransaction)) {
+                throw new Error('GEMWALLET_RAW_SIGNING_CONSENT_REQUIRED')
+              }
+              return await signGemWalletCredential(
+                preparedTransaction as Transaction,
+                account.value!,
+              )
+            }
+            return await walletSigner.sign(
+              transactionForWalletSigning(
+                preparedTransaction as Transaction,
+                manager.wallet?.id,
+              ) as SubmittableTransaction,
+            )
           } catch (error) {
-            throw normalizeWalletTransactionError(
+            const normalized = await normalizeWalletTransactionError(
               error,
-              $walletManager.wallet,
+              manager.wallet,
               preparedTransaction.TransactionType,
             )
+            if (normalized.message === OTSU_SIGNING_ACCOUNT_UNAVAILABLE) {
+              // The provider exists but the session cannot access its selected
+              // signing key. Do not leave XCS displaying a connected session
+              // that cannot authorize the reviewed transaction.
+              await manager.disconnect().catch(() => undefined)
+            }
+            throw normalized
           }
         },
       }
@@ -420,8 +425,9 @@ export function useWallet() {
         {
           journal: operationStore,
           operationId,
-          allowSignerLastLedgerSequenceRefresh: $walletManager.wallet?.id === 'xaman',
-          onValidatedSignature: async ({ txBlob, txHash, lastLedgerSequence }) => {
+          allowSignerLastLedgerSequenceRefresh: manager.wallet?.id === 'xaman',
+          onValidatedSignature: async (signature) => {
+            const { txBlob, txHash, lastLedgerSequence } = signature
             await operationStore.persistSigned({
               operationId,
               txBlob,
@@ -429,6 +435,7 @@ export function useWallet() {
               lastLedgerSequence,
               at: new Date().toISOString(),
             })
+            await afterSignatureValidated?.(signature)
           },
           beforeSubmit: async () => {
             // The signature already proves which account authorized the exact
@@ -436,7 +443,6 @@ export function useWallet() {
             // wallet session refresh; only re-run volatile application guards.
             assertCurrent?.()
             await assertBusinessGenerationCurrent(normalizedBusiness, activeProfile.profileId)
-            await afterSignatureValidated?.()
             assertCurrent?.()
             const latestProfile = await getActiveNetworkProfile()
             if (!sameProfile(activeProfile, latestProfile)) {
@@ -460,9 +466,7 @@ export function useWallet() {
       preparedWalletSessions.delete(transaction)
       return { ...result, ...businessResult }
     } finally {
-      await loadOperations().catch(() => undefined)
-      if (client.isConnected()) await client.disconnect()
-      walletBusy.value = false
+      await finishWalletOperation(walletBusy, loadOperations, client)
     }
   }
 
@@ -474,10 +478,10 @@ export function useWallet() {
 
   async function retryOperation(operationId: string): Promise<WalletSubmissionResult> {
     walletBusy.value = true
-    walletError.value = null
-    const operationStore = operationJournal()
-    const client = $xrplClientFactory(assertPublicRpcUrl(config.public.rpcUrl))
+    let client: ReturnType<typeof $xrplClientFactory> | undefined
     try {
+      const operationStore = operationJournal()
+      client = $xrplClientFactory(assertPublicRpcUrl(config.public.rpcUrl))
       const stored = (await operationStore.list()).find(
         (operation) => operation.operationId === operationId,
       )
@@ -552,17 +556,14 @@ export function useWallet() {
       )
       return { ...result, ...businessResult }
     } finally {
-      await loadOperations().catch(() => undefined)
-      if (client.isConnected()) await client.disconnect()
-      walletBusy.value = false
+      await finishWalletOperation(walletBusy, loadOperations, client)
     }
   }
 
   async function reconfirmOperation(operationId: string) {
     walletBusy.value = true
-    walletError.value = null
-    const operationStore = operationJournal()
     try {
+      const operationStore = operationJournal()
       const stored = (await operationStore.list()).find(
         (operation) => operation.operationId === operationId,
       )
@@ -591,30 +592,28 @@ export function useWallet() {
           operationStore.setBusinessConfirmation(operationId, confirmation, at, evidence),
       })
     } finally {
-      await loadOperations().catch(() => undefined)
-      walletBusy.value = false
+      await finishWalletOperation(walletBusy, loadOperations)
     }
   }
 
   async function abandonOperation(operationId: string): Promise<void> {
     walletBusy.value = true
-    walletError.value = null
     try {
       await operationJournal().abandon(operationId)
     } finally {
-      await loadOperations().catch(() => undefined)
-      walletBusy.value = false
+      await finishWalletOperation(walletBusy, loadOperations)
     }
   }
 
   return {
-    account: readonly(account),
-    busy: readonly(walletBusy),
-    error: readonly(walletError),
+    account,
+    walletId: computed(() => (account.value ? walletManager?.wallet?.id : undefined)),
+    consentToRawSigning(transaction: Transaction) {
+      rawSigningConsents.set(transaction, encode(transaction))
+    },
+    busy,
+    error,
     operations: readonly(operations),
-    walletChoices,
-    connect,
-    disconnect,
     prepare,
     signAndSubmit,
     loadOperations,

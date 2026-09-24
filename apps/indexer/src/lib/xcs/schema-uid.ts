@@ -1,4 +1,4 @@
-// Copied from packages/core/src/schema-uid.ts at 54c3486; keep in sync by hand (see CONTRIBUTING.md).
+// Copied from packages/core/src/schema-uid.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex } from '@noble/hashes/utils.js'
 import { isValidClassicAddress } from 'xrpl'

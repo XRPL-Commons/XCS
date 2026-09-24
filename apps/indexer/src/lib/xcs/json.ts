@@ -1,4 +1,4 @@
-// Copied from packages/core/src/json.ts at 54c3486; keep in sync by hand (see CONTRIBUTING.md).
+// Copied from packages/core/src/json.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import canonicalizeRfc8785 from 'canonicalize'
@@ -22,7 +22,7 @@ function assertWellFormed(value: string, path: string): void {
     const codeUnit = value.charCodeAt(index)
     if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
       const next = value.charCodeAt(index + 1)
-      if (next < 0xdc00 || next > 0xdfff) {
+      if (!(next >= 0xdc00 && next <= 0xdfff)) {
         fail('UNSUPPORTED_JSON_VALUE', 'JSON strings must contain valid Unicode', path)
       }
       index += 1

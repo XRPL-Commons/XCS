@@ -8,6 +8,15 @@
       "licenseFile": "LICENSE",
       "licenseSha256": "22cfaab2256435450e4375ef5593354cc3d53501f0ead3564336415b3909bae4",
       "rationale": "The bundled LICENSE is the permissive zlib license although the package manifest omits its SPDX field."
+    },
+    {
+      "package": "vaul-vue",
+      "version": "0.4.1",
+      "reportedLicense": "Unknown",
+      "reviewedLicense": "MIT",
+      "licenseFile": "LICENSE",
+      "licenseSha256": "ba02930e278b4ed6b564150a261b50319b5cef2a965b7470ae13498ece835944",
+      "rationale": "The published package omits the license file and SPDX field. The version-scoped pnpm patch restores the unmodified MIT LICENSE from npm gitHead 1b1f6dfdba6a775410508884097443d35c9a8690; see docs/runbooks/dependency-licenses.md."
     }
   ]
 }

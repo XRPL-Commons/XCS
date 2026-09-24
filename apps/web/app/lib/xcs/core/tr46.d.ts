@@ -1,4 +1,4 @@
-// Copied from packages/core/src/tr46.d.ts at 54c3486; keep in sync by hand (see CONTRIBUTING.md).
+// Copied from packages/core/src/tr46.d.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
 declare module 'tr46' {
   interface ToASCIIOptions {
     checkBidi?: boolean

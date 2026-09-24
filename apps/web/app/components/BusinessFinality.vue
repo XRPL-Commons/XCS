@@ -13,70 +13,74 @@ defineProps<{
 <template>
   <UCard class="mb-6" data-testid="business-finality">
     <template #header>
-      <h2 class="text-xl font-semibold">{{ $t('finality.title') }}</h2>
+      <h2 class="text-xl font-semibold">{{ $t('simpleUi.finalityTitle') }}</h2>
     </template>
-    <StatusBox tone="notice" :title="$t('finality.xrplValidated')" data-testid="xrpl-finality">
-      <p>
-        <code>{{ txHash }}</code>
-      </p>
-      <p>{{ engineResult ?? 'tesSUCCESS' }} · ledger {{ ledgerIndex ?? '—' }}</p>
+    <StatusBox tone="notice" :title="$t('simpleUi.recorded')" data-testid="xrpl-finality">
     </StatusBox>
     <StatusBox
       v-if="businessConfirmation === 'confirmed'"
       tone="success"
-      :title="$t('finality.xcsConfirmed')"
+      :title="$t('simpleUi.completed')"
       data-testid="xcs-confirmed"
     />
     <StatusBox
       v-else-if="businessConfirmation === 'rejected'"
       tone="error"
-      :title="$t('finality.xcsRejected')"
+      :title="$t('simpleUi.rejected')"
       data-testid="xcs-rejected"
     >
-      <code v-if="businessEvidence?.reasonCode">{{ businessEvidence.reasonCode }}</code>
+      <p>{{ $t('simpleUi.rejectedHelp') }}</p>
     </StatusBox>
     <StatusBox
       v-else-if="businessConfirmation === 'mismatch'"
       tone="error"
-      :title="$t('finality.xcsMismatch')"
+      :title="$t('simpleUi.mismatch')"
       data-testid="xcs-mismatch"
     />
-    <StatusBox v-else tone="notice" :title="$t('finality.xcsPending')" data-testid="xcs-pending">
-      <p>{{ $t('finality.reconfirm') }}</p>
+    <StatusBox v-else tone="notice" :title="$t('simpleUi.processing')" data-testid="xcs-pending">
+      <p>{{ $t('simpleUi.noRepeat') }}</p>
     </StatusBox>
-    <MetadataList v-if="businessEvidence" class="mt-5">
-      <dt>{{ $t('finality.proofLedger') }}</dt>
-      <dd>{{ businessEvidence.ledgerIndex }}</dd>
-      <dt>{{ $t('finality.proofLedgerHash') }}</dt>
-      <dd>
-        <code>{{ businessEvidence.ledgerHash }}</code>
-      </dd>
-      <dt>{{ $t('finality.proofTransactionIndex') }}</dt>
-      <dd>{{ businessEvidence.transactionIndex }}</dd>
-      <template v-if="businessEvidence.schemaUid">
-        <dt>Schema UID</dt>
+    <details class="mt-5" data-testid="finality-technical-details">
+      <summary class="cursor-pointer font-semibold">{{ $t('simpleUi.technicalDetails') }}</summary>
+      <p class="mt-3 break-all">
+        <code>{{ txHash }}</code>
+      </p>
+      <p>{{ engineResult ?? 'tesSUCCESS' }} · ledger {{ ledgerIndex ?? '—' }}</p>
+      <code v-if="businessEvidence?.reasonCode">{{ businessEvidence.reasonCode }}</code>
+      <MetadataList v-if="businessEvidence" class="mt-5">
+        <dt>{{ $t('finality.proofLedger') }}</dt>
+        <dd>{{ businessEvidence.ledgerIndex }}</dd>
+        <dt>{{ $t('finality.proofLedgerHash') }}</dt>
         <dd>
-          <code>{{ businessEvidence.schemaUid }}</code>
+          <code>{{ businessEvidence.ledgerHash }}</code>
         </dd>
-      </template>
-      <template v-if="businessEvidence.generationId">
-        <dt>Generation ID</dt>
-        <dd>
-          <code>{{ businessEvidence.generationId }}</code>
-        </dd>
-      </template>
-      <template v-if="businessEvidence.eventType">
-        <dt>{{ $t('finality.proofEvent') }}</dt>
-        <dd>
-          <code>{{ businessEvidence.eventType }}</code>
-        </dd>
-      </template>
-      <template v-if="businessEvidence.deletionCause">
-        <dt>{{ $t('finality.proofDeletionCause') }}</dt>
-        <dd>
-          <code>{{ businessEvidence.deletionCause }}</code>
-        </dd>
-      </template>
-    </MetadataList>
+        <dt>{{ $t('finality.proofTransactionIndex') }}</dt>
+        <dd>{{ businessEvidence.transactionIndex }}</dd>
+        <template v-if="businessEvidence.schemaUid">
+          <dt>Schema UID</dt>
+          <dd>
+            <code>{{ businessEvidence.schemaUid }}</code>
+          </dd>
+        </template>
+        <template v-if="businessEvidence.generationId">
+          <dt>Generation ID</dt>
+          <dd>
+            <code>{{ businessEvidence.generationId }}</code>
+          </dd>
+        </template>
+        <template v-if="businessEvidence.eventType">
+          <dt>{{ $t('finality.proofEvent') }}</dt>
+          <dd>
+            <code>{{ businessEvidence.eventType }}</code>
+          </dd>
+        </template>
+        <template v-if="businessEvidence.deletionCause">
+          <dt>{{ $t('finality.proofDeletionCause') }}</dt>
+          <dd>
+            <code>{{ businessEvidence.deletionCause }}</code>
+          </dd>
+        </template>
+      </MetadataList>
+    </details>
   </UCard>
 </template>

@@ -1,8 +1,13 @@
 import { isIP } from 'node:net'
 import { isValidClassicAddress } from 'xrpl'
+import { adminSecret } from './admin/config'
 
 export interface ApiConfig {
   databaseUrl: string
+  payloadDatabaseUrl: string | undefined
+  hostedPayloads:
+    | { enabled: false }
+    | { enabled: true; publicBaseUrl: string; ipHashSecret: string; networks: string[] }
   trustedProxyCidrs: string[]
   ipfsGateway: string
   trustedIssuers: string[]
@@ -38,7 +43,7 @@ function operationalMetrics(environment: NodeJS.ProcessEnv): ApiConfig['operatio
 }
 
 function required(environment: NodeJS.ProcessEnv, name: string): string {
-  const value = environment[name]
+  const value = adminSecret(environment, name)
   if (value === undefined || value.trim().length === 0) throw new Error(`${name} is required`)
   return value
 }
@@ -48,7 +53,7 @@ function compatibleRequired(
   primary: string,
   legacy: string,
 ): string {
-  const value = environment[primary] ?? environment[legacy]
+  const value = adminSecret(environment, primary) || adminSecret(environment, legacy)
   if (value === undefined || value.trim().length === 0) {
     throw new Error(`${primary} is required`)
   }
@@ -121,6 +126,39 @@ function origins(value: string | undefined): string[] {
   })
 }
 
+function databaseUrl(environment: NodeJS.ProcessEnv, name: string, role: string): string {
+  const value = required(environment, name)
+  try {
+    const url = new URL(value)
+    if (
+      !['postgres:', 'postgresql:'].includes(url.protocol) ||
+      decodeURIComponent(url.username) !== role
+    ) {
+      throw new Error('invalid role')
+    }
+  } catch {
+    // Connection URLs can contain secrets: never include their value or parser error.
+    throw new Error(`${name} must be a PostgreSQL URL for the ${role} role`)
+  }
+  return value
+}
+
+function hostedPayloadBaseUrl(value: string): string {
+  const parsed = new URL(value)
+  if (
+    parsed.protocol !== 'https:' ||
+    parsed.username !== '' ||
+    parsed.password !== '' ||
+    parsed.origin !== value ||
+    Buffer.byteLength(`${value}/p/${'0'.repeat(18)}#xcs-sha256=${'0'.repeat(64)}`, 'utf8') > 128
+  ) {
+    throw new Error(
+      'XCS_PUBLIC_PAYLOAD_BASE_URL must be a short HTTPS origin that produces a URI of at most 128 bytes',
+    )
+  }
+  return value
+}
+
 export function loadApiConfig(environment: NodeJS.ProcessEnv = process.env): ApiConfig {
   const readinessMaxLedgerAgeSeconds = Number(
     environment.XCS_READINESS_MAX_LEDGER_AGE_SECONDS ?? '120',
@@ -146,12 +184,30 @@ export function loadApiConfig(environment: NodeJS.ProcessEnv = process.env): Api
       }
     : ({ enabled: false } as const)
   const trustedIssuers = addressList(environment.XCS_TRUSTED_ISSUERS, 'XCS_TRUSTED_ISSUERS')
+  const hostedPayloadsEnabled = strictBoolean(
+    environment.XCS_HOSTED_PAYLOADS_ENABLED,
+    false,
+    'XCS_HOSTED_PAYLOADS_ENABLED',
+  )
+  const hostedPayloads: ApiConfig['hostedPayloads'] = hostedPayloadsEnabled
+    ? {
+        enabled: true,
+        publicBaseUrl: hostedPayloadBaseUrl(required(environment, 'XCS_PUBLIC_PAYLOAD_BASE_URL')),
+        ipHashSecret: required(environment, 'XCS_PAYLOAD_STORAGE_IP_HASH_SECRET'),
+        networks: list(environment.XCS_HOSTED_PAYLOAD_NETWORKS),
+      }
+    : { enabled: false }
   const untrustedIssuers = addressList(environment.XCS_UNTRUSTED_ISSUERS, 'XCS_UNTRUSTED_ISSUERS')
   if (trustedIssuers.some((issuer) => untrustedIssuers.includes(issuer))) {
     throw new Error('XCS_TRUSTED_ISSUERS and XCS_UNTRUSTED_ISSUERS must not overlap')
   }
   return {
     databaseUrl: compatibleRequired(environment, 'XCS_DATABASE_URL', 'DATABASE_URL'),
+    payloadDatabaseUrl:
+      hostedPayloadsEnabled || demoPinningEnabled
+        ? databaseUrl(environment, 'XCS_PAYLOAD_DATABASE_URL', 'xcs_payload_writer')
+        : undefined,
+    hostedPayloads,
     trustedProxyCidrs: trustedProxyCidrs(environment.XCS_TRUSTED_PROXY_CIDRS),
     ipfsGateway:
       environment.XCS_IPFS_GATEWAY_URL ?? environment.IPFS_GATEWAY_URL ?? 'https://ipfs.io/',

@@ -64,6 +64,14 @@ export interface ValidatedSignature {
   readonly lastLedgerSequence: number
 }
 
+export interface ValidatedSignedTransaction {
+  /** The exact unsigned fields recovered from the signed blob. */
+  readonly transaction: Readonly<SubmittableTransaction>
+  readonly txBlob: string
+  readonly txHash: string
+  readonly lastLedgerSequence: number
+}
+
 export interface ReliableSubmissionOptions {
   readonly journal: OperationJournal
   readonly operationId?: string | undefined
@@ -105,6 +113,43 @@ export interface ReliableSubmissionResult extends TransactionStatus {
 const HASH_PATTERN = /^[0-9a-fA-F]{64}$/u
 const BLOB_PATTERN = /^(?:[0-9a-fA-F]{2})+$/u
 const XRPL_JS_5_MAX_URI_HEX_CHARACTERS = 256
+
+/**
+ * Decode and cryptographically verify a single-signed XRPL transaction blob.
+ * This is the server-safe counterpart to the browser submission validation.
+ */
+export function decodeSignedTransactionBlob(txBlob: string): ValidatedSignedTransaction {
+  if (!BLOB_PATTERN.test(txBlob)) {
+    throw new XcsSdkError(
+      'XCS_SDK_INVALID_SIGNED_BLOB',
+      'Signed transaction input must be non-empty hexadecimal data.',
+    )
+  }
+
+  let decoded: Record<string, unknown>
+  let txHash: string
+  try {
+    decoded = decode(txBlob)
+    txHash = hashes.hashSignedTx(txBlob).toUpperCase()
+  } catch {
+    throw new XcsSdkError('XCS_SDK_INVALID_SIGNED_BLOB', 'Cannot decode signed transaction.')
+  }
+  assertValidSingleSignature(decoded, txBlob)
+  const lastLedgerSequence = asPositiveInteger(decoded.LastLedgerSequence)
+  if (lastLedgerSequence === undefined) {
+    throw new XcsSdkError(
+      'XCS_SDK_INVALID_SIGNED_BLOB',
+      'Signed transaction must contain a positive LastLedgerSequence.',
+    )
+  }
+
+  return {
+    transaction: withoutSignatureFields(decoded) as unknown as SubmittableTransaction,
+    txBlob,
+    txHash,
+    lastLedgerSequence,
+  }
+}
 
 export async function autofillXcsTransaction<T extends SubmittableTransaction>(
   client: Client,
@@ -212,6 +257,9 @@ export async function signPreparedAndSubmit<T extends SubmittableTransaction>(
       allowLastLedgerSequenceRefresh: options.allowSignerLastLedgerSequenceRefresh,
     })
     signedLastLedgerSequence = signedTransaction.LastLedgerSequence as number
+    // A wallet approval can outlive the reviewed ledger window. Reject before
+    // exposing recovery material to host hooks, so a fresh operation can retry.
+    await assertTransactionNotExpired(client, signedLastLedgerSequence)
     await options.onValidatedSignature?.({
       operationId,
       transaction: signedTransaction,
@@ -232,6 +280,13 @@ export async function signPreparedAndSubmit<T extends SubmittableTransaction>(
   return submitSignedTransaction(client, signed.txBlob, {
     ...options,
     operationId,
+    beforeSubmit: async (signature) => {
+      await options.beforeSubmit?.(signature)
+      // Recheck after asynchronous persistence/business guards, at the last
+      // boundary before this first relay. Recovery of old blobs stays separate:
+      // passing LastLedgerSequence does not prove absence from ledger history.
+      await assertTransactionNotExpired(client, signature.lastLedgerSequence)
+    },
   })
 }
 
@@ -246,31 +301,10 @@ export async function submitSignedTransaction(
       'Connect and validate the XRPL client before submitting a transaction.',
     )
   }
-  if (!BLOB_PATTERN.test(txBlob)) {
-    throw new XcsSdkError(
-      'XCS_SDK_INVALID_SIGNED_BLOB',
-      'Signed transaction input must be non-empty hexadecimal data.',
-    )
-  }
-
   const operationId = options.operationId ?? crypto.randomUUID()
-  let decoded: Record<string, unknown>
-  let txHash: string
-  try {
-    decoded = decode(txBlob)
-    txHash = hashes.hashSignedTx(txBlob).toUpperCase()
-  } catch {
-    throw new XcsSdkError('XCS_SDK_INVALID_SIGNED_BLOB', 'Cannot decode signed transaction.')
-  }
-  assertValidSingleSignature(decoded, txBlob)
-
-  const lastLedgerSequence = asPositiveInteger(decoded.LastLedgerSequence)
-  if (lastLedgerSequence === undefined) {
-    throw new XcsSdkError(
-      'XCS_SDK_INVALID_SIGNED_BLOB',
-      'Reliable submission requires a signed transaction with LastLedgerSequence.',
-    )
-  }
+  const validated = decodeSignedTransactionBlob(txBlob)
+  const decoded = validated.transaction as unknown as Record<string, unknown>
+  const { txHash, lastLedgerSequence } = validated
 
   // Persist the recovery identifiers before the first network side effect.
   await append(options.journal, {
@@ -392,17 +426,10 @@ export async function getTransactionStatus(
     }
   }
 
-  if (lastLedgerSequence !== undefined) {
-    const currentLedger = await getCurrentLedgerIndex(client)
-    if (currentLedger > lastLedgerSequence) {
-      return {
-        status: 'expired',
-        txHash: txHash.toUpperCase(),
-        lastLedgerSequence,
-      }
-    }
-  }
-
+  // A missing hash is not proof of expiry: the open ledger can be ahead of
+  // validation, and the server may lack historical ledgers. This API has no
+  // persisted submission-window start with which to prove complete absence.
+  // Keep the operation reconcilable instead of recording a terminal failure.
   return { status: 'not_found', txHash: txHash.toUpperCase(), lastLedgerSequence }
 }
 

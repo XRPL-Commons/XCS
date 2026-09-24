@@ -2,24 +2,73 @@
 const { getStats } = useXcsApi()
 const { locale, t } = useI18n()
 const localePath = useLocalePath()
+const auth = useAuth()
+const issuerEnabled = String(useRuntimeConfig().public.issuerEnabled) === '1'
+await auth.load()
+const simpleNavigation = computed(() => issuerEnabled && auth.enabled.value)
+const actions = computed(() => [
+  { name: 'receive', to: '/recipient', icon: 'i-lucide-inbox' },
+  {
+    name: 'issue',
+    to: auth.hasRole('issuer') ? '/issuer' : '/issuer/application',
+    icon: 'i-lucide-send',
+  },
+  { name: 'verify', to: '/presentations', icon: 'i-lucide-badge-check' },
+])
 const {
   data: stats,
   pending,
   error,
   refresh,
-} = await useAsyncData('explorer-stats', () => getStats())
+} = await useAsyncData('explorer-stats', () => getStats(), {
+  immediate: !simpleNavigation.value,
+})
 
 const numberFormat = computed(() => new Intl.NumberFormat(locale.value))
 
 useSeoMeta({
-  title: () => t('home.metaTitle'),
-  description: () => t('home.description'),
+  title: () => t(simpleNavigation.value ? 'simpleNavigation.metaTitle' : 'home.metaTitle'),
+  description: () =>
+    t(simpleNavigation.value ? 'simpleNavigation.description' : 'home.description'),
   robots: 'index,follow',
 })
 </script>
 
 <template>
-  <div>
+  <div v-if="simpleNavigation" data-testid="simple-home">
+    <UContainer class="py-16 sm:py-24">
+      <div class="max-w-3xl">
+        <p class="mb-4 text-sm font-semibold text-muted">{{ $t('simpleNavigation.eyebrow') }}</p>
+        <h1 class="text-4xl leading-tight tracking-tight sm:text-5xl">
+          {{ $t('simpleNavigation.title') }}
+        </h1>
+        <p class="mt-6 max-w-2xl text-lg text-toned">{{ $t('simpleNavigation.description') }}</p>
+      </div>
+      <nav
+        class="mt-12 grid gap-5 md:grid-cols-3"
+        :aria-label="$t('simpleNavigation.actionsLabel')"
+      >
+        <NuxtLink
+          v-for="action in actions"
+          :key="action.name"
+          :to="localePath(action.to)"
+          class="group rounded-xl border border-default bg-elevated p-6 text-default no-underline transition-colors hover:bg-accented focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+        >
+          <UIcon :name="action.icon" class="mb-5 size-7" aria-hidden="true" />
+          <h2 class="text-2xl font-semibold">{{ $t(`simpleNavigation.${action.name}`) }}</h2>
+          <p class="mt-3 text-sm leading-relaxed text-toned">
+            {{ $t(`simpleNavigation.${action.name}Description`) }}
+          </p>
+          <span class="mt-6 inline-flex items-center gap-2 font-semibold">
+            {{ $t(`simpleNavigation.${action.name}Action`) }}
+            <UIcon name="i-lucide-arrow-right" class="size-4" aria-hidden="true" />
+          </span>
+        </NuxtLink>
+      </nav>
+      <p class="mt-8 max-w-2xl text-sm text-muted">{{ $t('simpleNavigation.walletHelp') }}</p>
+    </UContainer>
+  </div>
+  <div v-else>
     <section
       class="relative isolate overflow-hidden bg-neutral-950 text-neutral-50"
       aria-labelledby="landing-title"

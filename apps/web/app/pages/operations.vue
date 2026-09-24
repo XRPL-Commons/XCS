@@ -144,6 +144,7 @@ onMounted(refresh)
     </PageHeader>
 
     <StatusBox tone="warning">{{ $t('operations.localOnly') }}</StatusBox>
+    <HostedPublicationRecovery />
     <StatusBox v-if="pageError" tone="error">{{ pageError }}</StatusBox>
     <StatusBox
       v-if="resultMessage"

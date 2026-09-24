@@ -1,5 +1,5 @@
 import { createHttpsPayloadUri, createIpfsPayloadUri } from '#xcs/core/index.js'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   MAX_PILOT_PAYLOAD_BYTES,
@@ -14,6 +14,7 @@ function jsonResponse(content: BodyInit, headers: Record<string, string> = {}): 
     headers: { 'content-type': 'application/json; charset=utf-8', ...headers },
   })
 }
+afterEach(() => vi.unstubAllGlobals())
 
 describe('browser HTTPS payload publication proof', () => {
   const canonical = canonicalJson({ claims: { programId: 'course-1' } })
@@ -127,6 +128,50 @@ describe('browser HTTPS payload publication proof', () => {
         fetchImpl: async () => jsonResponse(tampered),
       }),
     ).rejects.toThrow('PAYLOAD_DIGEST_MISMATCH')
+  })
+
+  it('treats an intentionally filtered private view as restricted, not digest tampering', async () => {
+    const response = jsonResponse(canonicalJson({ claims: {} }), { 'x-xcs-claim-scope': 'public' })
+    const readBytes = vi.spyOn(response.body!, 'getReader')
+    const fetchMock = vi.fn(async () => response)
+    await expect(
+      readCanonicalHttpsPayload({ credentialUri: uri, fetchImpl: fetchMock }),
+    ).rejects.toThrow('PAYLOAD_SCOPE_RESTRICTED')
+    expect(readBytes).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+      uri.split('#')[0],
+      expect.objectContaining({ credentials: 'omit' }),
+    )
+  })
+
+  it('allows only the same-origin short private alias on a local HTTPS deployment without credentials', async () => {
+    vi.stubGlobal('window', { location: { origin: 'https://localhost:3443' } })
+    const privateUri = createHttpsPayloadUri(
+      'https://localhost:3443/q/123456789012345678',
+      canonical,
+    )
+    const fetchMock = vi.fn(async () => jsonResponse(canonical, { 'x-xcs-claim-scope': 'full' }))
+    await expect(
+      readCanonicalHttpsPayload({ credentialUri: privateUri, fetchImpl: fetchMock }),
+    ).resolves.toMatchObject({ content: canonical })
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+      privateUri.split('#')[0],
+      expect.objectContaining({ credentials: 'omit', redirect: 'error' }),
+    )
+    for (const base of [
+      'https://localhost:3444/q/123456789012345678',
+      'https://localhost:3443/q/12345678901234567890',
+      'https://localhost:3443/q/123456789012345678?scope=full',
+    ]) {
+      fetchMock.mockClear()
+      await expect(
+        readCanonicalHttpsPayload({
+          credentialUri: createHttpsPayloadUri(base, canonical),
+          fetchImpl: fetchMock,
+        }),
+      ).rejects.toThrow('PILOT_PAYLOAD_HOST_REJECTED')
+      expect(fetchMock).not.toHaveBeenCalled()
+    }
   })
 
   it('aborts a stalled request on timeout', async () => {

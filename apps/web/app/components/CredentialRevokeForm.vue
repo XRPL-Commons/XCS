@@ -1,0 +1,393 @@
+<script setup lang="ts">
+import { decodeHexUtf8, rippleTimeToIso } from '#xcs/core/index.js'
+import { buildCredentialDelete } from '#xcs/sdk/index.js'
+import type { CredentialDelete } from 'xrpl'
+import type { WalletSubmissionResult } from '~/composables/useWallet'
+import {
+  credentialRevocationBlockReason,
+  parseApiCredentialDetail,
+  parseVerificationDimensions,
+  type ApiCredentialDetail,
+  type VerificationDimensions,
+} from '~/utils/credentialReview'
+import {
+  assertLinkGeneration,
+  assertLinkProfile,
+  buildCredentialPermalink,
+  singleRouteQueryValue,
+} from '~/utils/operationLinks'
+import { walletTransactionErrorMessage } from '~/utils/walletCompatibility'
+
+import type { IssuerRevokeEngineContext } from '~/utils/issuerEngine'
+
+const props = defineProps<{ issuerContext?: IssuerRevokeEngineContext }>()
+const route = useRoute()
+const localePath = useLocalePath()
+const { t } = useI18n()
+const { account, busy: walletBusy, prepare, signAndSubmit } = useWallet()
+const { getActiveNetworkProfile, getCredential, verify } = useXcsApi()
+const subject = ref(
+  props.issuerContext?.subjectAddress ?? singleRouteQueryValue(route.query.subject),
+)
+const schemaUid = ref(props.issuerContext?.schemaUid ?? singleRouteQueryValue(route.query.schema))
+const linkedProfileId = ref(
+  props.issuerContext?.profileId ?? singleRouteQueryValue(route.query.profile),
+)
+const linkedGenerationId = ref(
+  props.issuerContext?.generationId ?? singleRouteQueryValue(route.query.generation),
+)
+const transaction = shallowRef<CredentialDelete | null>(null)
+const credential = shallowRef<ApiCredentialDetail | null>(null)
+const report = shallowRef<VerificationDimensions | null>(null)
+const reviewProfileId = ref<string | null>(null)
+const reviewBusy = ref(false)
+const message = ref('')
+const result = shallowRef<WalletSubmissionResult | null>(null)
+const busy = computed(() => walletBusy.value || reviewBusy.value)
+const messageDisplay = computed(() => {
+  return (
+    walletTransactionErrorMessage(message.value, t) ??
+    (props.issuerContext ? t('simpleIssuer.error') : message.value)
+  )
+})
+const messageIsLocalized = computed(
+  () => message.value.length > 0 && messageDisplay.value !== message.value,
+)
+const resultCredentialLink = computed(() => {
+  const generationId = result.value?.businessEvidence?.generationId
+  if (
+    result.value?.businessConfirmation !== 'confirmed' ||
+    !generationId ||
+    !reviewProfileId.value
+  ) {
+    return null
+  }
+  return buildCredentialPermalink({
+    profileId: reviewProfileId.value,
+    generationId,
+  })
+})
+const decodedUri = computed(() => {
+  if (!credential.value?.uriHex) return null
+  try {
+    return decodeHexUtf8(credential.value.uriHex)
+  } catch {
+    return null
+  }
+})
+const expiration = computed(() =>
+  credential.value?.expiration === null || credential.value?.expiration === undefined
+    ? null
+    : rippleTimeToIso(credential.value.expiration),
+)
+let previewRevision = 0
+
+function invalidatePreview() {
+  previewRevision += 1
+  transaction.value = null
+  credential.value = null
+  report.value = null
+  reviewProfileId.value = null
+  result.value = null
+}
+
+watch([subject, schemaUid, linkedProfileId, linkedGenerationId], invalidatePreview)
+watch(
+  [() => account.value?.address ?? '', () => account.value?.network.id ?? ''],
+  invalidatePreview,
+)
+watch(
+  () => [route.query.subject, route.query.schema, route.query.profile, route.query.generation],
+  ([nextSubject, nextSchema, nextProfile, nextGeneration]) => {
+    if (props.issuerContext) return
+    subject.value = singleRouteQueryValue(nextSubject)
+    schemaUid.value = singleRouteQueryValue(nextSchema)
+    linkedProfileId.value = singleRouteQueryValue(nextProfile)
+    linkedGenerationId.value = singleRouteQueryValue(nextGeneration)
+  },
+)
+
+async function fetchExactCredential(input: {
+  issuer: string
+  subject: string
+  schemaUid: string
+  profileId: string
+  expectedGenerationId?: string | undefined
+}) {
+  const [rawCredential, rawReport] = await Promise.all([
+    getCredential(input.issuer, input.subject, input.schemaUid, input.profileId),
+    verify(
+      {
+        issuer: input.issuer,
+        subject: input.subject,
+        schemaUid: input.schemaUid,
+        resolvePayload: false,
+      },
+      input.profileId,
+    ),
+  ])
+  const exactCredential = parseApiCredentialDetail(rawCredential, input)
+  assertLinkGeneration(input.expectedGenerationId, exactCredential.generationId)
+  const dimensions = parseVerificationDimensions(rawReport)
+  if (exactCredential.state !== dimensions.onChain) {
+    throw new Error('CREDENTIAL_REVIEW_STATE_MISMATCH')
+  }
+  if (dimensions.generationId && dimensions.generationId !== exactCredential.generationId) {
+    throw new Error('CREDENTIAL_REVIEW_GENERATION_MISMATCH')
+  }
+  const reason = credentialRevocationBlockReason(exactCredential)
+  if (reason) throw new Error(reason)
+  return { exactCredential, dimensions }
+}
+
+async function buildPreview() {
+  invalidatePreview()
+  message.value = ''
+  if (!account.value) return void (message.value = 'WALLET_NOT_CONNECTED')
+
+  reviewBusy.value = true
+  const revision = previewRevision
+  const issuerAddress = account.value.address
+  const subjectAddress = subject.value
+  const normalizedSchemaUid = schemaUid.value.toLowerCase()
+  try {
+    if (props.issuerContext) {
+      if (issuerAddress !== props.issuerContext.issuerAddress)
+        throw new Error('ISSUER_VERIFIED_WALLET_REQUIRED')
+      await props.issuerContext.beforeSign(issuerAddress)
+    }
+    const profile = await getActiveNetworkProfile()
+    assertLinkProfile(linkedProfileId.value || undefined, profile.profileId)
+    const loaded = await fetchExactCredential({
+      issuer: issuerAddress,
+      subject: subjectAddress,
+      schemaUid: normalizedSchemaUid,
+      profileId: profile.profileId,
+      ...(linkedGenerationId.value ? { expectedGenerationId: linkedGenerationId.value } : {}),
+    })
+    if (revision !== previewRevision) throw new Error('CREDENTIAL_REVIEW_CHANGED_DURING_LOAD')
+    credential.value = loaded.exactCredential
+    report.value = loaded.dimensions
+    reviewProfileId.value = profile.profileId
+    const raw = buildCredentialDelete({
+      account: issuerAddress,
+      issuer: issuerAddress,
+      subject: subjectAddress,
+      schemaUid: normalizedSchemaUid,
+    })
+    const prepared = (await prepare(raw, profile)) as CredentialDelete
+    if (revision !== previewRevision) throw new Error('CREDENTIAL_REVIEW_CHANGED_DURING_BUILD')
+    transaction.value = prepared
+  } catch (error) {
+    transaction.value = null
+    message.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    reviewBusy.value = false
+  }
+}
+
+async function submit() {
+  const preparedTransaction = transaction.value
+  const expectedCredential = credential.value
+  const expectedIssuer = account.value?.address
+  const expectedSubject = subject.value
+  const expectedSchemaUid = schemaUid.value.toLowerCase()
+  const expectedLinkedProfileId = linkedProfileId.value
+  const expectedLinkedGenerationId = linkedGenerationId.value
+  const expectedReviewProfileId = reviewProfileId.value
+  const expectedRevision = previewRevision
+  if (!preparedTransaction || !expectedCredential || !expectedIssuer) {
+    message.value = 'TRANSACTION_PREVIEW_REQUIRED'
+    return
+  }
+
+  if (
+    props.issuerContext &&
+    !window.confirm(
+      t('issuer.engine.confirmRevoke', {
+        recipient: props.issuerContext.recipientLabel,
+        schema: props.issuerContext.schemaName,
+      }),
+    )
+  )
+    return
+  reviewBusy.value = true
+  message.value = ''
+  try {
+    const assertCurrent = () => {
+      if (
+        previewRevision !== expectedRevision ||
+        transaction.value !== preparedTransaction ||
+        account.value?.address !== expectedIssuer ||
+        subject.value !== expectedSubject ||
+        schemaUid.value.toLowerCase() !== expectedSchemaUid ||
+        linkedProfileId.value !== expectedLinkedProfileId ||
+        linkedGenerationId.value !== expectedLinkedGenerationId ||
+        reviewProfileId.value !== expectedReviewProfileId
+      ) {
+        throw new Error('CREDENTIAL_REVIEW_CHANGED_BEFORE_SIGNATURE')
+      }
+    }
+    assertCurrent()
+    if (props.issuerContext) {
+      if (expectedIssuer !== props.issuerContext.issuerAddress)
+        throw new Error('ISSUER_VERIFIED_WALLET_REQUIRED')
+      await props.issuerContext.beforeSign(expectedIssuer)
+      assertCurrent()
+    }
+    const profile = await getActiveNetworkProfile()
+    assertLinkProfile(expectedLinkedProfileId || undefined, profile.profileId)
+    assertLinkProfile(expectedReviewProfileId ?? undefined, profile.profileId)
+    const loaded = await fetchExactCredential({
+      issuer: expectedIssuer,
+      subject: expectedSubject,
+      schemaUid: expectedSchemaUid,
+      profileId: profile.profileId,
+      ...(expectedLinkedGenerationId ? { expectedGenerationId: expectedLinkedGenerationId } : {}),
+    })
+    assertCurrent()
+    if (loaded.exactCredential.generationId !== expectedCredential.generationId) {
+      throw new Error('CREDENTIAL_GENERATION_CHANGED_BEFORE_SIGNATURE')
+    }
+    credential.value = loaded.exactCredential
+    report.value = loaded.dimensions
+    const response = await signAndSubmit(
+      preparedTransaction,
+      {
+        action: 'credential-revoke',
+        issuer: expectedIssuer,
+        subject: expectedSubject,
+        schemaUid: expectedSchemaUid,
+        generationId: loaded.exactCredential.generationId,
+      },
+      assertCurrent,
+      async (signature) => {
+        await props.issuerContext?.beforeSign(expectedIssuer)
+        assertCurrent()
+        props.issuerContext?.onSigned?.(signature.txHash)
+      },
+      (validated) => {
+        result.value = { ...validated }
+        transaction.value = null
+      },
+    )
+    result.value = response
+    transaction.value = null
+    if (response.businessConfirmation === 'confirmed')
+      await props.issuerContext?.afterConfirmed?.(response)
+  } catch (error) {
+    message.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    reviewBusy.value = false
+  }
+}
+</script>
+
+<template>
+  <UContainer class="py-10 sm:py-14">
+    <PageHeader :title="$t('simpleIssuer.revokeTitle')" :lead="$t('simpleIssuer.revokeLead')" />
+    <StatusBox tone="warning">{{ $t('simpleIssuer.revokeWarning') }}</StatusBox>
+
+    <UCard class="mb-6">
+      <div class="grid gap-5">
+        <template v-if="issuerContext">
+          <p>
+            <strong>{{ $t('simpleIssuer.model') }}:</strong> {{ issuerContext.schemaName }}
+          </p>
+          <p>
+            <strong>{{ $t('simpleIssuer.recipient') }}:</strong> {{ issuerContext.recipientLabel }}
+          </p>
+        </template>
+        <UFormField v-if="!issuerContext" label="Subject">
+          <UInput id="revoke-subject" v-model.trim="subject" placeholder="r…" :disabled="busy" />
+        </UFormField>
+        <UFormField v-if="!issuerContext" label="Schema UID">
+          <UInput
+            id="revoke-schema"
+            v-model.trim="schemaUid"
+            pattern="[0-9a-fA-F]{64}"
+            :disabled="busy"
+          />
+        </UFormField>
+        <div>
+          <UButton :disabled="busy" @click="buildPreview">
+            {{ busy ? $t('common.working') : $t('simpleIssuer.reviewRevoke') }}
+          </UButton>
+        </div>
+      </div>
+    </UCard>
+
+    <StatusBox v-if="message" tone="error" data-testid="revoke-error" :title="messageDisplay">
+      <details v-if="messageIsLocalized">
+        <summary>{{ $t('simpleIssuer.technical') }}</summary>
+        <code>{{ message }}</code>
+      </details>
+    </StatusBox>
+
+    <UCard v-if="credential && report" class="mb-6">
+      <template #header>
+        <h2 class="text-xl font-semibold">{{ $t('revoke.exactCredential') }}</h2>
+      </template>
+      <p>{{ $t('simpleIssuer.currentState') }} : <AttestationStatus :value="credential.state" /></p>
+      <p class="mt-2">
+        {{ $t('simpleIssuer.expiration') }} : {{ expiration ?? $t('revoke.noExpiration') }}
+      </p>
+      <details class="mt-4">
+        <summary class="cursor-pointer text-sm text-muted">
+          {{ $t('simpleIssuer.technical') }}
+        </summary>
+        <MetadataList>
+          <dt>Issuer</dt>
+          <dd>
+            <code>{{ credential.issuer }}</code>
+          </dd>
+          <dt>Subject</dt>
+          <dd>
+            <code>{{ credential.subject }}</code>
+          </dd>
+          <dt>Schema UID</dt>
+          <dd>
+            <code>{{ credential.schemaUid }}</code>
+          </dd>
+          <dt>{{ $t('revoke.state') }}</dt>
+          <dd><StatusPill :value="credential.state" /></dd>
+          <dt>{{ $t('revoke.expiration') }}</dt>
+          <dd>{{ expiration ?? $t('revoke.noExpiration') }}</dd>
+          <dt>URI</dt>
+          <dd>
+            <code>{{ decodedUri ?? '—' }}</code>
+          </dd>
+          <dt>{{ $t('revoke.generation') }}</dt>
+          <dd>
+            <code>{{ credential.generationId }}</code>
+          </dd>
+        </MetadataList>
+      </details>
+    </UCard>
+
+    <TransactionPreview
+      :transaction="transaction"
+      :busy="busy"
+      :compact="!!issuerContext"
+      :confirm-label="$t('simpleIssuer.revoke')"
+      @confirm="submit"
+    />
+    <BusinessFinality
+      v-if="result"
+      :tx-hash="result.txHash"
+      :engine-result="result.transactionResult"
+      :ledger-index="result.ledgerIndex"
+      :business-confirmation="result.businessConfirmation"
+      :business-evidence="result.businessEvidence"
+    />
+    <UButton
+      v-if="resultCredentialLink"
+      color="neutral"
+      variant="outline"
+      data-testid="revoke-result-permalink"
+      :to="localePath(resultCredentialLink)"
+    >
+      {{ $t('revoke.openPermalink') }}
+    </UButton>
+  </UContainer>
+</template>
