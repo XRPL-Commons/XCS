@@ -1,4 +1,4 @@
-import type { ReliableSubmissionResult, Signer, SignerResult } from '@xcs-protocol/sdk'
+import type { ReliableSubmissionResult, Signer, SignerResult } from '#xcs/sdk/index.js'
 import { decode, encode, hashes, verifySignature } from 'xrpl'
 import type { SignedTransaction, Transaction } from 'xrpl-connect'
 

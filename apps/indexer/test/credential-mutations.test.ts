@@ -1,4 +1,4 @@
-import { createIpfsPayloadUri } from '@xcs-protocol/core'
+import { createIpfsPayloadUri } from '../src/lib/xcs/index.js'
 import { describe, expect, it } from 'vitest'
 
 import {

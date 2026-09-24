@@ -1,4 +1,4 @@
-import type { NetworkProfile } from '@xcs-protocol/core'
+import type { NetworkProfile } from './lib/xcs/index.js'
 
 import { LedgerFixtureBundleSource, validateLedgerFixtureBundle } from './fixture-bundle.js'
 import { createReplayTarget, ReplayTargetError, type ReplayTarget } from './replay-target.js'

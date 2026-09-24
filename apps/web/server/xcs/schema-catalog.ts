@@ -3,7 +3,7 @@ import {
   parseSchema,
   type NetworkProfile,
   type SchemaDefinition,
-} from '@xcs-protocol/core'
+} from '#xcs/core/index.js'
 import type { LedgerCheckpointRow, NetworkProfileRow, SchemaRow } from '#db/schema'
 
 import { authoritativeResolvedSchema, SchemaProjectionInvalidError } from './schema-projection.js'

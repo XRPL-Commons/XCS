@@ -3,7 +3,7 @@ import type {
   FieldDescriptor,
   JsonValue,
   ResolvedSchema,
-} from '@xcs-protocol/core'
+} from '#xcs/core/index.js'
 
 import {
   assertPayloadFetchConsentCurrent,

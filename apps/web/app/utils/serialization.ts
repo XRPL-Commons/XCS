@@ -6,4 +6,4 @@ export {
   encodeUtf8,
   parseJson,
   sha256Hex,
-} from '@xcs-protocol/core'
+} from '#xcs/core/index.js'

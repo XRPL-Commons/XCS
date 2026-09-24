@@ -1,4 +1,4 @@
-import { parseSchema, type ScalarFieldType, type SchemaDefinition } from '@xcs-protocol/core'
+import { parseSchema, type ScalarFieldType, type SchemaDefinition } from '#xcs/core/index.js'
 
 export const GUIDED_SCHEMA_FIELD_TYPES = [
   'string',

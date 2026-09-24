@@ -1,0 +1,7 @@
+node_modules
+coverage
+.nuxt
+.output
+playwright-report
+test-results
+pnpm-lock.yaml

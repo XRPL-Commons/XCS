@@ -1,4 +1,4 @@
-import type { JsonValue } from '@xcs-protocol/core'
+import type { JsonValue } from './lib/xcs/index.js'
 import {
   credentialEvents,
   credentialGenerations,

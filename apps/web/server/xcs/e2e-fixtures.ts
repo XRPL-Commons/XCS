@@ -5,7 +5,7 @@ import {
   type JsonValue,
   type NetworkProfile,
   type SchemaDefinition,
-} from '@xcs-protocol/core'
+} from '#xcs/core/index.js'
 
 import { canonicalJson, encodeHexUtf8 } from '../../app/utils/serialization'
 import type { ApiReply } from './http.js'

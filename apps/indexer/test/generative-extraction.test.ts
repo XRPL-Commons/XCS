@@ -1,4 +1,4 @@
-import { createIpfsPayloadUri, type JsonValue } from '@xcs-protocol/core'
+import { createIpfsPayloadUri, type JsonValue } from '../src/lib/xcs/index.js'
 import { describe, expect, it } from 'vitest'
 
 import { extractCredentialMutations } from '../src/credential-mutations.js'

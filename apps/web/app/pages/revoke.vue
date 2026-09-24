@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { rippleTimeToIso } from '@xcs-protocol/core'
-import { buildCredentialDelete } from '@xcs-protocol/sdk'
+import { rippleTimeToIso } from '#xcs/core/index.js'
+import { buildCredentialDelete } from '#xcs/sdk/index.js'
 import type { CredentialDelete } from 'xrpl'
 import type { WalletSubmissionResult } from '~/composables/useWallet'
 import {

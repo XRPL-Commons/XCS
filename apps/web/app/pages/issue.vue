@@ -3,8 +3,8 @@ import {
   createHttpsPayloadUri,
   createIpfsPayloadUri,
   encodeCredentialPayload,
-} from '@xcs-protocol/core'
-import { buildCredentialCreate } from '@xcs-protocol/sdk'
+} from '#xcs/core/index.js'
+import { buildCredentialCreate } from '#xcs/sdk/index.js'
 import type { CredentialCreate } from 'xrpl'
 import type { WalletSubmissionResult } from '~/composables/useWallet'
 import { LocalPayloadPiiFieldError, type LocalPayloadPublication } from '~/utils/localPayloadStore'

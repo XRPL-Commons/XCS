@@ -1,4 +1,4 @@
-import type { NetworkProfile, ResolvedSchema, SchemaDefinition } from '@xcs-protocol/core'
+import type { NetworkProfile, ResolvedSchema, SchemaDefinition } from '#xcs/core/index.js'
 import type { VerificationDimensions } from '../utils/credentialReview'
 import {
   exactCredentialEventPath,

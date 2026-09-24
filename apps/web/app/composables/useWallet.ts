@@ -1,4 +1,4 @@
-import type { NetworkProfile } from '@xcs-protocol/core'
+import type { NetworkProfile } from '#xcs/core/index.js'
 import {
   autofillXcsTransaction,
   connectAndValidateNetwork,
@@ -6,7 +6,7 @@ import {
   signPreparedAndSubmit,
   submitSignedTransaction,
   type ReliableSubmissionResult,
-} from '@xcs-protocol/sdk'
+} from '#xcs/sdk/index.js'
 import type { SubmittableTransaction } from 'xrpl'
 import {
   supportsFetchAccount,

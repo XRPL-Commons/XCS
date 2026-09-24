@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import { computeSchemaUid, parseSchema, type SchemaDefinition } from '@xcs-protocol/core'
+import { computeSchemaUid, parseSchema, type SchemaDefinition } from '#xcs/core/index.js'
 import { schemaEvents, schemas } from '#db/schema'
 import { type DatabaseClient, createDatabaseClient } from '../server/lib/db/client.js'
 import { bootstrapDatabase, databasePasswordFromUrl } from './lib/db/bootstrap.js'

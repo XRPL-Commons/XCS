@@ -15,7 +15,7 @@ import {
 import { basename, dirname, join, resolve } from 'node:path'
 import { gunzipSync, gzipSync } from 'node:zlib'
 
-import { parseNetworkProfile, type NetworkProfile } from '@xcs-protocol/core'
+import { parseNetworkProfile, type NetworkProfile } from './lib/xcs/index.js'
 
 import { assertLedgerContinuity, assertTransactionOrdering } from './continuity.js'
 import { canonicalJson, encodeUtf8, parseJson, sha256Hex } from './serialization.js'

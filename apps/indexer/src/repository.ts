@@ -18,7 +18,7 @@ import {
   renewIndexerLease,
   updateIndexerStatus as updateDatabaseIndexerStatus,
 } from './lib/db/indexer-fencing.js'
-import type { JsonValue } from '@xcs-protocol/core'
+import type { JsonValue } from './lib/xcs/index.js'
 import { and, asc, desc, eq, isNull } from 'drizzle-orm'
 
 import { assertLedgerContinuity } from './continuity.js'

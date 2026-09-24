@@ -28,7 +28,7 @@ import {
   initializeDatabase,
   provisionRuntimeDatabaseRoles,
 } from '../src/lib/db/bootstrap.js'
-import { computeSchemaUid, createIpfsPayloadUri, type JsonValue } from '@xcs-protocol/core'
+import { computeSchemaUid, createIpfsPayloadUri, type JsonValue } from '../src/lib/xcs/index.js'
 import { and, asc, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 

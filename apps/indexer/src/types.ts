@@ -4,7 +4,7 @@ import type {
   RegisteredSchema,
   ResolvedSchema,
   SchemaDefinition,
-} from '@xcs-protocol/core'
+} from './lib/xcs/index.js'
 import type { AcquiredIndexerLease, IndexerLeaseToken } from './lib/db/indexer-fencing.js'
 
 export type { NetworkProfile, RegisteredSchema, ResolvedSchema, SchemaDefinition }

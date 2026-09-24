@@ -1,4 +1,4 @@
-import { parsePayloadUri } from '@xcs-protocol/core'
+import { parsePayloadUri } from './lib/xcs/index.js'
 import { isValidClassicAddress } from 'xrpl'
 
 import { decodeHexUtf8 } from './serialization.js'

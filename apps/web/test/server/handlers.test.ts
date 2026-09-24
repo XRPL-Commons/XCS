@@ -1,4 +1,4 @@
-import { computeSchemaUid, parseSchema } from '@xcs-protocol/core'
+import { computeSchemaUid, parseSchema } from '#xcs/core/index.js'
 import type {
   CredentialEventRow,
   CredentialGenerationRow,

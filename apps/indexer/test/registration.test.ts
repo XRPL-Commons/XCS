@@ -1,4 +1,4 @@
-import type { JsonValue } from '@xcs-protocol/core'
+import type { JsonValue } from '../src/lib/xcs/index.js'
 import { describe, expect, it } from 'vitest'
 
 import { interpretSchemaRegistration } from '../src/registration.js'

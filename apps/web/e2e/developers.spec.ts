@@ -4,7 +4,7 @@ import {
   computeSchemaUid,
   type JsonValue,
   type SchemaDefinition,
-} from '@xcs-protocol/core'
+} from '#xcs/core/index.js'
 
 const PROFILE_ID = 'xrpl-testnet-xcs-browser-e2e'
 const ISSUER = 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh'

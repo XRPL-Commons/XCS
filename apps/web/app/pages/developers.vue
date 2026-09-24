@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { parseCredentialPayload, verifyPayloadIntegrity } from '@xcs-protocol/core'
-import { credentialHexToUri } from '@xcs-protocol/sdk'
+import { parseCredentialPayload, verifyPayloadIntegrity } from '#xcs/core/index.js'
+import { credentialHexToUri } from '#xcs/sdk/index.js'
 import type {
   ApiCredentialGenerationDetail,
   ApiSchemaDetail,

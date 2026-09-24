@@ -2,8 +2,8 @@ import type {
   OperationJournal,
   SubmissionJournalEntry,
   SubmissionJournalStage,
-} from '@xcs-protocol/sdk'
-import { parsePayloadUri } from '@xcs-protocol/core'
+} from '#xcs/sdk/index.js'
+import { parsePayloadUri } from '#xcs/core/index.js'
 import { isValidClassicAddress } from 'xrpl'
 
 const DATABASE_NAME = 'xcs-wallet-journal'

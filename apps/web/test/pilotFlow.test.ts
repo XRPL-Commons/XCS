@@ -2,8 +2,8 @@ import {
   createHttpsPayloadUri,
   type CredentialPayload,
   type ResolvedSchema,
-} from '@xcs-protocol/core'
-import { buildCredentialAccept } from '@xcs-protocol/sdk'
+} from '#xcs/core/index.js'
+import { buildCredentialAccept } from '#xcs/sdk/index.js'
 import { describe, expect, it } from 'vitest'
 
 import {

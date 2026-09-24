@@ -1,4 +1,4 @@
-import type { ResolvedSchema } from '@xcs-protocol/core'
+import type { ResolvedSchema } from '#xcs/core/index.js'
 import { describe, expect, it } from 'vitest'
 
 import {

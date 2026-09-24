@@ -1,4 +1,4 @@
-import { createIpfsPayloadUri, parsePayloadUri, verifyPayloadIntegrity } from '@xcs-protocol/core'
+import { createIpfsPayloadUri, parsePayloadUri, verifyPayloadIntegrity } from '#xcs/core/index.js'
 
 import { canonicalJson, parseJson } from './serialization'
 

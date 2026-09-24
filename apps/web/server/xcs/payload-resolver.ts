@@ -1,7 +1,7 @@
 import { lookup } from 'node:dns/promises'
 import { isIP, type LookupFunction } from 'node:net'
 
-import { parsePayloadUri } from '@xcs-protocol/core'
+import { parsePayloadUri } from '#xcs/core/index.js'
 import { Agent, fetch } from 'undici'
 
 import { assertSafeHttpsPayloadUrl, isPublicAddress } from './internal/network-safety.js'

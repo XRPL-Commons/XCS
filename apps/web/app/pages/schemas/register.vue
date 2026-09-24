@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { buildSchemaRegistrationPayment } from '@xcs-protocol/sdk'
+import { buildSchemaRegistrationPayment } from '#xcs/sdk/index.js'
 import type { Payment } from 'xrpl'
 import type { WalletSubmissionResult } from '~/composables/useWallet'
 import {

@@ -1,4 +1,4 @@
-import { createHttpsPayloadUri } from '@xcs-protocol/core'
+import { createHttpsPayloadUri } from '#xcs/core/index.js'
 import {
   buildCredentialAccept,
   buildCredentialCreate,
@@ -7,7 +7,7 @@ import {
   type OperationJournal,
   type ReliableSubmissionResult,
   type SubmissionJournalEntry,
-} from '@xcs-protocol/sdk'
+} from '#xcs/sdk/index.js'
 import {
   decode,
   encode,

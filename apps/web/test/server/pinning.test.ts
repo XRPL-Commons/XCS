@@ -1,4 +1,4 @@
-import { computeSchemaUid, type CredentialPayload, type ResolvedSchema } from '@xcs-protocol/core'
+import { computeSchemaUid, type CredentialPayload, type ResolvedSchema } from '#xcs/core/index.js'
 import type {
   CredentialEventRow,
   CredentialGenerationRow,

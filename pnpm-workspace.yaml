@@ -1,9 +1,6 @@
 packages:
   - 'packages/*'
-  - 'apps/*'
 
 onlyBuiltDependencies:
   - esbuild
   - unrs-resolver
-patchedDependencies:
-  xrpl-connect@1.0.0-rc.0: patches/xrpl-connect@1.0.0-rc.0.patch

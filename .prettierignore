@@ -6,3 +6,4 @@ coverage
 .output
 pnpm-lock.yaml
 XCS_draft0.pdf
+apps/*/pnpm-lock.yaml

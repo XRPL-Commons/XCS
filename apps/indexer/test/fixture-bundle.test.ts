@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gunzipSync, gzipSync } from 'node:zlib'
 
-import type { JsonValue, NetworkProfile } from '@xcs-protocol/core'
+import type { JsonValue, NetworkProfile } from '../src/lib/xcs/index.js'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import {

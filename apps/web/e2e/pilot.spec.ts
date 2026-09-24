@@ -11,7 +11,7 @@ import {
   type JsonValue,
   type NetworkProfile,
   type SchemaDefinition,
-} from '@xcs-protocol/core'
+} from '#xcs/core/index.js'
 import { hashes, Wallet } from 'xrpl'
 
 const PROFILE_ID = 'xrpl-testnet-xcs-browser-e2e'

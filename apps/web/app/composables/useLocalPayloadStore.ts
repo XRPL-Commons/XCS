@@ -1,4 +1,4 @@
-import { parsePayloadUri } from '@xcs-protocol/core'
+import { parsePayloadUri } from '#xcs/core/index.js'
 import {
   clearLocalTestPayloads,
   inspectLocalTestPayloadLocation,

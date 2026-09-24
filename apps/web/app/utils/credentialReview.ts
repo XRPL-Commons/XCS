@@ -4,7 +4,7 @@ import {
   rippleTimeToIso,
   type CredentialPayload,
   type ResolvedSchema,
-} from '@xcs-protocol/core'
+} from '#xcs/core/index.js'
 
 import { decodeHexUtf8 } from './serialization'
 

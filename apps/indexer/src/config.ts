@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 
-import { parseNetworkProfile, type NetworkProfile } from '@xcs-protocol/core'
+import { parseNetworkProfile, type NetworkProfile } from './lib/xcs/index.js'
 
 import { sha256Hex } from './serialization.js'
 import type { DatabaseScope, RegistryPolicy } from './types.js'

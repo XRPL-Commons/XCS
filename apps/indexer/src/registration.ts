@@ -4,7 +4,7 @@ import {
   resolveSchema,
   XcsError,
   type JsonValue,
-} from '@xcs-protocol/core'
+} from './lib/xcs/index.js'
 
 import { canonicalJson, parseJson } from './serialization.js'
 

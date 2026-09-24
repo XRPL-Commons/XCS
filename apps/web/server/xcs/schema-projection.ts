@@ -4,7 +4,7 @@ import {
   type ResolvedSchema,
   type SchemaDefinition,
   parseSchema,
-} from '@xcs-protocol/core'
+} from '#xcs/core/index.js'
 import type { SchemaRow } from '#db/schema'
 import { isValidClassicAddress } from 'xrpl'
 

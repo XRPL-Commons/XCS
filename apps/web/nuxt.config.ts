@@ -36,10 +36,14 @@ const cspConnectSources = ["'self'", 'https:', 'wss:', ...(production ? [] : ['h
 // of this app through `#db/*`. It is server-only: nothing under `app/` imports it.
 const dbDirectory = fileURLToPath(new URL('../../db', import.meta.url))
 
+// The protocol code is vendored under `app/lib/xcs`. `#xcs/*` gives the server
+// and the test suite one specifier for it instead of climbing out of `server/`.
+const xcsDirectory = fileURLToPath(new URL('./app/lib/xcs', import.meta.url))
+
 export default defineNuxtConfig({
   compatibilityDate: '2026-08-19',
-  alias: { '#db': dbDirectory },
-  nitro: { alias: { '#db': dbDirectory } },
+  alias: { '#db': dbDirectory, '#xcs': xcsDirectory },
+  nitro: { alias: { '#db': dbDirectory, '#xcs': xcsDirectory } },
   css: ['~/assets/css/main.css'],
   devtools: { enabled: false },
   modules: ['@nuxt/eslint', '@nuxt/ui', '@nuxtjs/i18n', 'nuxt-security'],
@@ -100,14 +104,30 @@ export default defineNuxtConfig({
       },
     ],
     optimizeDeps: {
-      // These linked workspace packages publish from dist. Force a fresh
-      // pre-bundle on each server start so rebuilt package code cannot be
-      // replaced by Nuxt's persistent dependency cache.
+      // Force a fresh pre-bundle on each server start so a changed dependency
+      // cannot be replaced by Nuxt's persistent dependency cache.
       force: true,
-      // `xrpl` and `xrpl-connect` are pulled in lazily by the wallet adapters, so
-      // Vite only discovers them after the first page load and re-optimizes mid-run,
-      // which 504s the in-flight module requests. Pre-bundle them up front.
-      include: ['@xcs-protocol/core', '@xcs-protocol/sdk', 'xrpl', 'xrpl-connect'],
+      // These are all reached only from lazily loaded code: `xrpl` and
+      // `xrpl-connect` from the wallet adapters, the rest from the vendored
+      // protocol code under `app/lib/xcs`. Vite would otherwise discover them
+      // after the first page load and re-optimize mid-run, which 504s the
+      // in-flight module requests. Pre-bundle them up front. The entries are
+      // the exact specifiers those modules import, because that is what Vite
+      // optimizes; keep this list in step with `app/lib/xcs`.
+      include: [
+        '@noble/hashes/sha2.js',
+        '@noble/hashes/utils.js',
+        '@scure/base',
+        'canonicalize',
+        'jsonc-parser',
+        'multiformats/bases/base32',
+        'multiformats/cid',
+        'multiformats/codecs/raw',
+        'multiformats/hashes/digest',
+        'tr46',
+        'xrpl',
+        'xrpl-connect',
+      ],
       // Served unbundled so the CSS-injection strip above also runs in dev.
       exclude: ['vaul-vue'],
     },
@@ -210,6 +230,7 @@ export default defineNuxtConfig({
       compilerOptions: {
         paths: {
           '#db/*': ['../../../db/*'],
+          '#xcs/*': ['../app/lib/xcs/*'],
           // `db/` has no package.json, so its own third-party imports must
           // resolve from this app's dependencies.
           'drizzle-orm': ['../node_modules/drizzle-orm'],

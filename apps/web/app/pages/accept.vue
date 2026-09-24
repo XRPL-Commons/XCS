@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { buildCredentialAccept, buildCredentialDelete } from '@xcs-protocol/sdk'
+import { buildCredentialAccept, buildCredentialDelete } from '#xcs/sdk/index.js'
 import type { CredentialAccept, CredentialDelete } from 'xrpl'
 import type { ApiSchemaDetail } from '~/composables/useXcsApi'
 import type { WalletSubmissionResult } from '~/composables/useWallet'

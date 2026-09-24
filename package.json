@@ -25,17 +25,18 @@
     }
   },
   "scripts": {
-    "build": "turbo run build",
-    "clean": "turbo run clean",
+    "build": "turbo run build && pnpm --dir apps/web build && pnpm --dir apps/indexer build",
+    "clean": "turbo run clean && pnpm --dir apps/web clean && pnpm --dir apps/indexer clean",
     "dev": "turbo run dev --parallel",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "turbo run lint",
-    "test": "turbo run test",
-    "test:coverage": "turbo run test:coverage",
-    "test:e2e": "pnpm --filter @xcs-protocol/core build && pnpm --filter @xcs-protocol/sdk build && XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 pnpm --filter @xcs-protocol/web build && pnpm --filter @xcs-protocol/web test:e2e && pnpm --filter @xcs-protocol/web test:e2e:security",
-    "test:postgres": "pnpm --filter @xcs-protocol/core build && pnpm --filter @xcs-protocol/indexer test:postgres && pnpm --filter @xcs-protocol/web test:postgres",
-    "typecheck": "turbo run typecheck",
+    "install:apps": "pnpm --dir apps/web install --ignore-workspace --frozen-lockfile && pnpm --dir apps/indexer install --ignore-workspace --frozen-lockfile",
+    "lint": "turbo run lint && pnpm --dir apps/web lint && pnpm --dir apps/indexer lint",
+    "test": "turbo run test && pnpm --dir apps/web test && pnpm --dir apps/indexer test",
+    "test:coverage": "turbo run test:coverage && pnpm --dir apps/web test:coverage && pnpm --dir apps/indexer test:coverage",
+    "test:e2e": "XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 pnpm --dir apps/web build && pnpm --dir apps/web test:e2e && pnpm --dir apps/web test:e2e:security",
+    "test:postgres": "pnpm --dir apps/indexer test:postgres && pnpm --dir apps/web test:postgres",
+    "typecheck": "turbo run typecheck && pnpm --dir apps/web typecheck && pnpm --dir apps/indexer typecheck",
     "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {

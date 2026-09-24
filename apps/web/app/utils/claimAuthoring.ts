@@ -3,7 +3,7 @@ import type {
   JsonObject,
   ResolvedSchema,
   ScalarFieldType,
-} from '@xcs-protocol/core'
+} from '#xcs/core/index.js'
 
 export interface GuidedClaimField {
   name: string

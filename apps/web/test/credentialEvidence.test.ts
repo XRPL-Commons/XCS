@@ -1,4 +1,4 @@
-import type { CredentialPayload, ResolvedSchema } from '@xcs-protocol/core'
+import type { CredentialPayload, ResolvedSchema } from '#xcs/core/index.js'
 import { describe, expect, it } from 'vitest'
 
 import {

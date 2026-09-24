@@ -2,7 +2,7 @@ import {
   createHttpsPayloadUri,
   type CredentialPayload,
   type ResolvedSchema,
-} from '@xcs-protocol/core'
+} from '#xcs/core/index.js'
 import { describe, expect, it, vi } from 'vitest'
 
 import {

@@ -4,7 +4,7 @@ import {
   type CredentialPayload,
   type ResolvedSchema,
   type SchemaDefinition,
-} from '@xcs-protocol/core'
+} from '#xcs/core/index.js'
 import type {
   CredentialEventRow,
   CredentialGenerationRow,

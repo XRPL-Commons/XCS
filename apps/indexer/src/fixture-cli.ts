@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 
-import { parseNetworkProfile, type NetworkProfile } from '@xcs-protocol/core'
+import { parseNetworkProfile, type NetworkProfile } from './lib/xcs/index.js'
 
 import { loadLedgerRpcConfig, resolveRegistryPolicy } from './config.js'
 import {

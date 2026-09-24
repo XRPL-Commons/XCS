@@ -7,6 +7,7 @@
     "build": "XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt build",
     "clean": "rm -rf .nuxt .output coverage",
     "dev": "nuxt dev",
+    "format:check": "prettier --check .",
     "lint": "NODE_ENV=development XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt prepare && eslint . && NODE_ENV=development XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt typecheck",
     "start": "node .output/server/index.mjs",
     "test": "vitest run",
@@ -14,21 +15,26 @@
     "test:e2e": "playwright test",
     "test:e2e:security": "playwright test --config playwright.security.config.ts",
     "test:postgres": "XCS_REQUIRE_POSTGRES_TESTS=1 vitest run test/postgres.integration.test.ts",
-    "typecheck": "NODE_ENV=development XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt typecheck"
+    "typecheck": "NODE_ENV=development XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 nuxt typecheck",
+    "verify": "pnpm format:check && pnpm lint && pnpm test && pnpm build"
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.135",
     "@iconify-json/simple-icons": "^1.2.97",
+    "@noble/hashes": "2.3.0",
     "@nuxt/ui": "^4.11.1",
     "@nuxtjs/i18n": "^10.0.6",
-    "@xcs-protocol/core": "workspace:*",
-    "@xcs-protocol/sdk": "workspace:*",
+    "@scure/base": "2.3.0",
     "ajv": "^8.20.0",
+    "canonicalize": "4.0.0",
     "drizzle-orm": "^0.45.2",
     "ipaddr.js": "^2.2.0",
+    "jsonc-parser": "3.3.1",
+    "multiformats": "14.0.5",
     "nuxt": "^4.5.2",
     "nuxt-security": "2.6.0",
     "postgres": "^3.4.7",
+    "tr46": "4.1.1",
     "undici": "^7.13.0",
     "vue": "^3.5.21",
     "vue-router": "^5.2.0",
@@ -39,10 +45,32 @@
     "@nuxt/eslint": "^1.17.0",
     "@playwright/test": "^1.62.1",
     "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "h3": "1.15.11",
     "node-mock-http": "1.0.5",
+    "prettier": "^3.6.2",
+    "typescript": "^5.8.3",
     "vitest": "^3.2.4",
     "vue-tsc": "^3.1.2"
+  },
+  "packageManager": "pnpm@10.34.4",
+  "engines": {
+    "node": ">=24 <27",
+    "pnpm": ">=10"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "unrs-resolver"
+    ],
+    "overrides": {
+      "js-yaml@>=4.0.0 <4.3.2": "^4.3.2",
+      "svgo@>=4.0.0 <4.1.0": ">=4.1.0"
+    },
+    "patchedDependencies": {
+      "xrpl-connect@1.0.0-rc.0": "patches/xrpl-connect@1.0.0-rc.0.patch"
+    }
   }
 }

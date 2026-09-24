@@ -5,7 +5,7 @@ import {
   parseCredentialPayload,
   verifyPayloadIntegrity,
   type CredentialPayload,
-} from '@xcs-protocol/core'
+} from '#xcs/core/index.js'
 import { deriveAddress, isValidClassicAddress, verifyKeypairSignature } from 'xrpl'
 
 import { assertAuthoritativeLedgerEvidence } from './indexer-status.js'

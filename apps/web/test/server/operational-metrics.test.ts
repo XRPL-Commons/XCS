@@ -1,4 +1,4 @@
-import { XcsError } from '@xcs-protocol/core'
+import { XcsError } from '#xcs/core/index.js'
 import { describe, expect, it } from 'vitest'
 
 import {
