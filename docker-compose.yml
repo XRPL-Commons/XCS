@@ -84,12 +84,13 @@ services:
       <<: *node-build
       args:
         XCS_NODE_IMAGE: ${XCS_NODE_IMAGE:-node:24-alpine}
-        XCS_PACKAGE: '@xcs-protocol/db'
+        XCS_PACKAGE: '@xcs-protocol/indexer'
         XCS_REVISION: ${XCS_REVISION:-local}
         XCS_VERSION: ${XCS_VERSION:-0.1.0-alpha.1}
-    command: ['node', 'dist/bin/bootstrap.js']
+    command: ['node', 'dist/lib/db/bin/bootstrap.js']
     environment:
       XCS_DATABASE_URL_TARGET: XCS_BOOTSTRAP_DATABASE_URL
+      XCS_MIGRATIONS_DIR: /workspace/db/migrations
       XCS_DATABASE_USER: xcs_admin
       XCS_DATABASE_PASSWORD: ${XCS_POSTGRES_ADMIN_PASSWORD:-}
       XCS_DATABASE_CLUSTER_SCOPE: dedicated

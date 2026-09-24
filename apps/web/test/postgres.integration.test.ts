@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
 
 import { computeSchemaUid, parseSchema, type SchemaDefinition } from '@xcs-protocol/core'
-import { createDatabaseClient, schemaEvents, schemas, type DatabaseClient } from '@xcs-protocol/db'
-import { bootstrapDatabase, databasePasswordFromUrl } from '@xcs-protocol/db/bootstrap'
+import { schemaEvents, schemas } from '#db/schema'
+import { type DatabaseClient, createDatabaseClient } from '../server/lib/db/client.js'
+import { bootstrapDatabase, databasePasswordFromUrl } from './lib/db/bootstrap.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { PostgresOperationalMetricsRepository } from '../server/xcs/operational-metrics-repository.js'

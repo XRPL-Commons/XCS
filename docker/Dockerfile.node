@@ -17,6 +17,8 @@ COPY patches ./patches
 COPY packages ./packages
 COPY apps ./apps
 COPY config ./config
+# Shared Drizzle schema and migrations: compiled through the `#db/*` alias.
+COPY db ./db
 
 RUN --mount=type=cache,id=xcs-pnpm-store,target=/pnpm/store \
     pnpm config set store-dir /pnpm/store && \
@@ -49,6 +51,8 @@ ENV NODE_ENV=production
 WORKDIR /workspace
 
 COPY --from=build --chown=node:node /runtime/ ./
+# The SQL migrations are data, not code: `pnpm deploy` does not carry them.
+COPY --from=build --chown=node:node /workspace/db/migrations ./db/migrations
 COPY --chmod=0555 docker/node-entrypoint.sh /usr/local/bin/xcs-entrypoint
 
 USER node

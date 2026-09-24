@@ -106,13 +106,6 @@ jobs:
             --build-arg XCS_VERSION="$VERSION" \
             --tag xcs-indexer:release \
             --file docker/Dockerfile.node .
-          docker build \
-            --build-arg XCS_NODE_IMAGE="$XCS_RELEASE_NODE_IMAGE" \
-            --build-arg XCS_PACKAGE=@xcs-protocol/db \
-            --build-arg XCS_REVISION="$GITHUB_SHA" \
-            --build-arg XCS_VERSION="$VERSION" \
-            --tag xcs-db:release \
-            --file docker/Dockerfile.node .
 
       - name: Scan API image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -136,17 +129,6 @@ jobs:
           format: table
           version: v0.72.0
           trivy-config: ops/security/trivy.yaml
-      - name: Scan database bootstrap image
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: xcs-db:release
-          scanners: vuln,secret,misconfig
-          severity: HIGH,CRITICAL
-          ignore-unfixed: false
-          exit-code: '1'
-          format: table
-          version: v0.72.0
-          trivy-config: ops/security/trivy.yaml
 
       - name: Generate API image SBOM
         uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
@@ -162,14 +144,6 @@ jobs:
           image: xcs-indexer:release
           format: spdx-json
           output-file: ${{ env.RELEASE_DIRECTORY }}/xcs-indexer.spdx.json
-          upload-artifact: false
-          upload-release-assets: false
-      - name: Generate database bootstrap image SBOM
-        uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
-        with:
-          image: xcs-db:release
-          format: spdx-json
-          output-file: ${{ env.RELEASE_DIRECTORY }}/xcs-db.spdx.json
           upload-artifact: false
           upload-release-assets: false
 

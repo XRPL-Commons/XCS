@@ -32,8 +32,14 @@ const localPayloadStoreMode = localPayloadStoreInput === '1' ? 'enabled' : 'disa
 const production = process.env.NODE_ENV === 'production'
 const cspConnectSources = ["'self'", 'https:', 'wss:', ...(production ? [] : ['http:', 'ws:'])]
 
+// The Drizzle schema in `db/` is shared with the indexer and compiled as a source
+// of this app through `#db/*`. It is server-only: nothing under `app/` imports it.
+const dbDirectory = fileURLToPath(new URL('../../db', import.meta.url))
+
 export default defineNuxtConfig({
   compatibilityDate: '2026-08-19',
+  alias: { '#db': dbDirectory },
+  nitro: { alias: { '#db': dbDirectory } },
   css: ['~/assets/css/main.css'],
   devtools: { enabled: false },
   modules: ['@nuxt/eslint', '@nuxt/ui', '@nuxtjs/i18n', 'nuxt-security'],
@@ -200,6 +206,17 @@ export default defineNuxtConfig({
     hidePoweredBy: true,
   },
   typescript: {
+    tsConfig: {
+      compilerOptions: {
+        paths: {
+          '#db/*': ['../../../db/*'],
+          // `db/` has no package.json, so its own third-party imports must
+          // resolve from this app's dependencies.
+          'drizzle-orm': ['../node_modules/drizzle-orm'],
+          'drizzle-orm/*': ['../node_modules/drizzle-orm/*'],
+        },
+      },
+    },
     strict: true,
     // Keep `nuxt typecheck` and production-build checking without injecting
     // vite-plugin-checker's nonced-unaware error overlay into the dev page.

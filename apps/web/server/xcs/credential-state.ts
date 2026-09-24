@@ -3,7 +3,7 @@ import {
   XcsError,
   type CredentialLifecycleState,
 } from '@xcs-protocol/core'
-import type { CredentialGenerationRow } from '@xcs-protocol/db'
+import type { CredentialGenerationRow } from '#db/schema'
 
 import { IndexerUnavailableError } from './ledger-freshness.js'
 

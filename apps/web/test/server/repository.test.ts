@@ -1,12 +1,12 @@
 import {
+  type SchemaEventRow,
+  type SchemaRow,
   credentialEvents,
   credentialGenerations,
   schemaEvents,
   schemas,
-  type SchemaEventRow,
-  type SchemaRow,
-  type XcsDatabase,
-} from '@xcs-protocol/db'
+} from '#db/schema'
+import type { XcsDatabase } from '../../server/lib/db/client.js'
 import type { SQL } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { describe, expect, it, vi } from 'vitest'

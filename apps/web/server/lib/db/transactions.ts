@@ -1,3 +1,4 @@
+// Copied from packages/db/src/transactions.ts at 5ce8eaa; keep in sync by hand (see CONTRIBUTING.md).
 import type { XcsDatabase } from './client.js'
 
 const RETRYABLE_TRANSACTION_ERROR_CODES = new Set(['40001', '40P01'])
@@ -80,6 +81,9 @@ export async function runSerializableTransaction<T>(
 
       const randomValue = random()
       if (!Number.isFinite(randomValue) || randomValue < 0 || randomValue >= 1) {
+        // This rejects a caller-supplied `random`; the caught transaction error is
+        // unrelated and must not be attached as its cause.
+        // eslint-disable-next-line preserve-caught-error
         throw new Error('random must return a finite number in [0, 1)')
       }
       const delayCapMs = Math.min(maxDelayMs, baseDelayMs * 2 ** (attempt - 1))

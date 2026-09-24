@@ -1,9 +1,6 @@
-import {
-  demoPins,
-  pinChallenges,
-  runSerializableTransaction,
-  type XcsDatabase,
-} from '@xcs-protocol/db'
+import { demoPins, pinChallenges } from '#db/schema'
+import type { XcsDatabase } from '../lib/db/client.js'
+import { runSerializableTransaction } from '../lib/db/transactions.js'
 import { and, count, eq, gt, gte, inArray, isNull, lte, ne, notExists } from 'drizzle-orm'
 
 import { PinningError } from './pinning.js'

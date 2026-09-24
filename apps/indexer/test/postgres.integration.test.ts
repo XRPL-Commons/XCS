@@ -4,29 +4,30 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import {
-  acquireIndexerLease,
   credentialEvents,
   credentialGenerations,
-  createDatabaseClient,
-  haltIndexer,
   indexerIncidents,
   indexerStatuses,
   ledgerCheckpoints,
-  releaseIndexerLease,
-  renewIndexerLease,
   schemaEvents,
   schemas,
-  updateIndexerStatus,
-  type DatabaseClient,
-} from '@xcs-protocol/db'
+} from '#db/schema'
+import { type DatabaseClient, createDatabaseClient } from '../src/lib/db/client.js'
 import {
-  databasePasswordFromUrl,
-  initializeDatabase,
-  provisionRuntimeDatabaseRoles,
+  acquireIndexerLease,
+  haltIndexer,
+  releaseIndexerLease,
+  renewIndexerLease,
+  updateIndexerStatus,
+} from '../src/lib/db/indexer-fencing.js'
+import {
   XCS_API_DATABASE_CONNECTION_LIMIT,
   XCS_INDEXER_DATABASE_CONNECTION_LIMIT,
   XCS_MONITOR_DATABASE_CONNECTION_LIMIT,
-} from '@xcs-protocol/db/bootstrap'
+  databasePasswordFromUrl,
+  initializeDatabase,
+  provisionRuntimeDatabaseRoles,
+} from '../src/lib/db/bootstrap.js'
 import { computeSchemaUid, createIpfsPayloadUri, type JsonValue } from '@xcs-protocol/core'
 import { and, asc, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'

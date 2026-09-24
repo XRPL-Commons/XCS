@@ -1,9 +1,22 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "dist",
-    "rootDir": ".",
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vitest/globals"],
+    "paths": {
+      "#db/*": ["../../db/*"],
+      "drizzle-orm": ["./node_modules/drizzle-orm"],
+      "drizzle-orm/*": ["./node_modules/drizzle-orm/*"],
+      "drizzle-kit": ["./node_modules/drizzle-kit"]
+    },
+    "baseUrl": ".",
+    "module": "Preserve",
+    "moduleResolution": "Bundler"
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "../../db/**/*.ts",
+    "tsup.config.ts",
+    "vitest.config.ts"
+  ]
 }

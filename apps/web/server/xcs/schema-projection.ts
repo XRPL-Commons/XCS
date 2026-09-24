@@ -5,7 +5,7 @@ import {
   type SchemaDefinition,
   parseSchema,
 } from '@xcs-protocol/core'
-import type { SchemaRow } from '@xcs-protocol/db'
+import type { SchemaRow } from '#db/schema'
 import { isValidClassicAddress } from 'xrpl'
 
 import { canonicalJson } from './serialization.js'

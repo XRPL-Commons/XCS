@@ -5,7 +5,7 @@ import {
   type CredentialPayloadStatus,
   type ResolvedSchema,
 } from '@xcs-protocol/core'
-import type { CredentialGenerationRow } from '@xcs-protocol/db'
+import type { CredentialGenerationRow } from '#db/schema'
 
 import { assertCredentialGenerationEvidence } from './credential-generation-evidence.js'
 import { credentialGenerationState } from './credential-state.js'

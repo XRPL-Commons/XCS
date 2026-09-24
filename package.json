@@ -34,7 +34,7 @@
     "test": "turbo run test",
     "test:coverage": "turbo run test:coverage",
     "test:e2e": "pnpm --filter @xcs-protocol/core build && pnpm --filter @xcs-protocol/sdk build && XCS_BROWSER_E2E=0 XCS_LOCAL_PAYLOAD_STORE=0 pnpm --filter @xcs-protocol/web build && pnpm --filter @xcs-protocol/web test:e2e && pnpm --filter @xcs-protocol/web test:e2e:security",
-    "test:postgres": "pnpm --filter @xcs-protocol/core build && pnpm --filter @xcs-protocol/db build && pnpm --filter @xcs-protocol/indexer test:postgres && pnpm --filter @xcs-protocol/web test:postgres",
+    "test:postgres": "pnpm --filter @xcs-protocol/core build && pnpm --filter @xcs-protocol/indexer test:postgres && pnpm --filter @xcs-protocol/web test:postgres",
     "typecheck": "turbo run typecheck",
     "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },

@@ -1,4 +1,4 @@
-import type { XcsDatabase } from '@xcs-protocol/db'
+import type { XcsDatabase } from '../../server/lib/db/client.js'
 import { describe, expect, it, vi } from 'vitest'
 
 import { PostgresOperationalMetricsRepository } from '../../server/xcs/operational-metrics-repository.js'

@@ -4,7 +4,7 @@ import {
   type NetworkProfile,
   type SchemaDefinition,
 } from '@xcs-protocol/core'
-import type { LedgerCheckpointRow, NetworkProfileRow, SchemaRow } from '@xcs-protocol/db'
+import type { LedgerCheckpointRow, NetworkProfileRow, SchemaRow } from '#db/schema'
 
 import { authoritativeResolvedSchema, SchemaProjectionInvalidError } from './schema-projection.js'
 import type { SchemaProjectionEvidence } from './types.js'

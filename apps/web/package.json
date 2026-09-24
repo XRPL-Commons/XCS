@@ -22,7 +22,6 @@
     "@nuxt/ui": "^4.11.1",
     "@nuxtjs/i18n": "^10.0.6",
     "@xcs-protocol/core": "workspace:*",
-    "@xcs-protocol/db": "workspace:*",
     "@xcs-protocol/sdk": "workspace:*",
     "ajv": "^8.20.0",
     "drizzle-orm": "^0.45.2",

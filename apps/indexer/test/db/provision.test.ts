@@ -4,9 +4,9 @@ import {
   databasePasswordFromUrl,
   parseDatabaseClusterScope,
   provisionRuntimeDatabaseRoles,
-} from '../src/bootstrap.js'
+} from '../../src/lib/db/bootstrap.js'
 
-import type { DatabaseClient } from '../src/client.js'
+import type { DatabaseClient } from '../../src/lib/db/client.js'
 
 function client(): DatabaseClient {
   return {

@@ -8,7 +8,7 @@ import type {
   PinChallengeRow,
   SchemaEventRow,
   SchemaRow,
-} from '@xcs-protocol/db'
+} from '#db/schema'
 
 export interface SchemaCursor {
   ledgerIndex: number

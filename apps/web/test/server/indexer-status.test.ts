@@ -1,4 +1,4 @@
-import type { IndexerStatusRow, LedgerCheckpointRow } from '@xcs-protocol/db'
+import type { IndexerStatusRow, LedgerCheckpointRow } from '#db/schema'
 import { describe, expect, it } from 'vitest'
 
 import {

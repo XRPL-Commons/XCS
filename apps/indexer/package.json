@@ -10,8 +10,11 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts src/main.ts src/maintenance.ts src/fixture-cli.ts --format esm --dts --clean",
+    "build": "tsup",
     "clean": "rm -rf dist coverage",
+    "db:bootstrap": "tsx src/lib/db/bin/bootstrap.ts",
+    "db:generate": "cd ../../db && drizzle-kit generate --config ./drizzle.config.ts",
+    "db:migrate": "tsx src/lib/db/bin/migrate.ts",
     "dev": "tsx watch src/main.ts",
     "fixture:capture": "tsx src/fixture-cli.ts capture",
     "fixture:validate": "tsx src/fixture-cli.ts validate",
@@ -28,8 +31,11 @@
   },
   "dependencies": {
     "@xcs-protocol/core": "workspace:*",
-    "@xcs-protocol/db": "workspace:*",
     "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.7",
     "xrpl": "^5.0.0"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.4"
   }
 }

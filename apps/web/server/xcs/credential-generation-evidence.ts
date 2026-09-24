@@ -1,4 +1,4 @@
-import type { CredentialGenerationRow } from '@xcs-protocol/db'
+import type { CredentialGenerationRow } from '#db/schema'
 import { isValidClassicAddress } from 'xrpl'
 
 import { IndexerUnavailableError } from './ledger-freshness.js'

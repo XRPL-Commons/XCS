@@ -1,4 +1,4 @@
-import type { IndexerStatusRow, IndexerStatusState, LedgerCheckpointRow } from '@xcs-protocol/db'
+import type { IndexerStatusRow, IndexerStatusState, LedgerCheckpointRow } from '#db/schema'
 
 import { assertFreshLedgerCheckpoint, IndexerUnavailableError } from './ledger-freshness.js'
 

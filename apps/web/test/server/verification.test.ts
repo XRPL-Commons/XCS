@@ -13,7 +13,7 @@ import type {
   NetworkProfileRow,
   SchemaEventRow,
   SchemaRow,
-} from '@xcs-protocol/db'
+} from '#db/schema'
 import { describe, expect, it } from 'vitest'
 
 import {

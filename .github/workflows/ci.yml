@@ -26,8 +26,8 @@ jobs:
       - run: pnpm verify
       - name: Verify generated database baseline is committed
         run: |
-          pnpm --filter @xcs-protocol/db db:generate
-          git diff --exit-code -- packages/db/drizzle
+          pnpm --filter @xcs-protocol/indexer db:generate
+          git diff --exit-code -- db/migrations
 
   postgres:
     runs-on: ubuntu-24.04

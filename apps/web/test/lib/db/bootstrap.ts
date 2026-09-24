@@ -1,11 +1,12 @@
+// Copied from packages/db/src/bootstrap.ts at 5ce8eaa; keep in sync by hand (see CONTRIBUTING.md).
 import { fileURLToPath } from 'node:url'
 
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 
-import type { DatabaseClient } from './client.js'
+import type { DatabaseClient } from '../../../server/lib/db/client.js'
 import { provisionRuntimeDatabaseRoles, type RuntimeDatabasePasswords } from './provision.js'
 
-const BASELINE_FOLDER = fileURLToPath(new URL('../drizzle', import.meta.url))
+const BASELINE_FOLDER = fileURLToPath(new URL('../../../../../db/migrations', import.meta.url))
 
 export {
   databasePasswordFromUrl,

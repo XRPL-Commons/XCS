@@ -1,4 +1,5 @@
-import type { DatabaseClient } from './client.js'
+// Copied from packages/db/src/provision.ts at 5ce8eaa; keep in sync by hand (see CONTRIBUTING.md).
+import type { DatabaseClient } from '../../../server/lib/db/client.js'
 
 export const XCS_INDEXER_DATABASE_ROLE = 'xcs_indexer' as const
 export const XCS_API_DATABASE_ROLE = 'xcs_api' as const

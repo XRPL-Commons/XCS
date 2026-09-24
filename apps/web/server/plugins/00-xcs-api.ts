@@ -1,4 +1,4 @@
-import { createDatabaseClient } from '@xcs-protocol/db'
+import { createDatabaseClient } from '../lib/db/client.js'
 
 import { loadApiConfig } from '../xcs/config'
 import type { XcsApiContext } from '../xcs/context'

@@ -15,9 +15,9 @@ import {
   pinChallenges,
   schemaEvents,
   schemas,
-} from '../src/schema/index.js'
+} from '#db/schema'
 
-const DRIZZLE_DIRECTORY = new URL('../drizzle/', import.meta.url)
+const DRIZZLE_DIRECTORY = new URL('../../../../db/migrations/', import.meta.url)
 
 const PROJECTION_INTEGRITY_CHECKS = [
   [ledgerCheckpoints, ['ledger_checkpoints_index_uint32', 'ledger_checkpoints_close_time_uint32']],

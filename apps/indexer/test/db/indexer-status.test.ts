@@ -6,7 +6,7 @@ import {
   normalizeHaltIndexerStatus,
   normalizeIndexerLeaseRequest,
   normalizeIndexerStatusUpdate,
-} from '../src/indexer-fencing.js'
+} from '../../src/lib/db/indexer-fencing.js'
 
 const HASH = 'a'.repeat(64)
 const NOW = new Date('2026-08-24T12:00:00.000Z')

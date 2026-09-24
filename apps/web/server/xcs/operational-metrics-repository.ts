@@ -1,4 +1,4 @@
-import type { XcsDatabase } from '@xcs-protocol/db'
+import type { XcsDatabase } from '../lib/db/client.js'
 import { sql } from 'drizzle-orm'
 
 import {

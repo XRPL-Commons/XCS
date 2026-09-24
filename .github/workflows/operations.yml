@@ -112,7 +112,7 @@ jobs:
             --profile site --profile monitoring config --format json \
             > "$RUNNER_TEMP/xcs-compose-secrets.json"
           jq -e '
-            (.services["db-bootstrap"].command == ["node", "dist/bin/bootstrap.js"]) and
+            (.services["db-bootstrap"].command == ["node", "dist/lib/db/bin/bootstrap.js"]) and
             (.services["db-bootstrap"].environment.XCS_DATABASE_URL_TARGET == "XCS_BOOTSTRAP_DATABASE_URL") and
             (.services.postgres.environment.POSTGRES_PASSWORD == null) and
             (.services.postgres.environment.POSTGRES_PASSWORD_FILE == "/run/secrets/postgres_admin_password") and

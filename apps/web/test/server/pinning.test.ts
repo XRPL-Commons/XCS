@@ -9,7 +9,7 @@ import type {
   PinChallengeRow,
   SchemaEventRow,
   SchemaRow,
-} from '@xcs-protocol/db'
+} from '#db/schema'
 import { describe, expect, it } from 'vitest'
 
 import { DemoPinningService, PinningError } from '../../server/xcs/pinning.js'

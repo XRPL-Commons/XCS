@@ -1,7 +1,8 @@
+// Copied from packages/db/src/client.ts at 5ce8eaa; keep in sync by hand (see CONTRIBUTING.md).
 import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import postgres, { type Sql } from 'postgres'
 
-import * as schema from './schema/index.js'
+import * as schema from '#db/schema'
 
 export type XcsDatabase = PostgresJsDatabase<typeof schema>
 

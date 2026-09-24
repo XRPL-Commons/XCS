@@ -198,7 +198,7 @@ receive no DDL privilege.
 On a new or recreated database, run the idempotent bootstrap before starting runtime services:
 
 ```sh
-pnpm --filter @xcs-protocol/db db:bootstrap
+pnpm --filter @xcs-protocol/indexer db:bootstrap
 ```
 
 The command applies the single generated baseline with Drizzle and then configures runtime roles in

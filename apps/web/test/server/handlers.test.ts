@@ -7,7 +7,7 @@ import type {
   NetworkProfileRow,
   SchemaEventRow,
   SchemaRow,
-} from '@xcs-protocol/db'
+} from '#db/schema'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { ApiHandlers } from '../../server/xcs/http.js'

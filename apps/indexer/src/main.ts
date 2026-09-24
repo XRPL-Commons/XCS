@@ -1,4 +1,4 @@
-import { createDatabaseClient } from '@xcs-protocol/db'
+import { createDatabaseClient } from './lib/db/client.js'
 
 import { loadIndexerConfig } from './config.js'
 import { PostgresIndexerRepository } from './repository.js'

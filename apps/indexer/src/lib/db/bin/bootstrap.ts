@@ -1,3 +1,4 @@
+// Copied from packages/db/src/bin/bootstrap.ts at 5ce8eaa; keep in sync by hand (see CONTRIBUTING.md).
 import {
   bootstrapDatabase,
   databasePasswordFromUrl,

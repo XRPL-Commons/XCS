@@ -12,7 +12,7 @@
 4. Bootstrap the fresh database, run the quorum preflight, then start the API and indexer:
 
 ```sh
-pnpm --filter @xcs-protocol/db db:bootstrap
+pnpm --filter @xcs-protocol/indexer db:bootstrap
 pnpm --filter @xcs-protocol/indexer preflight
 pnpm --filter @xcs-protocol/api start
 pnpm --filter @xcs-protocol/indexer start
