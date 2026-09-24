@@ -10,7 +10,7 @@ groups:
           (
             xcs_indexer_ready
               * on() group_left()
-            min(up{job="xcs-api"})
+            min(up{job="xcs-web"})
           )
           or
           (
@@ -18,7 +18,7 @@ groups:
           )
 
       - alert: XcsMetricsEndpointUnavailable
-        expr: up{job="xcs-api"} == 0 or absent(up{job="xcs-api"})
+        expr: up{job="xcs-web"} == 0 or absent(up{job="xcs-web"})
         for: 2m
         labels:
           severity: critical
@@ -88,7 +88,7 @@ groups:
           description: Profile {{ $labels.profile_id }} has been non-authoritative for five minutes.
 
       - alert: XcsIndexerTelemetryMissing
-        expr: absent(xcs_indexer_ready) and on() (up{job="xcs-api"} == 1)
+        expr: absent(xcs_indexer_ready) and on() (up{job="xcs-web"} == 1)
         for: 5m
         labels:
           severity: critical

@@ -36,7 +36,7 @@ jobs:
         run: |
           set -euo pipefail
           docker compose config --quiet
-          docker compose --profile site --profile monitoring --profile demo-pinning config --quiet
+          docker compose --profile monitoring --profile demo-pinning config --quiet
           docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile monitoring config --quiet
 
           mapfile -t DEFAULT_SERVICES < <(docker compose config --services | sort)
@@ -46,7 +46,7 @@ jobs:
             exit 1
           fi
 
-          docker compose --profile site --profile monitoring --profile demo-pinning config --format json \
+          docker compose --profile monitoring --profile demo-pinning config --format json \
             > "$RUNNER_TEMP/xcs-compose.json"
           jq -e '
             (.services.postgres.ports == null) and
@@ -101,7 +101,7 @@ jobs:
               'test ! -e node_modules/typescript && test ! -e node_modules/vitest && test ! -e node_modules/tsx'
           done
 
-      - name: Smoke the database bootstrap and API boundary
+      - name: Smoke the Compose stack
         shell: bash
         run: |
           set -euo pipefail
@@ -112,12 +112,35 @@ jobs:
           trap cleanup EXIT
 
           COMPOSE=(docker compose -f docker-compose.yml)
+          # `--wait web` starts postgres, runs db-bootstrap to completion and
+          # waits for the web healthcheck. The `indexer` service is deliberately
+          # not started: without an operator-supplied network profile and a
+          # complete-history endpoint it refuses to run past the
+          # SOURCE_REGISTRY_NOT_BLACKHOLED preflight, so it has no steady state
+          # CI could assert. Its image is still built and scanned above.
           "${COMPOSE[@]}" up --no-build --detach --wait web
 
-          # The bootstrap is deliberately restart-safe. Run it twice after the
+          for SERVICE in postgres web; do
+            CONTAINER="$("${COMPOSE[@]}" ps --quiet "$SERVICE")"
+            HEALTH="$(docker inspect --format '{{.State.Health.Status}}' "$CONTAINER")"
+            if [[ "$HEALTH" != 'healthy' ]]; then
+              echo "$SERVICE is $HEALTH, expected healthy" >&2
+              exit 1
+            fi
+          done
+
+          BOOTSTRAP_CONTAINER="$("${COMPOSE[@]}" ps --all --quiet db-bootstrap)"
+          read -r BOOTSTRAP_STATE BOOTSTRAP_EXIT < <(
+            docker inspect --format '{{.State.Status}} {{.State.ExitCode}}' "$BOOTSTRAP_CONTAINER"
+          )
+          if [[ "$BOOTSTRAP_STATE" != 'exited' || "$BOOTSTRAP_EXIT" != '0' ]]; then
+            echo "db-bootstrap is $BOOTSTRAP_STATE with exit code $BOOTSTRAP_EXIT" >&2
+            exit 1
+          fi
+
+          # The bootstrap is deliberately restart-safe. Run it again after the
           # dependency chain has completed to prove repeated initialization and
           # role provisioning do not require a clean volume.
-          "${COMPOSE[@]}" run --rm --no-deps db-bootstrap
           "${COMPOSE[@]}" run --rm --no-deps db-bootstrap
 
           curl --fail --silent --show-error http://127.0.0.1:3000/health/live > /dev/null
@@ -130,7 +153,7 @@ jobs:
             http://127.0.0.1:3000/internal/metrics/prometheus \
             | grep --fixed-strings 'xcs_database_available'
 
-          if "${COMPOSE[@]}" ps --services --status running | grep --extended-regexp '^(prometheus|grafana|postgres-exporter|node-exporter)$'; then
+          if "${COMPOSE[@]}" ps --services --status running | grep --extended-regexp '^(prometheus|grafana|postgres-exporter|node-exporter|ipfs)$'; then
             echo 'A non-core profile service started unexpectedly' >&2
             exit 1
           fi

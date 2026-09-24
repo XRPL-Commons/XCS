@@ -7,7 +7,7 @@ rule_files:
   - /etc/prometheus/rules/*.yml
 
 scrape_configs:
-  - job_name: xcs-api
+  - job_name: xcs-web
     metrics_path: /internal/metrics/prometheus
     authorization:
       type: Bearer

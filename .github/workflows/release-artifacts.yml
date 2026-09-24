@@ -92,25 +92,21 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
-          docker build \
-            --build-arg XCS_NODE_IMAGE="$XCS_RELEASE_NODE_IMAGE" \
-            --build-arg XCS_PACKAGE=@xcs-protocol/api \
-            --build-arg XCS_REVISION="$GITHUB_SHA" \
-            --build-arg XCS_VERSION="$VERSION" \
-            --tag xcs-api:release \
-            --file docker/Dockerfile.node .
-          docker build \
-            --build-arg XCS_NODE_IMAGE="$XCS_RELEASE_NODE_IMAGE" \
-            --build-arg XCS_PACKAGE=@xcs-protocol/indexer \
-            --build-arg XCS_REVISION="$GITHUB_SHA" \
-            --build-arg XCS_VERSION="$VERSION" \
-            --tag xcs-indexer:release \
-            --file docker/Dockerfile.node .
+          # Each application owns its Dockerfile; the build context is the
+          # repository root because both images copy the shared db/ schema.
+          for SERVICE in web indexer; do
+            docker build \
+              --build-arg XCS_NODE_IMAGE="$XCS_RELEASE_NODE_IMAGE" \
+              --build-arg XCS_REVISION="$GITHUB_SHA" \
+              --build-arg XCS_VERSION="$VERSION" \
+              --tag "xcs-$SERVICE:release" \
+              --file "apps/$SERVICE/Dockerfile" .
+          done
 
-      - name: Scan API image
+      - name: Scan web image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: xcs-api:release
+          image-ref: xcs-web:release
           scanners: vuln,secret,misconfig
           severity: HIGH,CRITICAL
           ignore-unfixed: false
@@ -130,12 +126,12 @@ jobs:
           version: v0.72.0
           trivy-config: ops/security/trivy.yaml
 
-      - name: Generate API image SBOM
+      - name: Generate web image SBOM
         uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
         with:
-          image: xcs-api:release
+          image: xcs-web:release
           format: spdx-json
-          output-file: ${{ env.RELEASE_DIRECTORY }}/xcs-api.spdx.json
+          output-file: ${{ env.RELEASE_DIRECTORY }}/xcs-web.spdx.json
           upload-artifact: false
           upload-release-assets: false
       - name: Generate indexer image SBOM
@@ -160,7 +156,7 @@ jobs:
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
           IMAGE_PREFIX="ghcr.io/${GITHUB_REPOSITORY,,}"
-          for SERVICE in api indexer db; do
+          for SERVICE in web indexer; do
             LOCAL_IMAGE="xcs-$SERVICE:release"
             VERSION_IMAGE="$IMAGE_PREFIX/$SERVICE:$VERSION"
             REVISION_IMAGE="$IMAGE_PREFIX/$SERVICE:sha-$GITHUB_SHA"
@@ -184,19 +180,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for SERVICE in api indexer db; do
-            NAME="${{ steps.images.outputs.api_name }}"
-            DIGEST="${{ steps.images.outputs.api_digest }}"
-            case "$SERVICE" in
-              indexer)
-                NAME="${{ steps.images.outputs.indexer_name }}"
-                DIGEST="${{ steps.images.outputs.indexer_digest }}"
-                ;;
-              db)
-                NAME="${{ steps.images.outputs.db_name }}"
-                DIGEST="${{ steps.images.outputs.db_digest }}"
-                ;;
-            esac
+          for SERVICE in web indexer; do
+            NAME="${{ steps.images.outputs.web_name }}"
+            DIGEST="${{ steps.images.outputs.web_digest }}"
+            if [[ "$SERVICE" == 'indexer' ]]; then
+              NAME="${{ steps.images.outputs.indexer_name }}"
+              DIGEST="${{ steps.images.outputs.indexer_digest }}"
+            fi
             cosign sign --yes "$NAME@$DIGEST"
             cosign attest --yes \
               --type spdxjson \
@@ -204,23 +194,17 @@ jobs:
               "$NAME@$DIGEST"
           done
 
-      - name: Attest API image provenance
+      - name: Attest web image provenance
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
-          subject-name: ${{ steps.images.outputs.api_name }}
-          subject-digest: ${{ steps.images.outputs.api_digest }}
+          subject-name: ${{ steps.images.outputs.web_name }}
+          subject-digest: ${{ steps.images.outputs.web_digest }}
           push-to-registry: true
       - name: Attest indexer image provenance
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
           subject-name: ${{ steps.images.outputs.indexer_name }}
           subject-digest: ${{ steps.images.outputs.indexer_digest }}
-          push-to-registry: true
-      - name: Attest database bootstrap image provenance
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
-        with:
-          subject-name: ${{ steps.images.outputs.db_name }}
-          subject-digest: ${{ steps.images.outputs.db_digest }}
           push-to-registry: true
 
       - name: Sign image SBOM files

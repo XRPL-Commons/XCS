@@ -7,7 +7,7 @@ tests:
   - name: authoritative availability counts outage gap and recovery
     interval: 30s
     input_series:
-      - series: 'up{job="xcs-api",instance="api:3001"}'
+      - series: 'up{job="xcs-web",instance="web:3000"}'
         values: '1 0 stale 1'
       - series: 'xcs_indexer_ready{profile_id="pilot"}'
         values: '1 stale stale 1'
@@ -36,7 +36,7 @@ tests:
   - name: sustained API outage consumes the readiness SLO
     interval: 30s
     input_series:
-      - series: 'up{job="xcs-api",instance="api:3001"}'
+      - series: 'up{job="xcs-web",instance="web:3000"}'
         values: '1 0x32'
       - series: 'xcs_indexer_ready{profile_id="pilot"}'
         values: '1 stale'

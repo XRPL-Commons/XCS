@@ -32,17 +32,32 @@ jobs:
           go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color .github/workflows/*.yml
       - name: Validate bounded security exceptions
         run: ruby ops/ci/check-trivy-exceptions.rb ops/security/trivyignore.yaml
+      # Three independent dependency graphs: the shared packages in the root
+      # workspace, and each standalone application with its own lockfile.
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --dir apps/web install --ignore-workspace --frozen-lockfile
+      - run: pnpm --dir apps/indexer install --ignore-workspace --frozen-lockfile
       - name: Reject high or critical production dependency advisories
-        run: pnpm audit --prod --audit-level high
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm audit --prod --audit-level high
+          pnpm --dir apps/web audit --prod --audit-level high
+          pnpm --dir apps/indexer audit --prod --audit-level high
       - name: Enforce production dependency license policy
         shell: bash
         run: |
           set -euo pipefail
-          pnpm licenses list --prod --json > "$RUNNER_TEMP/xcs-licenses.json"
-          node ops/ci/check-licenses.mjs \
-            "$RUNNER_TEMP/xcs-licenses.json" \
-            ops/security/license-overrides.json
+          for SCOPE in root apps/web apps/indexer; do
+            REPORT="$RUNNER_TEMP/xcs-licenses-${SCOPE//\//-}.json"
+            if [[ "$SCOPE" == 'root' ]]; then
+              pnpm licenses list --prod --json > "$REPORT"
+            else
+              pnpm --dir "$SCOPE" licenses list --prod --json > "$REPORT"
+            fi
+            node ops/ci/check-licenses.mjs "$REPORT" ops/security/license-overrides.json
+          done
+
   repository-scan:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
