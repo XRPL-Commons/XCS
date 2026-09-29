@@ -101,9 +101,11 @@ profiles, `exclusive-profile` rejects any different existing profile, and the co
 requires the exclusive mode.
 
 PostgreSQL bootstrap treats fixed cluster-wide roles as a dedicated-cluster boundary. It applies the
-single current-schema baseline, serializes role changes, removes unexpected direct memberships,
-normalizes role attributes and current-database grants, and writes SCRAM-SHA-256 passwords. A
-`pg_hba.conf` role-to-database SCRAM allowlist remains required defense in depth.
+single current-schema baseline, validates provider-created users and their membership graph, and
+normalizes current-database grants. The managed service alone creates users and manages passwords;
+bootstrap attempts bounded connection limits, timeout defaults and the monitoring membership, then
+reports any control the provider refuses. A provider-side role-to-database policy remains required
+defense in depth.
 
 Runtime database serialization no longer relies on advisory locks. Concurrent profile
 initialization and pin reservation use the same `SERIALIZABLE` helper with five bounded,

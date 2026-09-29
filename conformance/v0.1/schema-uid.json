@@ -1,0 +1,28 @@
+{
+  "version": "0.1",
+  "cases": [
+    {
+      "name": "course completion schema",
+      "input": {
+        "networkId": 1,
+        "ledgerHash": "ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB",
+        "ledgerIndex": 100,
+        "transactionIndex": 2,
+        "publisher": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+        "schema": {
+          "xcsVersion": "0.1",
+          "name": "XRPL Developer Course Completion",
+          "description": "Attests successful completion of the XRPL developer course.",
+          "fields": {
+            "programId": { "type": "string", "optional": false },
+            "programName": { "type": "string" },
+            "completedAt": { "type": "string" },
+            "achievement": { "type": "string", "optional": true }
+          }
+        }
+      },
+      "canonicalPreimage": "{\"ledgerHash\":\"abababababababababababababababababababababababababababababababab\",\"ledgerIndex\":100,\"networkId\":1,\"publisher\":\"rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh\",\"purpose\":\"xcs.schema.uid\",\"schema\":{\"description\":\"Attests successful completion of the XRPL developer course.\",\"fields\":{\"achievement\":{\"optional\":true,\"type\":\"string\"},\"completedAt\":{\"type\":\"string\"},\"programId\":{\"type\":\"string\"},\"programName\":{\"type\":\"string\"}},\"name\":\"XRPL Developer Course Completion\",\"xcsVersion\":\"0.1\"},\"transactionIndex\":2,\"version\":\"0.1\"}",
+      "uid": "e1e9e4a41ff0a4c846c9218e0cb345a05457abb6f9ba90d5bd9ee18e7d2ca9a3"
+    }
+  ]
+}

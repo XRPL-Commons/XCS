@@ -61,7 +61,7 @@ services:
     expose: ['5432']
     volumes:
       - xcs-postgres:/var/lib/postgresql
-      # Local development only: creates xcs_indexer, xcs_api and xcs_monitor with
+      # Local development only: creates all eight XCS runtime roles with
       # published non-secret passwords, because there is no managed database
       # service here to create them. Runs once, on a fresh data directory.
       - ./db/compose-initdb:/docker-entrypoint-initdb.d:ro
@@ -84,8 +84,7 @@ services:
         max-size: ${XCS_LOG_MAX_SIZE:-10m}
         max-file: ${XCS_LOG_MAX_FILES:-5}
 
-  # Migrations plus the privileges of the xcs_indexer, xcs_api and xcs_monitor
-  # roles, from the indexer image. It does not create the roles and does not set
+  # Migrations plus least-privilege grants for all eight runtime roles, from the indexer image. It does not create the roles and does not set
   # their passwords: it fails naming any role that is missing. Restart-safe:
   # running it again is a no-op.
   db-bootstrap:

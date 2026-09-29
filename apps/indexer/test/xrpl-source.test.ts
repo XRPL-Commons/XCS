@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { encode } from 'ripple-binary-codec'
+import { Client, decode, hashes, Wallet } from 'xrpl'
 
 import {
   assertFeatureResponseSupportsAmendment,
   normalizeLedgerResponse,
+  XrplLedgerSource,
 } from '../src/xrpl-source.js'
 
 const LEDGER_HASH = 'a'.repeat(64)
@@ -100,6 +103,41 @@ describe('normalizeLedgerResponse', () => {
       transaction: { TransactionType: 'Payment' },
       transactionIndex: 0,
     })
+  })
+
+  it.each<[string, unknown]>([
+    ['nftoken_id', FIRST_TX_HASH],
+    ['nftoken_ids', [FIRST_TX_HASH]],
+    ['offer_id', FIRST_TX_HASH],
+    ['mpt_issuance_id', '1'.repeat(48)],
+    ['delivered_amount', '1'],
+  ])(
+    'ignores the synthetic API metadata field %s without mutating the response',
+    (field, value) => {
+      const decorated = response()
+      const metadata = record(transactions(decorated)[0]!.meta)
+      metadata[field] = value
+
+      expect(normalizeLedgerResponse(decorated)).toEqual(normalizeLedgerResponse(response()))
+      expect(metadata[field]).toEqual(value)
+    },
+  )
+
+  it.each<[string, unknown]>([
+    ['DeliveredAmount', '1'],
+    ['AffectedNodes', [{ ModifiedNode: { LedgerEntryType: 'AccountRoot' } }]],
+    ['TransactionResult', 'tecFAILED'],
+    ['FutureCanonicalField', 'preserved'],
+  ])('preserves %s for the quorum to detect canonical metadata differences', (field, value) => {
+    const changed = response()
+    const metadata = record(transactions(changed)[0]!.meta)
+    metadata[field] = value
+    metadata.delivered_amount = '1'
+
+    const normalized = normalizeLedgerResponse(changed)
+    expect(normalized).not.toEqual(normalizeLedgerResponse(response()))
+    expect(normalized.transactions[1]!.metadata[field]).toEqual(value)
+    expect(normalized.transactions[1]!.metadata).not.toHaveProperty('delivered_amount')
   })
 
   it('rejects a ledger that is not marked validated or closed', () => {
@@ -240,5 +278,175 @@ describe('assertFeatureResponseSupportsAmendment', () => {
     expect(() => assertFeatureResponseSupportsAmendment(featureResponse, amendmentId)).toThrow(
       amendmentId,
     )
+  })
+})
+
+// Published XRPL binary-codec header vector (ledger 32052277); no transaction/account secrets.
+const BINARY_HEADER =
+  '01E91435016340767BF1C4A3EACEB081770D8ADE216C85445DD6FB002C6B5A2930F2DECE006DA18150CB18F6DD33F6F0990754C962A7CCE62F332FF9C13939B03B864117F0BDA86B6E9B4F873B5C3E520634D343EF5D9D9A4246643D64DAD278BA95DC0EAC6EB5350CF970D521276CDE21276CE60A00'
+const BINARY_HEADER_FIELDS = {
+  ledger_index: 32052277,
+  total_coins: '99994494362043555',
+  parent_hash: 'EACEB081770D8ADE216C85445DD6FB002C6B5A2930F2DECE006DA18150CB18F6',
+  transaction_hash: 'DD33F6F0990754C962A7CCE62F332FF9C13939B03B864117F0BDA86B6E9B4F87',
+  account_hash: '3B5C3E520634D343EF5D9D9A4246643D64DAD278BA95DC0EAC6EB5350CF970D5',
+  parent_close_time: 556231902,
+  close_time: 556231910,
+  close_time_resolution: 10,
+  close_flags: 0,
+}
+function binaryResponse() {
+  const holder = Wallet.generate()
+  const tx = holder.sign({
+    TransactionType: 'Payment',
+    Account: holder.address,
+    Destination: Wallet.generate().address,
+    Amount: '123',
+    Sequence: 1,
+    Fee: '12',
+  })
+  const metadata = {
+    TransactionIndex: 0,
+    TransactionResult: 'tesSUCCESS',
+    AffectedNodes: [],
+    DeliveredAmount: '123',
+  }
+  return {
+    signed: tx,
+    metadata,
+    result: {
+      validated: true,
+      ledger_index: BINARY_HEADER_FIELDS.ledger_index,
+      ledger_hash: hashes.hashLedgerHeader(
+        BINARY_HEADER_FIELDS as Parameters<typeof hashes.hashLedgerHeader>[0],
+      ),
+      ledger: {
+        closed: true,
+        ledger_data: BINARY_HEADER,
+        transactions: [{ tx_blob: tx.tx_blob, meta: encode(metadata) }],
+      },
+    },
+  }
+}
+
+describe('binary ledger transport', () => {
+  it('decodes canonical header/transaction/metadata and derives the missing transaction hash from signed bytes', () => {
+    const fixture = binaryResponse()
+    const normalized = normalizeLedgerResponse(fixture.result)
+    expect(normalized).toMatchObject({
+      ledgerIndex: 32052277,
+      totalCoins: '99994494362043555',
+      parentCloseTime: 556231902,
+      closeTime: 556231910,
+      closeTimeResolution: 10,
+      closeFlags: 0,
+      parentHash: BINARY_HEADER_FIELDS.parent_hash.toLowerCase(),
+      transactionRoot: BINARY_HEADER_FIELDS.transaction_hash.toLowerCase(),
+      accountRoot: BINARY_HEADER_FIELDS.account_hash.toLowerCase(),
+    })
+    expect(normalized.transactions[0]).toMatchObject({
+      hash: fixture.signed.hash.toLowerCase(),
+      transactionIndex: 0,
+      metadata: fixture.metadata,
+      transaction: { TransactionType: 'Payment', Amount: '123' },
+    })
+    expect(normalized.transactions[0]!.transaction).not.toHaveProperty('DeliverMax')
+    const expanded = {
+      ...fixture.result,
+      ledger: {
+        ...BINARY_HEADER_FIELDS,
+        ledger_hash: fixture.result.ledger_hash,
+        closed: true,
+        transactions: [
+          {
+            hash: fixture.signed.hash,
+            tx_json: decode(fixture.signed.tx_blob),
+            meta: fixture.metadata,
+          },
+        ],
+      },
+    }
+    expect(normalized).toEqual(normalizeLedgerResponse(expanded))
+  })
+  it('accepts API v2 meta_blob and hash while rejecting conflicting metadata aliases', () => {
+    const fixture = binaryResponse()
+    const expected = normalizeLedgerResponse(fixture.result)
+    const tx = record(fixture.result.ledger.transactions[0])
+    tx.meta_blob = tx.meta
+    tx.hash = fixture.signed.hash
+    delete tx.meta
+    expect(normalizeLedgerResponse(fixture.result)).toEqual(expected)
+    tx.meta = encode({ ...fixture.metadata, TransactionResult: 'tecUNFUNDED_PAYMENT' })
+    expect(() => normalizeLedgerResponse(fixture.result)).toThrow(
+      'metadata representations disagree',
+    )
+  })
+  it('requests a complete binary ledger and keeps the response-index guard', async () => {
+    const fixture = binaryResponse()
+    const request = vi
+      .spyOn(Client.prototype, 'request')
+      .mockResolvedValue({ result: fixture.result } as never)
+    try {
+      const source = new XrplLedgerSource('wss://source.invalid')
+      expect(await source.getLedger(32052277)).toEqual(normalizeLedgerResponse(fixture.result))
+      expect(request).toHaveBeenCalledWith({
+        command: 'ledger',
+        ledger_index: 32052277,
+        transactions: true,
+        expand: true,
+        binary: true,
+      })
+      await expect(source.getLedger(32052278)).rejects.toMatchObject({
+        code: 'SOURCE_RESPONSE_INVALID',
+      })
+    } finally {
+      request.mockRestore()
+    }
+  })
+  it.each(['', '0', 'GG', '00', BINARY_HEADER + '00'])(
+    'rejects malformed or trailing binary header bytes %s',
+    (header) => {
+      const fixture = binaryResponse()
+      fixture.result.ledger.ledger_data = header
+      expect(() => normalizeLedgerResponse(fixture.result)).toThrow()
+    },
+  )
+  it('rejects a binary header that disagrees with the advertised hash', () => {
+    const fixture = binaryResponse()
+    fixture.result.ledger_hash = '0'.repeat(64)
+    expect(() => normalizeLedgerResponse(fixture.result)).toThrow('hash values disagree')
+  })
+  it.each(['tx_blob', 'meta'] as const)(
+    'rejects invalid binary %s instead of trusting optional JSON shadows',
+    (field) => {
+      const fixture = binaryResponse()
+      const tx = fixture.result.ledger.transactions[0]!
+      tx[field] = '00'
+      Object.assign(tx, { hash: fixture.signed.hash, tx_json: decode(fixture.signed.tx_blob) })
+      expect(() => normalizeLedgerResponse(fixture.result)).toThrow('Cannot decode binary')
+    },
+  )
+  it('rejects a conflicting optional transaction hash', () => {
+    const fixture = binaryResponse()
+    Object.assign(fixture.result.ledger.transactions[0]!, { hash: '0'.repeat(64) })
+    expect(() => normalizeLedgerResponse(fixture.result)).toThrow('hash values disagree')
+  })
+  it('retains legitimate protocol pseudo-transactions without claiming an account signature', () => {
+    const fixture = binaryResponse()
+    const pseudo = {
+      TransactionType: 'EnableAmendment',
+      Account: 'rrrrrrrrrrrrrrrrrrrrrhoLvTp',
+      LedgerSequence: 32052277,
+      Amendment: 'a'.repeat(64),
+    }
+    const blob = encode(pseudo)
+    fixture.result.ledger.transactions[0]!.tx_blob = blob
+    const normalized = normalizeLedgerResponse(fixture.result).transactions[0]!
+    expect(normalized.transaction).toMatchObject({
+      ...pseudo,
+      Amendment: pseudo.Amendment.toUpperCase(),
+    })
+    // The standard ID domain applies to unsigned protocol operations too.
+    expect(normalized.hash).toBe('38b05da5a7dc38038355bb22ce9b605ba616f1cf87e8576dd6be3da1a6bf1702')
   })
 })

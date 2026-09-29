@@ -18,6 +18,20 @@ export interface StoredRecoveryMaterial {
 }
 
 /**
+ * Xaman may autofill LastLedgerSequence while signing. Do not ask it to retain
+ * an application-filled value that its signing service is documented to own;
+ * XCS still validates the returned blob and permits only that field to change.
+ */
+export function transactionForWalletSigning(
+  transaction: Transaction,
+  walletId: string | undefined,
+): Transaction {
+  if (walletId !== 'xaman' || transaction.LastLedgerSequence === undefined) return transaction
+  const { LastLedgerSequence: _lastLedgerSequence, ...request } = transaction
+  return request as Transaction
+}
+
+/**
  * Treat persisted browser recovery state as untrusted input before it can
  * influence terminal reconciliation or create a new XRPL side effect.
  */

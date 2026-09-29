@@ -1,4 +1,4 @@
-// Copied from packages/core/src/schema-resolution.ts at 54c3486; keep in sync by hand (see CONTRIBUTING.md).
+// Copied from packages/core/src/schema-resolution.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
 import { isValidClassicAddress } from 'xrpl'
 
 import { fail } from './errors.js'
@@ -43,20 +43,23 @@ function requireReference(
 ): RegisteredSchema {
   const referenced = context.getSchema(uid)
   if (referenced === undefined || referenced.uid !== uid) {
-    return fail('INVALID_SCHEMA_REFERENCE', `${relation} schema was not found`, `$.${relation}`, {
-      uid,
-    })
+    return fail(
+      relation === 'extends' ? 'SCHEMA_PARENT_NOT_FOUND' : 'SCHEMA_SUPERSEDES_NOT_FOUND',
+      `${relation} schema was not found`,
+      `$.${relation}`,
+      { uid },
+    )
   }
   if (referenced.networkId !== context.networkId) {
     return fail(
-      'INVALID_SCHEMA_REFERENCE',
+      relation === 'extends' ? 'SCHEMA_PARENT_NETWORK_MISMATCH' : 'SCHEMA_SUPERSEDES_NOT_FOUND',
       `${relation} schema belongs to another network`,
       `$.${relation}`,
     )
   }
   if (!isEarlier(referenced, context)) {
     return fail(
-      'INVALID_SCHEMA_REFERENCE',
+      relation === 'extends' ? 'SCHEMA_PARENT_NOT_PRIOR' : 'SCHEMA_SUPERSEDES_NOT_PRIOR',
       `${relation} schema must be registered earlier`,
       `$.${relation}`,
     )
@@ -73,12 +76,11 @@ function resolve(
   let lineage: string[] = []
 
   if (schema.extends !== undefined) {
-    if (visiting.size >= MAX_SCHEMA_DEPTH - 1 || visiting.has(schema.extends)) {
-      return fail(
-        'INVALID_SCHEMA_REFERENCE',
-        'Schema inheritance is cyclic or too deep',
-        '$.extends',
-      )
+    if (visiting.has(schema.extends)) {
+      return fail('SCHEMA_INHERITANCE_CYCLE', 'Schema inheritance is cyclic', '$.extends')
+    }
+    if (visiting.size >= MAX_SCHEMA_DEPTH - 1) {
+      return fail('SCHEMA_DEPTH_EXCEEDED', 'Schema inheritance is too deep', '$.extends')
     }
     const parent = requireReference(schema.extends, 'extends', context)
     visiting.add(schema.extends)
@@ -101,7 +103,7 @@ function resolve(
   for (const [name, descriptor] of Object.entries(schema.fields)) {
     if (Object.hasOwn(fields, name)) {
       return fail(
-        'INVALID_SCHEMA_REFERENCE',
+        'SCHEMA_OVERRIDE_FORBIDDEN',
         `Inherited field ${name} cannot be redefined`,
         `$.fields.${name}`,
       )
@@ -110,14 +112,18 @@ function resolve(
   }
 
   if (countSchemaFields(fields) > MAX_SCHEMA_FIELDS) {
-    return fail('INVALID_SCHEMA', `Resolved schema exceeds ${MAX_SCHEMA_FIELDS} fields`, '$.fields')
+    return fail(
+      'SCHEMA_FIELD_LIMIT_EXCEEDED',
+      `Resolved schema exceeds ${MAX_SCHEMA_FIELDS} fields`,
+      '$.fields',
+    )
   }
 
   if (schema.supersedes !== undefined) {
     const previous = requireReference(schema.supersedes, 'supersedes', context)
     if (previous.publisher !== context.publisher) {
       return fail(
-        'INVALID_SCHEMA_REFERENCE',
+        'SCHEMA_SUPERSEDES_PUBLISHER_MISMATCH',
         'Only the original publisher may supersede a schema',
         '$.supersedes',
       )
@@ -138,7 +144,7 @@ export function resolveSchema(
     !isValidClassicAddress(context.publisher) ||
     typeof context.getSchema !== 'function'
   ) {
-    return fail('INVALID_SCHEMA_REFERENCE', 'Invalid schema resolution context', '$context')
+    return fail('SCHEMA_INVALID', 'Invalid schema resolution context', '$context')
   }
   return resolve(parseSchema(input), context, new Set())
 }

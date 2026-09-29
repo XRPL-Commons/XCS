@@ -5,6 +5,7 @@ coverage/
 .nuxt/
 .output/
 .data/
+.do/
 .env
 .env.*
 !.env.compose.example

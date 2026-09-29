@@ -87,7 +87,7 @@ useSeoMeta({
       </template>
       <h2 class="mt-8 mb-3 text-xl font-semibold">{{ $t('schemas.definition') }}</h2>
       <JsonBlock :code="JSON.stringify(data.definition, null, 2)" />
-      <UButton :to="localePath(`/issue?schema=${data.uid}`)" color="neutral" variant="solid">
+      <UButton :to="localePath('/issuer/recipients')" color="neutral" variant="solid">
         {{ $t('schemas.use') }}
       </UButton>
     </template>

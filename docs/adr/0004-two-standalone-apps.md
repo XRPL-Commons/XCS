@@ -41,9 +41,11 @@ ran it. In practice it is an externally managed instance.
   same origin: `/v1/**`, `/health/*`, `/internal/metrics*` and `/documentation`.
 
 Each carries its own `package.json`, `pnpm-lock.yaml`, `.npmrc`, `.prettierrc.json`, tsconfig,
-`Dockerfile` and `.env.example`, and is deployed on its own with `gh deploy-setup` run from its own
-directory. Both Dockerfiles use the repository root as build context so the image can also copy `db/`
-and `config/`; nothing under `packages/` enters either image.
+`Dockerfile` and `.env.example`. Two one-purpose component directories package existing artifacts:
+`apps/notifier` runs the compiled web notification worker and `apps/db-bootstrap` runs the compiled
+indexer bootstrap command. `gh deploy-setup` discovers all four components from the repository root
+and creates one deployment with a web service, two workers and one pre-deploy job. All Dockerfiles use
+the repository root as build context; nothing under `packages/` enters a runtime image.
 
 **No shared code between the applications.** Neither imports `@xcs-protocol/*` or any other workspace
 package. The protocol and database code each one needs is copied into it as plain source:
@@ -73,8 +75,8 @@ applications.
 
 ### What this buys
 
-- Each application deploys, scales, rolls back and is audited on its own. A web rollback touches
-  nothing the indexer writes.
+- Each long-running application scales and rolls back independently inside one deployment. A web
+  rollback touches nothing the indexer writes.
 - The SSR hop is gone, and with it `NUXT_API_BASE_URL`, `NUXT_API_INTERNAL_TOKEN`,
   `NUXT_PUBLIC_API_BASE_URL`, the internal-token plugin, the SSR rate-limit middleware and the
   `x-xcs-internal-token` / `x-xcs-client-key` headers. One fewer process, one fewer shared secret,
@@ -82,32 +84,32 @@ applications.
 - Each lockfile describes exactly one deployable, so `pnpm audit` and `pnpm licenses list` report on
   what actually ships.
 - An image contains only its own application, `db/` and `config/`.
-- Removing the production Compose overlay removed every `*_FILE` secret variable and the class of
-  bind-mount permission problems that came with them.
+- Removing the production Compose overlay removes its prescribed secret-file bind mounts.
+  Hosted secret provisioning now belongs to the deployment operator; local Compose is not a
+  production secret-management contract.
 
 ### What it costs
 
-- **The copies are maintained by hand, and nothing enforces it.** A protocol fix in `packages/core`
-  with a green package suite changes nothing in either application until a human mirrors it — no
-  build, type check or test will say so. The rule (land in `packages/core` first, mirror into both
-  applications in the same pull request, keep the header comments current) lives in
-  `CONTRIBUTING.md`, and code review is the only control. For a security-relevant fix this is a real
-  correctness risk, accepted deliberately in exchange for independent deployability.
-- Drift can also run the other way: a change made only in an application copy leaves the published
-  library stale.
-- The same third-party dependency now appears in two lockfiles. `drizzle-orm` in particular must stay
-  identical in both, because `db/schema/` is compiled by each application against its own copy, and
-  nothing checks this automatically.
+- **The copies are maintained by hand.** CI's `ops/ci/check-vendored-copies.mjs` checks parity with
+  the reference source, allowing import rewrites and explicitly reviewed divergences pinned to a
+  source digest. It detects an unmirrored source change or an unreviewed application-only edit,
+  but does not generate the copies or validate deployed behavior. Follow `CONTRIBUTING.md`: land
+  protocol changes in the reference source, mirror both applications and run the owning app gates.
+- A change made only in an application copy does not update the published library. The parity gate
+  and review must accompany independent application builds and tests.
+- The same third-party dependency appears in two lockfiles. `drizzle-orm` must stay identical because
+  `db/schema/` is compiled by each application against its own copy;
+  `ops/ci/check-drizzle-parity.mjs` enforces this in CI.
 - **`--ignore-workspace` is mandatory** on every per-app pnpm command that resolves dependencies
   (`install`, `audit`, `licenses list`). Without it pnpm silently operates on the root workspace and
   still exits 0, so a report can look green while covering the wrong lockfile.
 - Three separate CI units (packages, web, indexer) with three installs; more wall-clock time.
-- The repository no longer ships a production deployment topology. Database provisioning, secret
-  storage and a hosted monitoring stack are now the operator's design. `ops/monitoring/` still
-  provides the alert rules, dashboard and scrape configuration.
-- The two applications are versioned and deployed independently, so a deployment can run mismatched
-  revisions. They share only database rows and there is no version negotiation between them; a schema
-  change must be rolled out in a compatible order.
+- The repository declares the four DigitalOcean application components, while PostgreSQL, private
+  object storage, SMTP, identity registration, secrets and hosted monitoring remain operator-managed.
+  `ops/monitoring/` provides the alert rules, dashboard and scrape configuration.
+- The two applications share only database rows and there is no runtime version negotiation between
+  them. App Platform now builds them from one repository revision, but a database change still needs
+  a compatible PRE_DEPLOY migration and rollback plan.
 
 ### Unchanged
 

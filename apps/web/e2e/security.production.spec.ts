@@ -58,6 +58,9 @@ test('serves production assets without applying an HTML CSP to them', async ({ r
     expect(asset.status(), assetPath).toBe(200)
     expectNonHtmlDefensiveHeaders(asset)
     expect(asset.headers()['cache-control'], assetPath).toBe('public, max-age=31536000, immutable')
+    if (assetPath.endsWith('.js')) {
+      expect(await asset.text(), assetPath).not.toContain('xcs-browser-e2e')
+    }
   }
 })
 
@@ -67,11 +70,12 @@ test('keeps the browser E2E fixtures out of the production build', async ({ requ
   expect(live.headers()['cache-control']).toBe('no-store')
   await expect(live.json()).resolves.toEqual({ status: 'ok' })
 
-  // The production build configures an unreachable database, so the real read
-  // API must fail rather than answer with the browser end-to-end fixtures.
+  // A deliberately unreachable database must fail through the real same-origin API,
+  // not return deterministic fixture data or an absent-route HTML document.
   const networks = await request.get('/v1/networks')
   expect(networks.status()).toBe(500)
   const body = (await networks.json()) as Record<string, unknown>
   expect(body.error).toBe('INTERNAL_ERROR')
   expect(body).not.toHaveProperty('items')
+  expectNonHtmlDefensiveHeaders(networks)
 })

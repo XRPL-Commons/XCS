@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844" role="img" aria-labelledby="title desc" xml:lang="fr">
+<title id="title">F2 — Invitation inutilisable</title>
+<desc id="desc">Ce lien a expiré ou ne peut plus être utilisé. Utilisez votre contact habituel chez l’émetteur. Ce message ne révèle pas qui a utilisé le lien.</desc>
+<rect x="0" y="0" width="390" height="844" rx="3" fill="#ffffff" stroke="#777777"/>
+<rect x="0" y="0" width="390" height="42" rx="3" fill="#eeeeee" stroke="#777777"/>
+<text x="20" y="12" font-family="Arial, sans-serif" font-size="13" fill="#252525" dominant-baseline="text-before-edge"><tspan x="20" dy="0">XCS / États partagés</tspan></text>
+<text x="24" y="62" font-family="Arial, sans-serif" font-size="23" fill="#252525" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Invitation inutilisable</tspan></text>
+<text x="24" y="103.9" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Ce lien a expiré ou ne peut plus être</tspan><tspan x="24" dy="18.2">utilisé.</tspan></text>
+<rect x="24" y="155.3" width="342" height="37" rx="3" fill="#eeeeee" stroke="#b4b4b4"/>
+<text x="34" y="165.3" font-family="Arial, sans-serif" font-size="13" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Aucune invitation récupérée</tspan></text>
+<rect x="24" y="208.3" width="342" height="77.4" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="217.3" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Que faire ?</tspan></text>
+<text x="34" y="237.3" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Demander une nouvelle invitation à</tspan><tspan x="34" dy="18.2">l’émetteur</tspan></text>
+<rect x="24" y="295.70000000000005" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="304.70000000000005" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Votre compte</tspan></text>
+<text x="34" y="324.70000000000005" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Vous pourrez continuer avec le même compte</tspan></text>
+<rect x="24" y="364.90000000000003" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="373.90000000000003" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Confidentialité</tspan></text>
+<text x="34" y="393.90000000000003" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Aucune information de destinataire affichée</tspan></text>
+<rect x="24" y="440.1" width="342" height="44" rx="3" fill="#333333" stroke="#333333"/>
+<text x="36" y="453" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" dominant-baseline="text-before-edge"><tspan x="36" dy="0">Retour à mon espace</tspan></text>
+<text x="24" y="497.1" font-family="Arial, sans-serif" font-size="12" fill="#555555" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Utilisez votre contact habituel chez l’émetteur.</tspan><tspan x="24" dy="15.600000000000001">Ce message ne révèle pas qui a utilisé le lien.</tspan></text>
+<text x="24" y="821" font-family="Arial, sans-serif" font-size="10" fill="#666666" dominant-baseline="text-before-edge"><tspan x="24" dy="0">MAQUETTE · Exemple fictif · Non fonctionnel</tspan></text>
+</svg>

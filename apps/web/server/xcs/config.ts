@@ -1,10 +1,14 @@
 import { isIP } from 'node:net'
 import { isValidClassicAddress } from 'xrpl'
-
+import { adminSecret } from './admin/config'
 import { apiEnvironment, apiSettings } from './settings'
 
 export interface ApiConfig {
   databaseUrl: string
+  payloadDatabaseUrl: string | undefined
+  hostedPayloads:
+    | { enabled: false }
+    | { enabled: true; publicBaseUrl: string; ipHashSecret: string; networks: string[] }
   trustedProxyCidrs: string[]
   ipfsGateway: string
   trustedIssuers: string[]
@@ -28,31 +32,19 @@ export interface ApiConfig {
       }
 }
 
-/**
- * The operational metrics routes are enabled by the presence of a usable
- * `XCS_METRICS_TOKEN` and by nothing else.
- *
- * No token means no routes, which is what an ordinary deployment that sets
- * nothing gets. A token that is present but malformed is a hard error rather
- * than a quiet fallback to "off": a typo in the one credential that guards the
- * snapshot must not silently produce an unmonitored deployment.
- */
 function operationalMetrics(environment: NodeJS.ProcessEnv): ApiConfig['operationalMetrics'] {
-  const supplied = environment.XCS_METRICS_TOKEN
-  if (supplied === undefined || supplied.trim().length === 0) return { enabled: false }
-  if (!/^[A-Za-z0-9_-]{32,256}$/u.test(supplied)) {
+  const token = adminSecret(environment, 'XCS_METRICS_TOKEN')
+  if (token.trim().length === 0) return { enabled: false }
+  if (!/^[A-Za-z0-9_-]{32,256}$/u.test(token)) {
     throw new Error('XCS_METRICS_TOKEN must be 32 to 256 URL-safe random characters')
   }
-  return { enabled: true, token: supplied }
-}
-
-function requiredValue(value: string | undefined, name: string): string {
-  if (value === undefined || value.trim().length === 0) throw new Error(`${name} is required`)
-  return value
+  return { enabled: true, token }
 }
 
 function required(environment: NodeJS.ProcessEnv, name: string): string {
-  return requiredValue(environment[name], name)
+  const value = adminSecret(environment, name)
+  if (value === undefined || value.trim().length === 0) throw new Error(`${name} is required`)
+  return value
 }
 
 function compatibleRequired(
@@ -60,7 +52,7 @@ function compatibleRequired(
   primary: string,
   legacy: string,
 ): string {
-  const value = environment[primary] ?? environment[legacy]
+  const value = adminSecret(environment, primary) || adminSecret(environment, legacy)
   if (value === undefined || value.trim().length === 0) {
     throw new Error(`${primary} is required`)
   }
@@ -133,6 +125,56 @@ function origins(value: string | undefined): string[] {
   })
 }
 
+function databaseUrl(environment: NodeJS.ProcessEnv, name: string, role: string): string {
+  const value = required(environment, name)
+  try {
+    const url = new URL(value)
+    if (
+      !['postgres:', 'postgresql:'].includes(url.protocol) ||
+      decodeURIComponent(url.username) !== role
+    ) {
+      throw new Error('invalid role')
+    }
+  } catch {
+    // Connection URLs can contain secrets: never include their value or parser error.
+    throw new Error(`${name} must be a PostgreSQL URL for the ${role} role`)
+  }
+  return value
+}
+
+function hostedPayloadBaseUrl(value: string): string {
+  const parsed = new URL(value)
+  if (
+    parsed.protocol !== 'https:' ||
+    parsed.username !== '' ||
+    parsed.password !== '' ||
+    parsed.origin !== value ||
+    Buffer.byteLength(`${value}/p/${'0'.repeat(18)}#xcs-sha256=${'0'.repeat(64)}`, 'utf8') > 128
+  ) {
+    throw new Error(
+      'XCS_PUBLIC_PAYLOAD_BASE_URL must be a short HTTPS origin that produces a URI of at most 128 bytes',
+    )
+  }
+  return value
+}
+
+export function loadHostedPayloadConfig(
+  environment: NodeJS.ProcessEnv = apiEnvironment(),
+): ApiConfig['hostedPayloads'] {
+  const supplied = [
+    environment.XCS_PUBLIC_PAYLOAD_BASE_URL,
+    environment.XCS_PAYLOAD_STORAGE_IP_HASH_SECRET,
+    environment.XCS_HOSTED_PAYLOAD_NETWORKS,
+  ].some((value) => value !== undefined && value.trim().length > 0)
+  if (!supplied) return { enabled: false }
+  return {
+    enabled: true,
+    publicBaseUrl: hostedPayloadBaseUrl(required(environment, 'XCS_PUBLIC_PAYLOAD_BASE_URL')),
+    ipHashSecret: required(environment, 'XCS_PAYLOAD_STORAGE_IP_HASH_SECRET'),
+    networks: list(environment.XCS_HOSTED_PAYLOAD_NETWORKS),
+  }
+}
+
 export function loadApiConfig(environment: NodeJS.ProcessEnv = apiEnvironment()): ApiConfig {
   const readinessMaxLedgerAgeSeconds = Number(
     environment.XCS_READINESS_MAX_LEDGER_AGE_SECONDS ??
@@ -153,10 +195,7 @@ export function loadApiConfig(environment: NodeJS.ProcessEnv = apiEnvironment())
   const demoPinning = demoPinningEnabled
     ? {
         enabled: true as const,
-        kuboRpcUrl: requiredValue(
-          environment.XCS_IPFS_API_URL ?? apiSettings.XCS_IPFS_API_URL,
-          'XCS_IPFS_API_URL',
-        ),
+        kuboRpcUrl: environment.XCS_IPFS_API_URL ?? apiSettings.XCS_IPFS_API_URL,
         ipHashSecret: required(environment, 'XCS_PINNING_IP_HASH_SECRET'),
         networks: list(environment.XCS_PINNING_NETWORKS ?? apiSettings.XCS_PINNING_NETWORKS),
       }
@@ -165,6 +204,7 @@ export function loadApiConfig(environment: NodeJS.ProcessEnv = apiEnvironment())
     environment.XCS_TRUSTED_ISSUERS ?? apiSettings.XCS_TRUSTED_ISSUERS,
     'XCS_TRUSTED_ISSUERS',
   )
+  const hostedPayloads = loadHostedPayloadConfig(environment)
   const untrustedIssuers = addressList(
     environment.XCS_UNTRUSTED_ISSUERS ?? apiSettings.XCS_UNTRUSTED_ISSUERS,
     'XCS_UNTRUSTED_ISSUERS',
@@ -174,6 +214,11 @@ export function loadApiConfig(environment: NodeJS.ProcessEnv = apiEnvironment())
   }
   return {
     databaseUrl: compatibleRequired(environment, 'XCS_DATABASE_URL', 'DATABASE_URL'),
+    payloadDatabaseUrl:
+      hostedPayloads.enabled || demoPinningEnabled
+        ? databaseUrl(environment, 'XCS_PAYLOAD_DATABASE_URL', 'xcs_payload_writer')
+        : undefined,
+    hostedPayloads,
     trustedProxyCidrs: trustedProxyCidrs(environment.XCS_TRUSTED_PROXY_CIDRS),
     ipfsGateway:
       environment.XCS_IPFS_GATEWAY_URL ??

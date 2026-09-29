@@ -6,13 +6,16 @@ This repository is alpha software for XRPL Testnet. Do not use personal data or 
 
 ## Layout
 
-Two deployable applications:
+Two application runtimes and two one-purpose deployment components:
 
 - `apps/indexer`: validated-ledger ingestion and rebuildable projections. It owns the database
   tooling (`db:generate`, `db:migrate`, `db:bootstrap`).
 - `apps/web`: the Nuxt Testnet explorer and issuer/subject workflows **and** the read/verification
   API it serves from the same origin at `/v1`, with `/health/*`, `/internal/metrics*` and
   `/documentation`.
+- `apps/notifier`: the restricted SMTP notification worker built from the web application.
+- `apps/db-bootstrap`: the pre-deploy migration and least-privilege role provisioning job built from
+  the indexer.
 
 Each application is standalone: its own `package.json`, `pnpm-lock.yaml`, `.npmrc`, tsconfig,
 Prettier config, `Dockerfile` and `.env.example`. Neither imports a workspace package; each carries
@@ -76,11 +79,10 @@ pnpm --dir apps/indexer verify
 
 ### Pointing the applications at a database
 
-PostgreSQL is provisioned outside this repository, and so are its users: create `xcs_indexer`,
-`xcs_api` and `xcs_monitor` in the DigitalOcean control panel or with `doctl databases user create`
-and keep the passwords DigitalOcean generates. The indexer then owns the grants; run it once against
-a fresh database as the administrator, then give each application its least-privilege connection
-string:
+PostgreSQL is provisioned outside this repository. First create these eight managed users in
+DigitalOcean: `xcs_indexer`, `xcs_api`, `xcs_payload_writer`, `xcs_monitor`, `xcs_app`,
+`xcs_admin_app`, `xcs_notifier` and `xcs_issuer`. DigitalOcean generates and owns their passwords.
+Then run the grants-only bootstrap with the database administrator URL:
 
 ```bash
 XCS_BOOTSTRAP_DATABASE_URL=postgres://xcs_admin:…@host:5432/xcs \
@@ -88,10 +90,13 @@ XCS_BOOTSTRAP_DATABASE_URL=postgres://xcs_admin:…@host:5432/xcs \
   pnpm --dir apps/indexer db:bootstrap
 ```
 
-The indexer then reads `XCS_INDEXER_DATABASE_URL` (role `xcs_indexer`) and the web app reads
-`XCS_DATABASE_URL` (role `xcs_api`). The complete contracts are
+The command applies migrations 0000–0008 and database grants atomically. It never creates a user and
+never reads, sets or rotates a runtime password. Each component then receives its own managed URL.
+The complete contracts are
 [`apps/indexer/.env.example`](./apps/indexer/.env.example) and
-[`apps/web/.env.example`](./apps/web/.env.example).
+[`apps/web/.env.example`](./apps/web/.env.example). The pre-deploy and notification contracts are
+[`apps/db-bootstrap/.env.example`](./apps/db-bootstrap/.env.example) and
+[`apps/notifier/.env.example`](./apps/notifier/.env.example).
 
 For a disposable local database, `docker-compose.yml` runs PostgreSQL, the one-shot bootstrap and
 both applications. It is a **local-development stack only**; it is not a deployment template. Copy

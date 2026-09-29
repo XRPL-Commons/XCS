@@ -1,4 +1,4 @@
-// Copied from packages/db/src/transactions.ts at 61fb809; keep in sync by hand (see CONTRIBUTING.md).
+// Not a vendored copy (retired source): application-local database implementation maintained with db/schema.
 import type { XcsDatabase } from './client.js'
 
 const RETRYABLE_TRANSACTION_ERROR_CODES = new Set(['40001', '40P01'])

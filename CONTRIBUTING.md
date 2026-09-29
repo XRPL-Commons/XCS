@@ -44,13 +44,13 @@ The rule is therefore:
 
 The copy locations are:
 
-| Copy                         | Source                                            |
-| ---------------------------- | ------------------------------------------------- |
-| `apps/web/app/lib/xcs/core/` | `packages/core/src/**`                            |
-| `apps/web/app/lib/xcs/sdk/`  | `packages/sdk/src/**`                             |
-| `apps/web/server/lib/db/`    | the former `packages/db` client and transactions  |
-| `apps/indexer/src/lib/xcs/`  | the `packages/core` modules the indexer reaches   |
-| `apps/indexer/src/lib/db/`   | client, fencing, transactions, provision, migrate |
+| Copy                         | Source                                          |
+| ---------------------------- | ----------------------------------------------- |
+| `apps/web/app/lib/xcs/core/` | `packages/core/src/**`                          |
+| `apps/web/app/lib/xcs/sdk/`  | `packages/sdk/src/**`                           |
+| `apps/web/server/lib/db/`    | application-local database implementation       |
+| `apps/indexer/src/lib/xcs/`  | the `packages/core` modules the indexer reaches |
+| `apps/indexer/src/lib/db/`   | application-local database implementation       |
 
 ### How the rule is enforced
 
@@ -73,10 +73,11 @@ from` module specifier — which is the case this check exists for, since a chan
 - a new file under a vendored directory with no header at all, so a copy cannot be added unlabelled;
 - a stale by-design divergence (below).
 
-It compares against the source **as it is now**, not as it was at the recorded `<sha>`. The sha is
-immutable, so comparing against it would only ever notice edits to the copy. A source that has been
-retired from the tree (the former `packages/db`) can no longer change, so for those files the
-recorded commit is used.
+It compares protocol copies against the source **as it is now**, not as it was at the recorded
+`<sha>`. The sha is immutable, so comparing against it would only ever notice edits to the copy. The
+former `packages/db` implementation was retired before this repository history and cannot be
+resolved here; its descendants are explicitly marked as application-local code and are covered by
+each application's tests. Shared tables and migrations remain canonical under `db/`.
 
 A copy that genuinely has to differ — because the surrounding application requires it, not because
 someone edited it — declares that on a second header line, pinning the exact source the divergence

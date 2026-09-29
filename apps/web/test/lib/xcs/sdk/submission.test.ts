@@ -1,4 +1,4 @@
-// Copied from packages/sdk/test/submission.test.ts at 54c3486; keep in sync by hand (see CONTRIBUTING.md).
+// Copied from packages/sdk/test/submission.test.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
 import { decode, encode, hashes, Wallet, type Client, type SubmittableTransaction } from 'xrpl'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -200,6 +200,69 @@ describe('reliable submission', () => {
     expect(submit).not.toHaveBeenCalled()
   })
 
+  it('rejects a signature returned after expiry before persisting it or entering the relay path', async () => {
+    const blob = signedBlob()
+    const transaction = decode(blob) as unknown as SubmittableTransaction
+    const journal = new MemoryOperationJournal()
+    const submit = vi.fn()
+    const onValidatedSignature = vi.fn()
+    const beforeSubmit = vi.fn()
+    const request = vi.fn(async () => ({ result: { ledger_current_index: 51 } }))
+    await expect(
+      signPreparedAndSubmit(
+        mockClient({ submit, request }),
+        transaction,
+        { sign: async () => ({ txBlob: blob, hash: hashes.hashSignedTx(blob) }) },
+        { journal, onValidatedSignature, beforeSubmit },
+      ),
+    ).rejects.toMatchObject({ code: 'XCS_SDK_TRANSACTION_EXPIRED' })
+    expect(onValidatedSignature).not.toHaveBeenCalled()
+    expect(beforeSubmit).not.toHaveBeenCalled()
+    expect(submit).not.toHaveBeenCalled()
+    expect(journal.entries.map((entry) => entry.stage)).toEqual(['prepared', 'failed'])
+    expect(journal.entries.every((entry) => entry.txHash === undefined)).toBe(true)
+  })
+
+  it('rechecks expiry after the final asynchronous host guard without relaying the blob', async () => {
+    const blob = signedBlob()
+    const journal = new MemoryOperationJournal()
+    let currentLedger = 49
+    const submit = vi.fn()
+    const onValidatedSignature = vi.fn()
+    await expect(
+      signPreparedAndSubmit(
+        mockClient({
+          submit,
+          request: vi.fn(async () => ({ result: { ledger_current_index: currentLedger } })),
+        }),
+        decode(blob) as unknown as SubmittableTransaction,
+        { sign: async () => ({ txBlob: blob, hash: hashes.hashSignedTx(blob) }) },
+        {
+          journal,
+          onValidatedSignature,
+          beforeSubmit: async () => {
+            currentLedger = 51
+          },
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'XCS_SDK_TRANSACTION_EXPIRED' })
+    expect(onValidatedSignature).toHaveBeenCalledOnce()
+    expect(submit).not.toHaveBeenCalled()
+    // Once recovery material has escaped to a host hook, do not infer global absence.
+    expect(journal.entries.at(-1)?.stage).toBe('signed')
+  })
+
+  it('keeps a previously relayed cached transaction pending after its ledger window', async () => {
+    const request = vi.fn(async ({ command }: { command: string }) => ({
+      result: command === 'tx' ? { validated: false } : { ledger_current_index: 100 },
+    }))
+    await expect(
+      getTransactionStatus(mockClient({ request }), 'AB'.repeat(32), 50),
+    ).resolves.toMatchObject({ status: 'pending' })
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({ command: 'tx' }))
+  })
+
   it('runs the validated-signature hook after exact comparison and before submit', async () => {
     const calls: string[] = []
     const blob = signedBlob()
@@ -313,18 +376,47 @@ describe('reliable submission', () => {
     expect(request).not.toHaveBeenCalled()
   })
 
-  it('reports expiration only after the last ledger sequence passes', async () => {
-    const notFound = Object.assign(new Error('txnNotFound'), { data: { error: 'txnNotFound' } })
+  it('does not infer final failure from an open ledger or incomplete history', async () => {
+    const notFound = Object.assign(new Error('txnNotFound'), {
+      data: { error: 'txnNotFound', searched_all: false },
+    })
     const client = mockClient({
-      request: vi
-        .fn()
-        .mockRejectedValueOnce(notFound)
-        .mockResolvedValueOnce({ result: { ledger_current_index: 51 } }),
+      request: vi.fn(async (request: { command: string }) => {
+        if (request.command === 'tx') throw notFound
+        return { result: { ledger_current_index: 51 } }
+      }),
     })
 
     await expect(getTransactionStatus(client, 'AB'.repeat(32), 50)).resolves.toMatchObject({
-      status: 'expired',
+      status: 'not_found',
     })
+  })
+
+  it('keeps polling after txnNotFound so a later validated result is not lost', async () => {
+    const journal = new MemoryOperationJournal()
+    let lookups = 0
+    const client = mockClient({
+      request: vi.fn(async ({ command }: { command: string }) => {
+        if (command !== 'tx') return { result: { ledger_current_index: 51 } }
+        if (lookups++ === 0) {
+          throw Object.assign(new Error('txnNotFound'), { data: { error: 'txnNotFound' } })
+        }
+        return {
+          result: {
+            validated: true,
+            ledger_index: 50,
+            meta: { TransactionResult: 'tesSUCCESS' },
+          },
+        }
+      }),
+    })
+    const result = await submitSignedTransaction(client, signedBlob(), {
+      journal,
+      pollIntervalMs: 1,
+      timeoutMs: 100,
+    })
+    expect(result).toMatchObject({ status: 'validated', ledgerIndex: 50 })
+    expect(journal.entries.map((entry) => entry.stage)).not.toContain('expired')
   })
 
   it('rejects an expired prepared transaction before any submit side effect', async () => {

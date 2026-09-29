@@ -9,5 +9,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['test/**/*.test.ts'],
+    // Integration files provision the same cluster-wide roles, even in separate databases.
+    fileParallelism: !process.env.XCS_TEST_DATABASE_URL?.trim(),
   },
 })

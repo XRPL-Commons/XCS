@@ -1,4 +1,4 @@
-// Copied from packages/core/src/lifecycle.ts at 54c3486; keep in sync by hand (see CONTRIBUTING.md).
+// Copied from packages/core/src/lifecycle.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
 import { fail } from './errors.js'
 
 export type CredentialLifecycleState = 'pending' | 'active' | 'expired' | 'deleted'
@@ -14,7 +14,7 @@ const UINT32_MAX = 0xffff_ffff
 
 function requireRippleTime(value: number): void {
   if (!Number.isInteger(value) || value < 0 || value > UINT32_MAX) {
-    return fail('INVALID_RIPPLE_TIME', 'Credential lifecycle time must be a uint32', '$time')
+    return fail('RIPPLE_TIME_INVALID', 'Credential lifecycle time must be a uint32', '$time')
   }
 }
 

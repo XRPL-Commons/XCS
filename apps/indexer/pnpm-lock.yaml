@@ -33,6 +33,9 @@ importers:
       postgres:
         specifier: ^3.4.7
         version: 3.4.9
+      ripple-binary-codec:
+        specifier: 2.11.0
+        version: 2.11.0
       tr46:
         specifier: 4.1.1
         version: 4.1.1

@@ -1,4 +1,4 @@
-// Copied from packages/core/src/schema.ts at 54c3486; keep in sync by hand (see CONTRIBUTING.md).
+// Copied from packages/core/src/schema.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
 import { fail } from './errors.js'
 import { encodeCanonicalJson, parseCanonicalJson, utf8ByteLength } from './json.js'
 
@@ -76,17 +76,17 @@ function assertOnlyProperties(
   path: string,
 ): void {
   for (const key of Object.keys(value)) {
-    if (!allowed.has(key)) fail('INVALID_SCHEMA', `Unknown property ${key}`, `${path}.${key}`)
+    if (!allowed.has(key)) fail('SCHEMA_INVALID', `Unknown property ${key}`, `${path}.${key}`)
   }
 }
 
 function parseText(value: unknown, path: string, maxBytes: number): string {
   if (typeof value !== 'string' || CONTROL_CHARACTER.test(value)) {
-    return fail('INVALID_SCHEMA', `Expected 1 to ${maxBytes} UTF-8 bytes`, path)
+    return fail('SCHEMA_INVALID', `Expected 1 to ${maxBytes} UTF-8 bytes`, path)
   }
   const length = utf8ByteLength(value)
   if (length < 1 || length > maxBytes) {
-    return fail('INVALID_SCHEMA', `Expected 1 to ${maxBytes} UTF-8 bytes`, path)
+    return fail('SCHEMA_INVALID', `Expected 1 to ${maxBytes} UTF-8 bytes`, path)
   }
   return value
 }
@@ -98,10 +98,10 @@ function parseDescriptor(
   count: { value: number },
 ): FieldDescriptor {
   if (!isRecord(input) || typeof input.type !== 'string') {
-    return fail('INVALID_SCHEMA', 'Field descriptor must contain a type', path)
+    return fail('SCHEMA_INVALID', 'Field descriptor must contain a type', path)
   }
   if (input.optional !== undefined && typeof input.optional !== 'boolean') {
-    return fail('INVALID_SCHEMA', 'optional must be a boolean', `${path}.optional`)
+    return fail('SCHEMA_INVALID', 'optional must be a boolean', `${path}.optional`)
   }
   const optional = input.optional === true ? { optional: true as const } : {}
 
@@ -112,7 +112,7 @@ function parseDescriptor(
   if (input.type === 'array') {
     assertOnlyProperties(input, new Set(['type', 'optional', 'items']), path)
     if (depth >= MAX_SCHEMA_DEPTH || input.items === undefined) {
-      return fail('INVALID_SCHEMA', 'Array descriptor is missing items or exceeds depth', path)
+      return fail('SCHEMA_INVALID', 'Array descriptor is missing items or exceeds depth', path)
     }
     count.value += 1
     assertFieldLimit(count.value, `${path}.items`)
@@ -125,7 +125,7 @@ function parseDescriptor(
   if (input.type === 'object') {
     assertOnlyProperties(input, new Set(['type', 'optional', 'fields']), path)
     if (depth >= MAX_SCHEMA_DEPTH) {
-      return fail('INVALID_SCHEMA', `Schema nesting exceeds ${MAX_SCHEMA_DEPTH}`, path)
+      return fail('SCHEMA_INVALID', `Schema nesting exceeds ${MAX_SCHEMA_DEPTH}`, path)
     }
     return {
       type: 'object',
@@ -133,12 +133,16 @@ function parseDescriptor(
       ...optional,
     }
   }
-  return fail('INVALID_SCHEMA', `Unsupported field type ${input.type}`, `${path}.type`)
+  return fail('SCHEMA_INVALID', `Unsupported field type ${input.type}`, `${path}.type`)
 }
 
 function assertFieldLimit(count: number, path: string): void {
   if (count > MAX_SCHEMA_FIELDS) {
-    fail('INVALID_SCHEMA', `Schema exceeds ${MAX_SCHEMA_FIELDS} field descriptors`, path)
+    fail(
+      'SCHEMA_FIELD_LIMIT_EXCEEDED',
+      `Schema exceeds ${MAX_SCHEMA_FIELDS} field descriptors`,
+      path,
+    )
   }
 }
 
@@ -149,11 +153,11 @@ function parseFields(
   count: { value: number },
 ): SchemaFields {
   if (!isRecord(input) || Object.keys(input).length === 0) {
-    return fail('INVALID_SCHEMA', 'fields must be a non-empty object', path)
+    return fail('SCHEMA_INVALID', 'fields must be a non-empty object', path)
   }
   const fields = Object.create(null) as SchemaFields
   for (const [name, descriptor] of Object.entries(input)) {
-    if (!FIELD_NAME.test(name)) fail('INVALID_SCHEMA', 'Invalid field name', `${path}.${name}`)
+    if (!FIELD_NAME.test(name)) fail('SCHEMA_INVALID', 'Invalid field name', `${path}.${name}`)
     count.value += 1
     assertFieldLimit(count.value, `${path}.${name}`)
     fields[name] = parseDescriptor(descriptor, `${path}.${name}`, depth, count)
@@ -164,22 +168,22 @@ function parseFields(
 function parseRelation(value: unknown, path: string): string | undefined {
   if (value === undefined) return undefined
   if (typeof value !== 'string' || !SCHEMA_UID.test(value)) {
-    return fail('INVALID_SCHEMA', 'Expected a lowercase 32-byte schema UID', path)
+    return fail('SCHEMA_INVALID', 'Expected a lowercase 32-byte schema UID', path)
   }
   return value
 }
 
 export function parseSchema(input: unknown): SchemaDefinition {
-  if (!isRecord(input)) return fail('INVALID_SCHEMA', 'Schema must be an object', '$')
+  if (!isRecord(input)) return fail('SCHEMA_INVALID', 'Schema must be an object', '$')
   assertOnlyProperties(input, SCHEMA_PROPERTIES, '$')
   if (input.xcsVersion !== '0.1') {
-    return fail('INVALID_SCHEMA', 'Unsupported XCS schema version', '$.xcsVersion')
+    return fail('SCHEMA_INVALID', 'Unsupported XCS schema version', '$.xcsVersion')
   }
 
   const parent = parseRelation(input.extends, '$.extends')
   const predecessor = parseRelation(input.supersedes, '$.supersedes')
   if (parent !== undefined && parent === predecessor) {
-    return fail('INVALID_SCHEMA', 'extends and supersedes must reference different schemas', '$')
+    return fail('SCHEMA_INVALID', 'extends and supersedes must reference different schemas', '$')
   }
 
   return {
@@ -191,6 +195,9 @@ export function parseSchema(input: unknown): SchemaDefinition {
     ...(predecessor === undefined ? {} : { supersedes: predecessor }),
   }
 }
+
+/** Normative XCS v0.1 name retained for existing consumers. */
+export const validateSchema = parseSchema
 
 export function parseSchemaBytes(bytes: Uint8Array): SchemaDefinition {
   return parseSchema(parseCanonicalJson(bytes))

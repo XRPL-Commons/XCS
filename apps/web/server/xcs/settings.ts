@@ -17,6 +17,13 @@ import { parseNetworkProfile, type NetworkProfile } from '#xcs/core'
  * names, so a bad edit here fails at start-up the way a bad variable used to.
  */
 export const apiSettings = {
+  /** XRPL Commons Identity endpoint used by the account workspace. */
+  XCS_IDENTITY_ISSUER: 'https://account.xrpl.in',
+  /** Session lifetimes for the account workspace. */
+  XCS_AUTH_IDLE_SECONDS: '1800',
+  XCS_AUTH_MAX_SECONDS: '28800',
+  /** Issuer invitation lifetime. */
+  XCS_ISSUER_INVITE_DAYS: '7',
   /** Server-side fetching of credential payloads. Off. */
   XCS_PAYLOAD_FETCH_ENABLED: 'false',
   /** Gateway used to fetch `ipfs://` payloads once the flag above is on. */

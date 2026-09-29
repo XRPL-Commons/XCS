@@ -1,0 +1,72 @@
+{
+  "version": "0.1",
+  "schema": {
+    "xcsVersion": "0.1",
+    "name": "Conformance Claims",
+    "description": "Exercises all XCS v0.1 claim types.",
+    "fields": {
+      "text": { "type": "string" },
+      "flag": { "type": "bool" },
+      "count": { "type": "uint" },
+      "delta": { "type": "int" },
+      "data": { "type": "bytes" },
+      "account": { "type": "address" },
+      "tags": { "type": "array", "items": { "type": "string" } },
+      "detail": {
+        "type": "object",
+        "fields": {
+          "code": { "type": "string" },
+          "note": { "type": "string", "optional": true }
+        }
+      },
+      "optionalText": { "type": "string", "optional": true }
+    }
+  },
+  "cases": [
+    {
+      "name": "all supported types",
+      "valid": true,
+      "claims": {
+        "text": "completed",
+        "flag": true,
+        "count": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "delta": "-57896044618658097711785492504343953926634992332820282019728792003956564819968",
+        "data": "SGVsbG8",
+        "account": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+        "tags": ["xcs", "xrpl"],
+        "detail": { "code": "course-1" }
+      }
+    },
+    {
+      "name": "rejects a non-canonical integer",
+      "valid": false,
+      "errorCode": "CLAIMS_INVALID",
+      "claims": {
+        "text": "completed",
+        "flag": true,
+        "count": "01",
+        "delta": "0",
+        "data": "",
+        "account": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+        "tags": [],
+        "detail": { "code": "course-1" }
+      }
+    },
+    {
+      "name": "rejects an additional claim",
+      "valid": false,
+      "errorCode": "CLAIMS_INVALID",
+      "claims": {
+        "text": "completed",
+        "flag": true,
+        "count": "1",
+        "delta": "0",
+        "data": "",
+        "account": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+        "tags": [],
+        "detail": { "code": "course-1" },
+        "extra": true
+      }
+    }
+  ]
+}

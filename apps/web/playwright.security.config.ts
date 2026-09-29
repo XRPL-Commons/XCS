@@ -2,7 +2,8 @@ import { fileURLToPath } from 'node:url'
 
 import { defineConfig, devices } from '@playwright/test'
 
-const baseURL = 'http://127.0.0.1:3101'
+const port = process.env.XCS_SECURITY_E2E_PORT ?? '3101'
+const baseURL = `http://127.0.0.1:${port}`
 
 export default defineConfig({
   testDir: './e2e',
@@ -29,7 +30,10 @@ export default defineConfig({
     env: {
       NODE_ENV: 'production',
       NITRO_HOST: '127.0.0.1',
-      NITRO_PORT: '3101',
+      NITRO_PORT: port,
+      // Production uses the standalone API config, never the fixture repository.
+      XCS_DATABASE_URL: 'postgres://xcs_api@127.0.0.1:1/security-test',
+      XCS_ALLOWED_ORIGINS: baseURL,
       NUXT_BROWSER_E2E_MODE: 'disabled',
       NUXT_PUBLIC_BROWSER_E2E_MODE: 'disabled',
       // The browser-visible profile identifier is derived from this file's
@@ -39,10 +43,6 @@ export default defineConfig({
       ),
       XCS_BROWSER_E2E: '0',
       XCS_LOCAL_PAYLOAD_STORE: '0',
-      // The production build boots the real API context; the address is
-      // deliberately unreachable so the read routes answer 503 rather than data.
-      XCS_DATABASE_URL: 'postgres://127.0.0.1:1/xcs',
-      XCS_ALLOWED_ORIGINS: baseURL,
     },
   },
   projects: [{ name: 'chromium-security-production', use: { ...devices['Desktop Chrome'] } }],

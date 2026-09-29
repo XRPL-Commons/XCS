@@ -26,8 +26,10 @@ pnpm --dir apps/indexer dev      # tsx watch src/main.ts
 pnpm --dir apps/indexer verify   # format:check, lint, test, build
 ```
 
-Configuration is the contract in [`.env.example`](./.env.example). The long-running service reads the
-first ten variables; the last two are read only by `db:bootstrap`.
+Configuration for the long-running service is the contract in [`.env.example`](./.env.example).
+Bootstrap secrets have a separate contract in
+[`apps/db-bootstrap/.env.example`](../db-bootstrap/.env.example) and must never be delivered to the
+indexer worker.
 
 The committed `config/networks/testnet.example.json` is a placeholder with an invalid registry and
 activation boundary. The indexer refuses it and stops with `SOURCE_REGISTRY_NOT_BLACKHOLED`. **This is
@@ -40,18 +42,22 @@ The indexer owns every database command. `drizzle-kit` and the migration runner 
 devDependencies; the web app has none of them.
 
 ```sh
-pnpm --dir apps/indexer db:generate    # regenerate db/migrations after editing db/schema — commit the result
+pnpm --dir apps/indexer db:generate    # add a migration after editing db/schema — retain applied files
 pnpm --dir apps/indexer db:migrate     # apply migrations to an existing database (idempotent)
-pnpm --dir apps/indexer db:bootstrap   # migrate + grant privileges to xcs_indexer / xcs_api / xcs_monitor
+pnpm --dir apps/indexer db:bootstrap   # migrate + grant all eight runtime users
 ```
 
-`db:bootstrap` runs once against a fresh database and needs only `XCS_BOOTSTRAP_DATABASE_URL` and
-`XCS_DATABASE_CLUSTER_SCOPE=dedicated`. It is **grants-only**: the managed database service owns the
-users, so create `xcs_indexer`, `xcs_api` and `xcs_monitor` in the DigitalOcean control panel or with
-`doctl databases user create` first, take the passwords DigitalOcean generates, then run this once as
-the administrator. It never creates a role and never sets, resets or reads a role password; if a role
-is missing it fails and names it. It is idempotent. Rotating a runtime password is now a DigitalOcean
-operation and does not need this step. PostgreSQL is provisioned outside this repository; see
+Before `db:bootstrap`, create all eight runtime users listed in [`db/README.md`](../../db/README.md)
+through DigitalOcean and retain the generated connection strings in the deployment secret store.
+The bootstrap needs only `XCS_BOOTSTRAP_DATABASE_URL` and
+`XCS_DATABASE_CLUSTER_SCOPE=dedicated`. It checks every user before DDL, applies migrations 0000–0008
+and least-privilege grants in one transaction, and never reads or changes a runtime password.
+
+`db:migrate` applies pending migrations without provisioning roles. The committed 0000–0008 history
+supports populated-baseline upgrades and repeated runs; integration tests check preservation of
+profiles and legacy payload bytes/locators. Never rewrite an applied migration. This is not an
+upgrader for arbitrary schema drift or the former Nuxt MVP. See the [shared database contract](../../db/README.md).
+PostgreSQL is provisioned outside this repository; see
 [`docs/database.md`](../../docs/database.md) and the
 [deployment runbook](../../docs/runbooks/deployment.md).
 
@@ -70,6 +76,22 @@ Preflight checks network ID, contiguous retained history, the amendment, the act
 the selected registry policy on both sources, and prints no endpoint or credential. The full
 procedures — healthy state, recovery, deterministic rebuild and evidence capture — are in the
 [indexer runbook](../../docs/runbooks/indexer.md).
+
+Ledger transport requests the complete transaction set with `transactions: true`, `expand: true`
+and `binary: true`. Large expanded JSON responses can exceed a provider's WebSocket limit even
+when that provider retains the ledger. The official binary codec decodes the header, transaction
+bytes and metadata locally; XRPL hash helpers validate the header and derive transaction IDs.
+Protocol pseudo-transactions use the standard unsigned transaction-ID domain. Canonical serialized
+fields such as `Payment.Amount` are preserved instead of API v2 JSON aliases such as `DeliverMax`.
+See the [XRPL ledger API](https://xrpl.org/docs/references/http-websocket-apis/public-api-methods/ledger-methods/ledger).
+
+Both independently operated sources must still agree on the complete normalized header and every
+transaction/metadata object. Malformed blobs, conflicting hashes, missing transactions and a source
+without the required history remain fatal. The transport change neither skips checkpoints nor
+resets a projection or reduces the quorum. `ripple-binary-codec@2.11.0` is a direct dependency for
+its official ledger-header decoder, matching the version already used transitively by `xrpl`.
+An existing database with a different migration journal still requires its own reviewed upgrade;
+rebuilding the indexer image does not authorize rewriting that history.
 
 ## Tests
 

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844" role="img" aria-labelledby="title desc" xml:lang="fr">
+<title id="title">R4 — Examiner avant d’accepter</title>
+<desc id="desc">Lire le contenu seulement après votre accord. Émetteur inconnu : accord explicite avant acceptation. Émetteur non fiable : acceptation bloquée. Refuser ne télécharge rien.</desc>
+<rect x="0" y="0" width="390" height="844" rx="3" fill="#ffffff" stroke="#777777"/>
+<rect x="0" y="0" width="390" height="42" rx="3" fill="#eeeeee" stroke="#777777"/>
+<text x="20" y="12" font-family="Arial, sans-serif" font-size="13" fill="#252525" dominant-baseline="text-before-edge"><tspan x="20" dy="0">XCS / Destinataire</tspan></text>
+<text x="24" y="62" font-family="Arial, sans-serif" font-size="23" fill="#252525" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Examiner avant d’accepter</tspan></text>
+<text x="24" y="103.9" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Lire le contenu seulement après votre</tspan><tspan x="24" dy="18.2">accord.</tspan></text>
+<rect x="24" y="155.3" width="342" height="37" rx="3" fill="#eeeeee" stroke="#b4b4b4"/>
+<text x="34" y="165.3" font-family="Arial, sans-serif" font-size="13" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">4 sur 4 · À accepter</tspan></text>
+<rect x="24" y="208.3" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="217.3" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Émetteur et attestation</tspan></text>
+<text x="34" y="237.3" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Atelier Exemple · Fin de formation</tspan></text>
+<rect x="24" y="277.5" width="342" height="77.4" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="286.5" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Source du contenu</tspan></text>
+<text x="34" y="306.5" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Hébergement privé XCS · Lecture sur</tspan><tspan x="34" dy="18.2">autorisation</tspan></text>
+<rect x="24" y="364.9" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="373.9" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Après lecture et contrôles</tspan></text>
+<text x="34" y="393.9" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Afficher les champs et le résumé à signer</tspan></text>
+<rect x="24" y="434.09999999999997" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="443.09999999999997" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Avant signature</tspan></text>
+<text x="34" y="463.09999999999997" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Votre compte · Testnet · Frais à afficher</tspan></text>
+<rect x="24" y="509.29999999999995" width="342" height="44" rx="3" fill="#333333" stroke="#333333"/>
+<text x="36" y="522.1999999999999" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" dominant-baseline="text-before-edge"><tspan x="36" dy="0">Autoriser la lecture du contenu</tspan></text>
+<rect x="24" y="563.3" width="342" height="44" rx="3" fill="#ffffff" stroke="#333333"/>
+<text x="36" y="576.1999999999999" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="36" dy="0">Refuser sans lire le contenu</tspan></text>
+<text x="24" y="620.3" font-family="Arial, sans-serif" font-size="12" fill="#555555" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Émetteur inconnu : accord explicite avant</tspan><tspan x="24" dy="15.600000000000001">acceptation. Émetteur non fiable : acceptation</tspan><tspan x="24" dy="15.600000000000001">bloquée. Refuser ne télécharge rien.</tspan></text>
+<text x="24" y="821" font-family="Arial, sans-serif" font-size="10" fill="#666666" dominant-baseline="text-before-edge"><tspan x="24" dy="0">MAQUETTE · Exemple fictif · Non fonctionnel</tspan></text>
+</svg>

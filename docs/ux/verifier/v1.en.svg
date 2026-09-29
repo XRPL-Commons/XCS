@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844" role="img" aria-labelledby="title desc" xml:lang="en">
+<title id="title">V1 — Request full-detail access</title>
+<desc id="desc">Explain your organization and your need. After global approval, the recipient must share with your verifier identity.</desc>
+<rect x="0" y="0" width="390" height="844" rx="3" fill="#ffffff" stroke="#777777"/>
+<rect x="0" y="0" width="390" height="42" rx="3" fill="#eeeeee" stroke="#777777"/>
+<text x="20" y="12" font-family="Arial, sans-serif" font-size="13" fill="#252525" dominant-baseline="text-before-edge"><tspan x="20" dy="0">XCS / Verifier</tspan></text>
+<text x="24" y="62" font-family="Arial, sans-serif" font-size="23" fill="#252525" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Request full-detail</tspan><tspan x="24" dy="29.900000000000002">access</tspan></text>
+<text x="24" y="133.8" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Explain your organization and your need.</tspan></text>
+<rect x="24" y="167" width="342" height="37" rx="3" fill="#eeeeee" stroke="#b4b4b4"/>
+<text x="34" y="177" font-family="Arial, sans-serif" font-size="13" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Public verification needs no account</tspan></text>
+<rect x="24" y="220" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="229" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Organization</tspan></text>
+<text x="34" y="249" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Example Office</tspan></text>
+<rect x="24" y="289.2" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="298.2" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Verification purpose</tspan></text>
+<text x="34" y="318.2" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Check declared course completions</tspan></text>
+<rect x="24" y="358.4" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="367.4" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Contact</tspan></text>
+<text x="34" y="387.4" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Organization work contact</tspan></text>
+<rect x="24" y="427.59999999999997" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="436.59999999999997" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">After submission</tspan></text>
+<text x="34" y="456.59999999999997" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Pending; if declined, show the reason</tspan></text>
+<rect x="24" y="502.79999999999995" width="342" height="44" rx="3" fill="#333333" stroke="#333333"/>
+<text x="36" y="515.6999999999999" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" dominant-baseline="text-before-edge"><tspan x="36" dy="0">Submit application</tspan></text>
+<rect x="24" y="556.8" width="342" height="44" rx="3" fill="#ffffff" stroke="#333333"/>
+<text x="36" y="569.6999999999999" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="36" dy="0">Back to presentation</tspan></text>
+<text x="24" y="613.8" font-family="Arial, sans-serif" font-size="12" fill="#555555" dominant-baseline="text-before-edge"><tspan x="24" dy="0">After global approval, the recipient must share</tspan><tspan x="24" dy="15.600000000000001">with your verifier identity.</tspan></text>
+<text x="24" y="821" font-family="Arial, sans-serif" font-size="10" fill="#666666" dominant-baseline="text-before-edge"><tspan x="24" dy="0">WIREFRAME · Fictional example · Non-functional</tspan></text>
+</svg>

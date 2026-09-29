@@ -1,4 +1,6 @@
-import { publicProfileId } from '../xcs/settings'
+import { loadHostedPayloadConfig } from '../xcs/config'
+import { loadIssuerConfig } from '../xcs/issuer/config'
+import { apiEnvironment, publicProfileId } from '../xcs/settings'
 
 /**
  * Publishes the browser-visible profile identifier, derived from the network
@@ -22,5 +24,11 @@ import { publicProfileId } from '../xcs/settings'
  * empty identifier, which is what an unset `NUXT_PUBLIC_PROFILE_ID` already meant.
  */
 export default defineNitroPlugin(() => {
-  process.env.NUXT_PUBLIC_PROFILE_ID = publicProfileId()
+  const environment = apiEnvironment()
+  const hostedPayloads = loadHostedPayloadConfig(environment)
+  process.env.NUXT_PUBLIC_PROFILE_ID = publicProfileId(environment)
+  process.env.NUXT_PUBLIC_ISSUER_ENABLED = loadIssuerConfig(environment) === undefined ? '0' : '1'
+  process.env.NUXT_PUBLIC_PAYLOAD_BASE_URL = hostedPayloads.enabled
+    ? hostedPayloads.publicBaseUrl
+    : ''
 })

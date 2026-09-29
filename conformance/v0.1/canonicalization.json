@@ -1,0 +1,20 @@
+{
+  "version": "0.1",
+  "cases": [
+    {
+      "name": "sorts object keys and removes insignificant whitespace",
+      "inputJson": "{ \"z\": 0, \"a\": [true, null, \"é\"] }",
+      "canonical": "{\"a\":[true,null,\"é\"],\"z\":0}"
+    },
+    {
+      "name": "uses ECMAScript number serialization",
+      "inputJson": "[333333333.33333329,1E30,4.50,2e-3,0.000000000000000000000000001]",
+      "canonical": "[333333333.3333333,1e+30,4.5,0.002,1e-27]"
+    },
+    {
+      "name": "sorts keys by UTF-16 code units",
+      "inputJson": "{\"€\":1,\"a\":2,\"😀\":3,\"ö\":4}",
+      "canonical": "{\"a\":2,\"ö\":4,\"€\":1,\"😀\":3}"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844" role="img" aria-labelledby="title desc" xml:lang="fr">
+<title id="title">I3 — Créer un modèle</title>
+<desc id="desc">Définir les informations de votre attestation. Le schéma devient public. Aucune donnée réelle de destinataire n’est saisie à cette étape.</desc>
+<rect x="0" y="0" width="390" height="844" rx="3" fill="#ffffff" stroke="#777777"/>
+<rect x="0" y="0" width="390" height="42" rx="3" fill="#eeeeee" stroke="#777777"/>
+<text x="20" y="12" font-family="Arial, sans-serif" font-size="13" fill="#252525" dominant-baseline="text-before-edge"><tspan x="20" dy="0">XCS / Émetteur</tspan></text>
+<text x="24" y="62" font-family="Arial, sans-serif" font-size="23" fill="#252525" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Créer un modèle</tspan></text>
+<text x="24" y="103.9" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Définir les informations de votre</tspan><tspan x="24" dy="18.2">attestation.</tspan></text>
+<rect x="24" y="155.3" width="342" height="37" rx="3" fill="#eeeeee" stroke="#b4b4b4"/>
+<text x="34" y="165.3" font-family="Arial, sans-serif" font-size="13" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Étape 1 · Schéma public</tspan></text>
+<rect x="24" y="208.3" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="217.3" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Partir d’un modèle</tspan></text>
+<text x="34" y="237.3" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Fin de formation ✓ · Diplôme</tspan></text>
+<rect x="24" y="277.5" width="342" height="77.4" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="286.5" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Champs du modèle</tspan></text>
+<text x="34" y="306.5" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Nom : texte · Formation : texte · Date :</tspan><tspan x="34" dy="18.2">date</tspan></text>
+<rect x="24" y="364.9" width="342" height="77.4" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="373.9" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Aperçu</tspan></text>
+<text x="34" y="393.9" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Nom du destinataire · Formation · Date de</tspan><tspan x="34" dy="18.2">fin</tspan></text>
+<rect x="24" y="452.29999999999995" width="342" height="77.4" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="461.29999999999995" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Avant signature</tspan></text>
+<text x="34" y="481.29999999999995" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Compte : Atelier Exemple · Testnet · Frais</tspan><tspan x="34" dy="18.2">à afficher</tspan></text>
+<rect x="24" y="545.6999999999999" width="342" height="44" rx="3" fill="#333333" stroke="#333333"/>
+<text x="36" y="558.5999999999999" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" dominant-baseline="text-before-edge"><tspan x="36" dy="0">Vérifier puis publier</tspan></text>
+<rect x="24" y="599.6999999999999" width="342" height="44" rx="3" fill="#ffffff" stroke="#333333"/>
+<text x="36" y="612.5999999999999" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="36" dy="0">Détails techniques</tspan></text>
+<text x="24" y="656.6999999999999" font-family="Arial, sans-serif" font-size="12" fill="#555555" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Le schéma devient public. Aucune donnée réelle de</tspan><tspan x="24" dy="15.600000000000001">destinataire n’est saisie à cette étape.</tspan></text>
+<text x="24" y="821" font-family="Arial, sans-serif" font-size="10" fill="#666666" dominant-baseline="text-before-edge"><tspan x="24" dy="0">MAQUETTE · Exemple fictif · Non fonctionnel</tspan></text>
+</svg>

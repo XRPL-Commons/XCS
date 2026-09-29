@@ -78,6 +78,20 @@ The patch restores that MIT text verbatim into the installed package. **Keep the
 nothing now verifies it**, because distributing the component without its licence text would breach
 the MIT notice condition. Drop it only when upstream publishes a version that ships its own licence.
 
+## Nodemailer
+
+Nodemailer is the direct SMTP client used by invitation and lifecycle delivery.
+
+|                  |                                                                    |
+| ---------------- | ------------------------------------------------------------------ |
+| Version reviewed | 10.0.10                                                            |
+| Licence file     | `LICENSE`                                                          |
+| Licence          | MIT-0                                                              |
+| SHA-256          | `4f814dcacd2da618d62829ea1f6238701cf421f18a6b36c91c5d8212245e2c78` |
+
+MIT-0 is a permissive licence and imposes no attribution condition. Commons accepts it for this
+direct production dependency. Re-review the installed licence when the exact version changes.
+
 ## tosource
 
 Declares no SPDX field. Its bundled `LICENSE` is the permissive zlib licence, SHA-256

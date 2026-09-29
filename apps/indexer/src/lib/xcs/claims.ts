@@ -1,4 +1,4 @@
-// Copied from packages/core/src/claims.ts at 54c3486; keep in sync by hand (see CONTRIBUTING.md).
+// Copied from packages/core/src/claims.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
 import { base64urlnopad } from '@scure/base'
 import { isValidClassicAddress } from 'xrpl'
 
@@ -33,46 +33,46 @@ function isCanonicalBase64Url(value: string): boolean {
 }
 
 function parseValue(value: unknown, descriptor: FieldDescriptor, path: string): JsonValue {
-  if (value === null) return fail('INVALID_CLAIMS', 'null is not allowed', path)
+  if (value === null) return fail('CLAIMS_INVALID', 'null is not allowed', path)
 
   switch (descriptor.type) {
     case 'string':
-      if (typeof value !== 'string') return fail('INVALID_CLAIMS', 'Expected a string', path)
+      if (typeof value !== 'string') return fail('CLAIMS_INVALID', 'Expected a string', path)
       return value
     case 'bool':
-      if (typeof value !== 'boolean') return fail('INVALID_CLAIMS', 'Expected a boolean', path)
+      if (typeof value !== 'boolean') return fail('CLAIMS_INVALID', 'Expected a boolean', path)
       return value
     case 'uint': {
       if (typeof value !== 'string' || !UNSIGNED_INTEGER.test(value)) {
-        return fail('INVALID_CLAIMS', 'Expected a canonical unsigned decimal string', path)
+        return fail('CLAIMS_INVALID', 'Expected a canonical unsigned decimal string', path)
       }
       if (value.length > 78 || BigInt(value) > UINT256_MAX) {
-        return fail('INVALID_CLAIMS', 'Unsigned integer exceeds 256 bits', path)
+        return fail('CLAIMS_INVALID', 'Unsigned integer exceeds 256 bits', path)
       }
       return value
     }
     case 'int': {
       if (typeof value !== 'string' || !SIGNED_INTEGER.test(value)) {
-        return fail('INVALID_CLAIMS', 'Expected a canonical signed decimal string', path)
+        return fail('CLAIMS_INVALID', 'Expected a canonical signed decimal string', path)
       }
       const integer = BigInt(value)
       if (value.length > 79 || integer < INT256_MIN || integer > INT256_MAX) {
-        return fail('INVALID_CLAIMS', 'Signed integer exceeds 256 bits', path)
+        return fail('CLAIMS_INVALID', 'Signed integer exceeds 256 bits', path)
       }
       return value
     }
     case 'bytes':
       if (typeof value !== 'string' || !isCanonicalBase64Url(value)) {
-        return fail('INVALID_CLAIMS', 'Expected unpadded canonical base64url', path)
+        return fail('CLAIMS_INVALID', 'Expected unpadded canonical base64url', path)
       }
       return value
     case 'address':
       if (typeof value !== 'string' || !isValidClassicAddress(value)) {
-        return fail('INVALID_CLAIMS', 'Expected an XRPL classic address', path)
+        return fail('CLAIMS_INVALID', 'Expected an XRPL classic address', path)
       }
       return value
     case 'array':
-      if (!Array.isArray(value)) return fail('INVALID_CLAIMS', 'Expected an array', path)
+      if (!Array.isArray(value)) return fail('CLAIMS_INVALID', 'Expected an array', path)
       return value.map((item, index) => parseValue(item, descriptor.items, `${path}[${index}]`))
     case 'object':
       return parseObject(value, descriptor.fields, path)
@@ -80,10 +80,10 @@ function parseValue(value: unknown, descriptor: FieldDescriptor, path: string): 
 }
 
 function parseObject(input: unknown, fields: SchemaFields, path: string): JsonObject {
-  if (!isRecord(input)) return fail('INVALID_CLAIMS', 'Expected an object', path)
+  if (!isRecord(input)) return fail('CLAIMS_INVALID', 'Expected an object', path)
   for (const name of Object.keys(input)) {
     if (!Object.hasOwn(fields, name)) {
-      return fail('INVALID_CLAIMS', `Unknown claim ${name}`, `${path}.${name}`)
+      return fail('CLAIMS_INVALID', `Unknown claim ${name}`, `${path}.${name}`)
     }
   }
 
@@ -91,7 +91,7 @@ function parseObject(input: unknown, fields: SchemaFields, path: string): JsonOb
   for (const [name, descriptor] of Object.entries(fields)) {
     if (!Object.hasOwn(input, name)) {
       if (descriptor.optional === true) continue
-      return fail('INVALID_CLAIMS', `Missing required claim ${name}`, `${path}.${name}`)
+      return fail('CLAIMS_INVALID', `Missing required claim ${name}`, `${path}.${name}`)
     }
     claims[name] = parseValue(input[name], descriptor, `${path}.${name}`)
   }
@@ -100,4 +100,16 @@ function parseObject(input: unknown, fields: SchemaFields, path: string): JsonOb
 
 export function parseClaims(input: unknown, fields: SchemaFields): JsonObject {
   return parseObject(input, fields, '$.claims')
+}
+
+export function validateClaims(
+  input: unknown,
+  schema: SchemaFields | { fields: SchemaFields; definition?: unknown; lineage?: unknown },
+): JsonObject {
+  const resolved = schema as { fields?: unknown; definition?: unknown; lineage?: unknown }
+  const fields =
+    resolved.definition !== undefined && resolved.lineage !== undefined
+      ? (resolved.fields as SchemaFields)
+      : (schema as SchemaFields)
+  return parseClaims(input, fields)
 }

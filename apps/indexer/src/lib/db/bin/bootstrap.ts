@@ -1,29 +1,20 @@
-// Copied from packages/db/src/bin/bootstrap.ts at 61fb809; keep in sync by hand (see CONTRIBUTING.md).
-// Diverges by design (provisioning is grants-only, so no runtime password is read from the environment, and a missing role is reported by name); source sha256:d9142aa3fda17e3032510d9dd0405a01464b531e59ed59299d5823c06e2fa8fd.
+// Not a vendored copy (retired source): application-local database implementation maintained with db/schema.
 import {
   bootstrapDatabase,
   DatabaseBootstrapConfigurationError,
   MissingRuntimeDatabaseRolesError,
   parseDatabaseClusterScope,
   UnsafeRuntimeDatabaseRolesError,
+  XCS_RUNTIME_DATABASE_ROLES,
 } from '../bootstrap.js'
 import { createDatabaseClient } from '../client.js'
-
-function requiredEnvironment(name: string): string {
-  const value = process.env[name]
-  if (value === undefined || value.trim().length === 0) {
-    throw new DatabaseBootstrapConfigurationError(
-      `${name} is required. Set it in the same command that runs this step: a bare ` +
-        'shell assignment on its own line is a shell variable, not an environment ' +
-        'variable, and this process never sees it.',
-    )
-  }
-  return value
-}
+import { requiredEnvironment } from './environment.js'
 
 async function main(): Promise<void> {
   const databaseUrl = requiredEnvironment('XCS_BOOTSTRAP_DATABASE_URL')
-  const client = createDatabaseClient(databaseUrl)
+  const client = createDatabaseClient(databaseUrl, {
+    onNotice: () => undefined,
+  })
 
   try {
     const report = await bootstrapDatabase(client, {
@@ -35,7 +26,7 @@ async function main(): Promise<void> {
     process.stdout.write(
       `${JSON.stringify({
         ok: true,
-        roles: ['xcs_indexer', 'xcs_api', 'xcs_monitor'],
+        roles: XCS_RUNTIME_DATABASE_ROLES,
         administrator: report.administrator,
         unappliedResourceControls: report.unappliedResourceControls,
       })}\n`,
@@ -66,7 +57,12 @@ try {
           ? { roles: error.roles, findings: error.findings }
           : {}
     process.stderr.write(
-      `${JSON.stringify({ ok: false, code: error.code, ...roles, message: error.message })}\n`,
+      `${JSON.stringify({
+        ok: false,
+        code: error.code,
+        ...roles,
+        message: error.message,
+      })}\n`,
     )
   } else {
     // Drivers and migration helpers wrap the original failure, so walk the

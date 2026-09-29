@@ -1,6 +1,10 @@
-import { createIpfsPayloadUri, parsePayloadUri, verifyPayloadIntegrity } from '#xcs/core/index.js'
-
-import { canonicalJson, parseJson } from './serialization'
+import {
+  canonicalJson,
+  createIpfsPayloadUri,
+  parseJson,
+  parsePayloadUri,
+  verifyPayloadIntegrity,
+} from '#xcs/core/index.js'
 
 export const LOCAL_PAYLOAD_STORE_MAX_BYTES = 64 * 1024
 export const LOCAL_PAYLOAD_STORE_MAX_ENTRIES = 20

@@ -1,4 +1,4 @@
-// Copied from packages/sdk/test/network.test.ts at 54c3486; keep in sync by hand (see CONTRIBUTING.md).
+// Copied from packages/sdk/test/network.test.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
 import type { Client } from 'xrpl'
 import { describe, expect, it, vi } from 'vitest'
 

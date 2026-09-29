@@ -1,3 +1,5 @@
+import { isWalletError, WalletErrorCode, type WalletAdapter } from 'xrpl-connect'
+
 export const XCS_CREDENTIAL_TRANSACTION_TYPES = [
   'CredentialCreate',
   'CredentialAccept',
@@ -5,7 +7,7 @@ export const XCS_CREDENTIAL_TRANSACTION_TYPES = [
 ] as const
 
 export type XcsCredentialTransactionType = (typeof XCS_CREDENTIAL_TRANSACTION_TYPES)[number]
-export type WalletCredentialSupport = 'supported' | 'unsupported' | 'unverified'
+export type WalletCredentialSupport = 'supported' | 'raw' | 'unverified'
 
 export interface WalletIdentity {
   readonly id: string
@@ -18,7 +20,10 @@ export interface WalletCredentialTransactionErrorDetails {
   readonly transactionType: XcsCredentialTransactionType
 }
 
+type WalletErrorTranslator = (key: string, parameters?: Record<string, string>) => string
+
 const ERROR_PREFIX = 'WALLET_CREDENTIAL_TRANSACTION_UNSUPPORTED'
+export const OTSU_SIGNING_ACCOUNT_UNAVAILABLE = 'OTSU_SIGNING_ACCOUNT_UNAVAILABLE'
 const SAFE_WALLET_ID_PATTERN = /^[a-z0-9-]{1,64}$/u
 const CREDENTIAL_TRANSACTION_TYPE_SET = new Set<string>(XCS_CREDENTIAL_TRANSACTION_TYPES)
 const WALLET_NAMES: Readonly<Record<string, string>> = {
@@ -75,7 +80,7 @@ export function isXcsCredentialTransactionType(
  */
 export function walletCredentialSupport(walletId: string): WalletCredentialSupport {
   const normalized = safeWalletId(walletId)
-  if (normalized === 'gemwallet') return 'unsupported'
+  if (normalized === 'gemwallet') return 'raw'
   if (normalized === 'xaman') return 'supported'
   return 'unverified'
 }
@@ -94,26 +99,32 @@ export function walletCredentialTransactionError(
   return cause === undefined ? new Error(code) : new Error(code, { cause })
 }
 
-export function assertWalletSupportsXcsTransaction(
-  wallet: WalletIdentity | null | undefined,
-  transactionType: unknown,
-): void {
-  if (!wallet || !isXcsCredentialTransactionType(transactionType)) return
-  if (walletCredentialSupport(wallet.id) === 'unsupported') {
-    throw walletCredentialTransactionError(wallet, transactionType)
-  }
-}
-
 /**
  * Some adapters wrap the wallet's original validation error. Map only the
  * exact pre-XLS-70 codec error for the transaction being signed so unrelated
  * wallet failures and user rejections retain their original diagnostics.
  */
-export function normalizeWalletTransactionError(
+export async function normalizeWalletTransactionError(
   error: unknown,
-  wallet: WalletIdentity | null | undefined,
+  wallet: WalletAdapter | null | undefined,
   transactionType: unknown,
-): Error {
+): Promise<Error> {
+  // xrpl-connect rc.2 maps every Otsu error containing "not found" to
+  // WALLET_NOT_INSTALLED. Otsu also uses "Account not found" when its
+  // persisted public account is no longer present in the unlocked keyring.
+  // Prove that the provider is still installed before correcting that false
+  // diagnostic; a genuinely missing extension keeps the upstream error.
+  if (
+    wallet?.id === 'otsu' &&
+    isWalletError(error) &&
+    error.code === WalletErrorCode.WALLET_NOT_INSTALLED
+  ) {
+    const installed = await wallet.isAvailable().catch(() => false)
+    if (installed) {
+      return new Error(OTSU_SIGNING_ACCOUNT_UNAVAILABLE, { cause: error })
+    }
+  }
+
   if (wallet && isXcsCredentialTransactionType(transactionType)) {
     const unsupportedMessage = `Invalid field TransactionType: ${transactionType}`
     if (errorMessages(error).some((message) => message.trim() === unsupportedMessage)) {
@@ -141,4 +152,20 @@ export function parseWalletCredentialTransactionError(
     walletName: walletDisplayName(walletId),
     transactionType,
   }
+}
+
+/** Return a user-facing message only for wallet errors XCS can identify exactly. */
+export function walletTransactionErrorMessage(
+  value: string,
+  translate: WalletErrorTranslator,
+): string | null {
+  if (value === OTSU_SIGNING_ACCOUNT_UNAVAILABLE) {
+    return translate('wallet.errors.otsuSigningAccountUnavailable')
+  }
+  const unsupported = parseWalletCredentialTransactionError(value)
+  if (!unsupported) return null
+  return translate('wallet.errors.credentialUnsupported', {
+    wallet: unsupported.walletName,
+    transactionType: unsupported.transactionType,
+  })
 }

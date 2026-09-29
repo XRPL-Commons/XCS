@@ -64,6 +64,23 @@ const report = {
 }
 
 describe('exact credential review', () => {
+  it('preserves restricted access as unavailable evidence and never approves a filtered view', async () => {
+    await expect(
+      loadCredentialReview({
+        credential,
+        report,
+        issuer: ISSUER,
+        subject: SUBJECT,
+        schemaUid: UID,
+        schema,
+        fetchPayload: true,
+        fetchImpl: async () =>
+          new Response('{"claims":{}}', {
+            headers: { 'content-type': 'application/json', 'x-xcs-claim-scope': 'public' },
+          }),
+      }),
+    ).rejects.toThrow('PAYLOAD_SCOPE_RESTRICTED')
+  })
   it('loads the exact HTTPS payload and permits a fully valid trusted acceptance', async () => {
     const review = await loadCredentialReview({
       credential,
@@ -86,6 +103,27 @@ describe('exact credential review', () => {
       claims: { programId: 'course-1' },
     })
     expect(credentialActionBlockReason(review, 'accept')).toBeUndefined()
+  })
+
+  it('blocks acceptance when a payload review error remains alongside previously loaded claims', async () => {
+    const review = await loadCredentialReview({
+      credential,
+      report,
+      issuer: ISSUER,
+      subject: SUBJECT,
+      schemaUid: UID,
+      schema,
+      fetchPayload: true,
+      fetchImpl: async () =>
+        new Response(canonical, { headers: { 'content-type': 'application/json' } }),
+    })
+    const failedReview = { ...review, payloadReviewError: 'PAYLOAD_FETCH_FAILED' }
+
+    expect(failedReview.claims).toEqual(payload.claims)
+    expect(credentialActionBlockReason(failedReview, 'accept')).toBe(
+      'CREDENTIAL_PAYLOAD_REVIEW_FAILED',
+    )
+    expect(credentialActionBlockReason(failedReview, 'reject')).toBeUndefined()
   })
 
   it('blocks acceptance unless every gate is valid and trusted', async () => {

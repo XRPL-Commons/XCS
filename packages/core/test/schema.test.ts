@@ -44,7 +44,7 @@ describe('schema', () => {
     )
     expect(parseSchemaBytes(canonical).name).toBe('Schema')
     expect(() => parseSchemaBytes(new TextEncoder().encode('{ "xcsVersion": "0.1" }'))).toThrow(
-      expect.objectContaining({ code: 'NON_CANONICAL_JSON' }),
+      expect.objectContaining({ code: 'JSON_INVALID' }),
     )
     expect(() =>
       parseSchemaBytes(
@@ -52,7 +52,7 @@ describe('schema', () => {
           '{"description":"First","description":"Second","fields":{"value":{"type":"string"}},"name":"Schema","xcsVersion":"0.1"}',
         ),
       ),
-    ).toThrow(expect.objectContaining({ code: 'INVALID_JSON' }))
+    ).toThrow(expect.objectContaining({ code: 'JSON_DUPLICATE_KEY' }))
   })
 
   it('resolves prior parents and rejects field overrides', () => {
@@ -88,7 +88,7 @@ describe('schema', () => {
     expect(Object.keys(resolveSchema(child, context).fields)).toEqual(['courseId', 'score'])
     expect(() =>
       resolveSchema(parseSchema({ ...child, fields: { courseId: { type: 'bool' } } }), context),
-    ).toThrow(expect.objectContaining({ code: 'INVALID_SCHEMA_REFERENCE' }))
+    ).toThrow(expect.objectContaining({ code: 'SCHEMA_OVERRIDE_FORBIDDEN' }))
   })
 
   it('derives the published schema UID with noble SHA-256', () => {

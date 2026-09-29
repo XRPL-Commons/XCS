@@ -34,48 +34,48 @@ function isUint32(value: unknown): value is number {
 
 export function parseNetworkProfile(input: unknown): NetworkProfile {
   if (!isRecord(input)) {
-    return fail('INVALID_NETWORK_PROFILE', 'Network profile must be an object', '$')
+    return fail('NETWORK_PROFILE_INVALID', 'Network profile must be an object', '$')
   }
   for (const key of Object.keys(input)) {
     if (!PROFILE_PROPERTIES.has(key)) {
-      return fail('INVALID_NETWORK_PROFILE', `Unknown property ${key}`, `$.${key}`)
+      return fail('NETWORK_PROFILE_INVALID', `Unknown property ${key}`, `$.${key}`)
     }
   }
   if (
     typeof input.profileId !== 'string' ||
     !/^[a-z0-9][a-z0-9._-]{0,127}$/.test(input.profileId)
   ) {
-    return fail('INVALID_NETWORK_PROFILE', 'Invalid profileId', '$.profileId')
+    return fail('NETWORK_PROFILE_INVALID', 'Invalid profileId', '$.profileId')
   }
   if (input.xcsVersion !== '0.1') {
-    return fail('INVALID_NETWORK_PROFILE', 'Unsupported XCS version', '$.xcsVersion')
+    return fail('NETWORK_PROFILE_INVALID', 'Unsupported XCS version', '$.xcsVersion')
   }
   if (!isUint32(input.networkId)) {
-    return fail('INVALID_NETWORK_PROFILE', 'networkId must be a uint32', '$.networkId')
+    return fail('NETWORK_PROFILE_INVALID', 'networkId must be a uint32', '$.networkId')
   }
   if (
     typeof input.requiredAmendment !== 'string' ||
     !/^[0-9a-fA-F]{64}$/.test(input.requiredAmendment)
   ) {
     return fail(
-      'INVALID_NETWORK_PROFILE',
+      'NETWORK_PROFILE_INVALID',
       'requiredAmendment must be a 32-byte hexadecimal value',
       '$.requiredAmendment',
     )
   }
   if (typeof input.registryAddress !== 'string' || !isValidClassicAddress(input.registryAddress)) {
-    return fail('INVALID_NETWORK_PROFILE', 'Invalid XRPL registry address', '$.registryAddress')
+    return fail('NETWORK_PROFILE_INVALID', 'Invalid XRPL registry address', '$.registryAddress')
   }
   if (input.registrationAmountDrops !== '1') {
     return fail(
-      'INVALID_NETWORK_PROFILE',
+      'NETWORK_PROFILE_INVALID',
       'registrationAmountDrops must equal "1"',
       '$.registrationAmountDrops',
     )
   }
   if (!isUint32(input.activationLedgerIndex) || input.activationLedgerIndex === 0) {
     return fail(
-      'INVALID_NETWORK_PROFILE',
+      'NETWORK_PROFILE_INVALID',
       'activationLedgerIndex must be a positive uint32',
       '$.activationLedgerIndex',
     )
@@ -85,7 +85,7 @@ export function parseNetworkProfile(input: unknown): NetworkProfile {
     !/^[0-9a-fA-F]{64}$/.test(input.activationLedgerHash)
   ) {
     return fail(
-      'INVALID_NETWORK_PROFILE',
+      'NETWORK_PROFILE_INVALID',
       'activationLedgerHash must be a 32-byte hexadecimal value',
       '$.activationLedgerHash',
     )
@@ -103,9 +103,12 @@ export function parseNetworkProfile(input: unknown): NetworkProfile {
   }
 }
 
+/** Normative XCS v0.1 name retained for existing consumers. */
+export const validateNetworkProfile = parseNetworkProfile
+
 export function rippleTimeToIso(rippleTime: number): string {
   if (!isUint32(rippleTime)) {
-    return fail('INVALID_RIPPLE_TIME', 'Ripple time must be a uint32', '$time')
+    return fail('RIPPLE_TIME_INVALID', 'Ripple time must be a uint32', '$time')
   }
   return xrplRippleTimeToIso(rippleTime)
 }

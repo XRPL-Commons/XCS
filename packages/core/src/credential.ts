@@ -10,7 +10,9 @@ export interface CredentialContext {
   issuer: string
   subject: string
   schemaUid: string
-  fields: SchemaFields
+  fields?: SchemaFields
+  /** Backward-compatible XCS v0.1 context name. */
+  schema?: SchemaFields
 }
 
 export interface CredentialPayload extends JsonObject {
@@ -41,47 +43,52 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function assertContext(context: CredentialContext): void {
   if (!isValidClassicAddress(context.issuer)) {
-    fail('INVALID_CREDENTIAL_PAYLOAD', 'Invalid issuer address', '$context.issuer')
+    fail('PAYLOAD_INVALID', 'Invalid issuer address', '$context.issuer')
   }
   if (!isValidClassicAddress(context.subject)) {
-    fail('INVALID_CREDENTIAL_PAYLOAD', 'Invalid subject address', '$context.subject')
+    fail('PAYLOAD_INVALID', 'Invalid subject address', '$context.subject')
   }
   if (!SCHEMA_UID.test(context.schemaUid)) {
-    fail('INVALID_CREDENTIAL_PAYLOAD', 'Invalid schema UID', '$context.schemaUid')
+    fail('PAYLOAD_INVALID', 'Invalid schema UID', '$context.schemaUid')
   }
-  if (!isRecord(context.fields)) {
-    fail('INVALID_CREDENTIAL_PAYLOAD', 'Invalid schema fields', '$context.fields')
+  if (!isRecord(context.fields ?? context.schema)) {
+    fail('PAYLOAD_INVALID', 'Invalid schema fields', '$context.fields')
   }
 }
 
-function parsePayload(input: unknown, context: CredentialContext): CredentialPayload {
+function contextFields(context: CredentialContext): SchemaFields {
   assertContext(context)
+  return (context.fields ?? context.schema) as SchemaFields
+}
+
+function parsePayload(input: unknown, context: CredentialContext): CredentialPayload {
+  const fields = contextFields(context)
   if (!isRecord(input)) {
-    return fail('INVALID_CREDENTIAL_PAYLOAD', 'Credential payload must be an object', '$')
+    return fail('PAYLOAD_INVALID', 'Credential payload must be an object', '$')
   }
   for (const property of Object.keys(input)) {
     if (!PAYLOAD_PROPERTIES.has(property)) {
-      return fail('INVALID_CREDENTIAL_PAYLOAD', `Unknown property ${property}`, `$.${property}`)
+      return fail('PAYLOAD_INVALID', `Unknown property ${property}`, `$.${property}`)
     }
   }
   if (input.xcsVersion !== '0.1') {
-    return fail('INVALID_CREDENTIAL_PAYLOAD', 'Unsupported XCS version', '$.xcsVersion')
+    return fail('PAYLOAD_INVALID', 'Unsupported XCS version', '$.xcsVersion')
   }
   if (input.issuer !== context.issuer) {
-    return fail('INVALID_CREDENTIAL_PAYLOAD', 'Issuer does not match the credential', '$.issuer')
+    return fail('PAYLOAD_INVALID', 'Issuer does not match the credential', '$.issuer')
   }
   if (input.subject !== context.subject) {
-    return fail('INVALID_CREDENTIAL_PAYLOAD', 'Subject does not match the credential', '$.subject')
+    return fail('PAYLOAD_INVALID', 'Subject does not match the credential', '$.subject')
   }
   if (input.schema !== context.schemaUid) {
-    return fail('INVALID_CREDENTIAL_PAYLOAD', 'Schema does not match CredentialType', '$.schema')
+    return fail('PAYLOAD_INVALID', 'Schema does not match CredentialType', '$.schema')
   }
   return {
     xcsVersion: '0.1',
     issuer: context.issuer,
     subject: context.subject,
     schema: context.schemaUid,
-    claims: parseClaims(input.claims, context.fields),
+    claims: parseClaims(input.claims, fields),
   }
 }
 
@@ -110,7 +117,21 @@ export function parseCredentialPayload(
   context: CredentialContext,
 ): CredentialPayload {
   const bytes = payloadBytes(content)
-  return parsePayload(parseCanonicalJson(bytes), context)
+  try {
+    return parsePayload(parseCanonicalJson(bytes), context)
+  } catch (error) {
+    if (
+      error instanceof XcsError &&
+      (error.code.startsWith('JSON_') ||
+        error.code === 'UTF8_INVALID' ||
+        error.code === 'CANONICALIZATION_UNSUPPORTED_VALUE')
+    ) {
+      return fail('PAYLOAD_INVALID', 'Credential payload must be canonical JSON', '$payload', {
+        cause: error.code,
+      })
+    }
+    throw error
+  }
 }
 
 export function verifyCredentialPayload(

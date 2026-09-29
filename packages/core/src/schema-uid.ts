@@ -25,17 +25,17 @@ export function computeSchemaUid(input: SchemaUidInput): string {
     !isUint32(input.ledgerIndex) ||
     !isUint32(input.transactionIndex)
   ) {
-    return fail('INVALID_UID_INPUT', 'Network and ledger coordinates must be uint32 values', '$')
+    return fail('UID_INPUT_INVALID', 'Network and ledger coordinates must be uint32 values', '$')
   }
   if (!/^[0-9a-fA-F]{64}$/.test(input.ledgerHash)) {
     return fail(
-      'INVALID_UID_INPUT',
+      'UID_INPUT_INVALID',
       'ledgerHash must be a 32-byte hexadecimal hash',
       '$.ledgerHash',
     )
   }
   if (!isValidClassicAddress(input.publisher)) {
-    return fail('INVALID_UID_INPUT', 'publisher must be an XRPL classic address', '$.publisher')
+    return fail('UID_INPUT_INVALID', 'publisher must be an XRPL classic address', '$.publisher')
   }
 
   const preimage = {

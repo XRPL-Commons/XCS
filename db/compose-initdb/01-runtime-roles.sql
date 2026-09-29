@@ -1,18 +1,15 @@
--- Local development only. Mounted read-only into the Compose `postgres` service
--- at /docker-entrypoint-initdb.d and run once, when the data directory is first
--- initialised. It is never applied to a deployed database.
+-- Local development only. The PostgreSQL image runs this once for a fresh data
+-- directory. Production users and passwords are created by DigitalOcean; the
+-- XCS bootstrap only applies migrations and least-privilege grants.
 --
--- In a deployment the three runtime users are created by the managed database
--- service (DigitalOcean's control panel, `doctl` or its API), which generates
--- and stores their passwords. The `db-bootstrap` step is grants-only: it never
--- creates a role and never sets a password, so the local Compose cluster has to
--- supply the roles itself.
---
--- The passwords below are fixed, published literals that say so in their own
--- text. They are NOT secrets, they must never be used anywhere but this local
--- stack, and docker-compose.yml hardcodes the very same literals in the
--- connection URLs it composes.
+-- These fixed published literals are not secrets and must never be reused
+-- outside this local Compose stack.
 
 CREATE ROLE xcs_indexer LOGIN PASSWORD 'local-development-only-not-a-secret-indexer';
 CREATE ROLE xcs_api LOGIN PASSWORD 'local-development-only-not-a-secret-api';
+CREATE ROLE xcs_payload_writer LOGIN PASSWORD 'local-development-only-not-a-secret-payload';
 CREATE ROLE xcs_monitor LOGIN PASSWORD 'local-development-only-not-a-secret-monitor';
+CREATE ROLE xcs_app LOGIN PASSWORD 'local-development-only-not-a-secret-app';
+CREATE ROLE xcs_admin_app LOGIN PASSWORD 'local-development-only-not-a-secret-admin-app';
+CREATE ROLE xcs_notifier LOGIN PASSWORD 'local-development-only-not-a-secret-notifier';
+CREATE ROLE xcs_issuer LOGIN PASSWORD 'local-development-only-not-a-secret-issuer';

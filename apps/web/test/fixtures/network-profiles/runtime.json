@@ -1,0 +1,10 @@
+{
+  "profileId": "runtime-testnet",
+  "xcsVersion": "0.1",
+  "networkId": 1,
+  "requiredAmendment": "1CB67D082CF7D9102412D34258CEDB400E659352D3B207348889297A6D90F5EF",
+  "registryAddress": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+  "registrationAmountDrops": "1",
+  "activationLedgerIndex": 1,
+  "activationLedgerHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

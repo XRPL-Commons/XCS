@@ -18,8 +18,8 @@ issuer/subject wallet -> unsigned transaction from SDK/web/CLI -> XRPL
 
 ## Ownership
 
-Two deployable applications, one shared schema folder, and a library that neither application
-imports. See [ADR 0004](./adr/0004-two-standalone-apps.md).
+Two application runtimes, two one-purpose deployment components, one shared schema folder, and a
+library that neither application imports. See [ADR 0004](./adr/0004-two-standalone-apps.md).
 
 - `apps/indexer` is the projection writer and the only normal writer to protocol projections. It
   advances only on validated ledger evidence agreed by its configured sources, and it owns the
@@ -28,11 +28,29 @@ imports. See [ADR 0004](./adr/0004-two-standalone-apps.md).
   the projection and fetches off-ledger payloads for verification, failing closed when projection
   evidence is stale or inconsistent; its `app/` half presents the workflows and connects user
   wallets. Browser-visible RPC configuration is separate from the private indexer sources.
+- `apps/notifier` runs the compiled SMTP outbox worker with only its restricted database and mail
+  credentials. It has no HTTP surface and no wallet or XRPL signing key.
+- `apps/db-bootstrap` runs migrations and role provisioning as a pre-deploy job. Its managed
+  PostgreSQL administrator URL never reaches a long-running component.
 - `db/` defines the rebuildable PostgreSQL model — Drizzle tables and generated SQL migrations. It
   is not a package: both applications compile it as their own source through the `#db/*` alias.
 - `core` parses and validates protocol values. It is browser-safe and performs no I/O.
 - `sdk` builds and validates XRPL transaction JSON and submits signed blobs. It never owns keys.
 - `cli` is a thin command layer over core and SDK.
+
+## Guided application boundary
+
+The browser mutation surface is role-oriented: `/issuer` derives the issuer's next action,
+`/recipient` joins invitation, wallet, review, acceptance and sharing, and `/presentations` resolves
+public or audience-restricted sharing links. Pure application presenters build those views from
+DTOs; their `nextAction` values are never authorization. Server repositories remain authoritative
+for roles, organization approval, wallet ownership, current ledger evidence, audience and replay
+protection.
+
+Technical identifiers remain in internal coordinates and in the public integration surfaces, but
+the role portals do not ask users to type or interpret them. The public `/v1` API, CLI and read-only
+Explorer pages are unchanged. See
+[ADR 0007](./adr/0007-guided-role-portals.md).
 
 The applications do not import `core` or `sdk`. Each carries hand-maintained copies of the protocol
 code it needs, every file headed with its origin; `packages/core` remains the reference

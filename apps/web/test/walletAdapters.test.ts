@@ -1,21 +1,13 @@
 import { adapterSupports } from 'xrpl-connect'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  clearMismatchedXamanSession,
-  configureXamanOAuthRequest,
-  createXrplConnectAdapters,
-  forceXamanOAuthNetwork,
-  resolveXamanRedirectUrl,
-  withXamanSignWindow,
-} from '../app/utils/walletAdapters'
+import { createXrplConnectAdapters } from '../app/utils/walletAdapters'
 
 describe('XRPL Connect adapter registration', () => {
   afterEach(() => vi.unstubAllGlobals())
 
   it('registers every self-contained sign-only adapter without public app identifiers', () => {
     const adapters = createXrplConnectAdapters()
-
     expect(adapters.map((adapter) => adapter.id)).toEqual([
       'crossmark',
       'gemwallet',
@@ -30,9 +22,8 @@ describe('XRPL Connect adapter registration', () => {
   it('registers all eight official adapters when Xaman and WalletConnect are configured', () => {
     const adapters = createXrplConnectAdapters({
       xamanApiKey: '  00000000-0000-0000-0000-000000000000  ',
-      walletConnectProjectId: `  ${'1'.repeat(32)}  `,
+      walletConnectProjectId: '  ' + '1'.repeat(32) + '  ',
     })
-
     expect(adapters.map((adapter) => adapter.id)).toEqual([
       'xaman',
       'crossmark',
@@ -51,127 +42,15 @@ describe('XRPL Connect adapter registration', () => {
       xamanApiKey: ' ',
       walletConnectProjectId: '\n',
     }).map((adapter) => adapter.id)
-
     expect(adapterIds).not.toContain('xaman')
     expect(adapterIds).not.toContain('walletconnect')
   })
 
-  it('only reports Otsu as available when its injected provider marker is present', async () => {
-    const otsu = createXrplConnectAdapters().find((adapter) => adapter.id === 'otsu')
-    expect(otsu).toBeDefined()
-
-    vi.stubGlobal('xrpl', {})
-    await expect(otsu?.isAvailable()).resolves.toBe(false)
-    vi.stubGlobal('xrpl', { isOtsu: true })
-    await expect(otsu?.isAvailable()).resolves.toBe(true)
-  })
-
-  it('forces the Xaman OAuth sign-in request onto Testnet', () => {
-    expect(
-      forceXamanOAuthNetwork(
-        'https://oauth2.xumm.app/auth?client_id=public-app-id&redirect_uri=http%3A%2F%2F127.0.0.1%3A3000',
-      ),
-    ).toBe(
-      'https://oauth2.xumm.app/auth?client_id=public-app-id&redirect_uri=http%3A%2F%2F127.0.0.1%3A3000&force_network=TESTNET',
-    )
-    expect(forceXamanOAuthNetwork('https://example.com/auth?client_id=other')).toBe(
-      'https://example.com/auth?client_id=other',
-    )
-  })
-
-  it('uses one stable Xaman redirect for every application route', () => {
-    expect(resolveXamanRedirectUrl(undefined, 'https://xcs.example/studio?draft=1#form')).toBe(
-      'https://xcs.example/',
-    )
-    expect(resolveXamanRedirectUrl(undefined, 'https://xcs.example/verify/credential')).toBe(
-      'https://xcs.example/',
-    )
-    expect(
-      resolveXamanRedirectUrl('  http://127.0.0.1:3000/  ', 'http://127.0.0.1:3000/issue'),
-    ).toBe('http://127.0.0.1:3000/')
-  })
-
-  it('rejects unsafe or route-specific Xaman redirect configuration', () => {
-    expect(() =>
-      resolveXamanRedirectUrl('https://attacker.example/', 'https://xcs.example/studio'),
-    ).toThrow('must use the current application origin')
-    expect(() =>
-      resolveXamanRedirectUrl('https://xcs.example/studio', 'https://xcs.example/studio'),
-    ).toThrow('must be the application origin with a trailing slash')
-    expect(() =>
-      resolveXamanRedirectUrl('http://xcs.example/', 'http://xcs.example/studio'),
-    ).toThrow('requires HTTPS outside local loopback development')
-  })
-
-  it('binds the Xaman Testnet authorization request to the stable redirect', () => {
-    expect(
-      configureXamanOAuthRequest(
-        'https://oauth2.xumm.app/auth?client_id=public-app-id&redirect_uri=https%3A%2F%2Fxcs.example%2Fstudio',
-        'https://xcs.example/',
-      ),
-    ).toBe(
-      'https://oauth2.xumm.app/auth?client_id=public-app-id&redirect_uri=https%3A%2F%2Fxcs.example%2F&force_network=TESTNET',
-    )
-    expect(
-      configureXamanOAuthRequest(
-        'https://example.com/auth?redirect_uri=https%3A%2F%2Fxcs.example%2Fstudio',
-        'https://xcs.example/',
-      ),
-    ).toBe('https://example.com/auth?redirect_uri=https%3A%2F%2Fxcs.example%2Fstudio')
-  })
-
-  it('evicts only cached Xaman sessions that cannot prove the required network', () => {
-    const removeItem = vi.fn()
-    const mainnetStorage = {
-      getItem: vi.fn().mockReturnValue(JSON.stringify({ me: { networkId: '0' } })),
-      removeItem,
-    }
-
-    clearMismatchedXamanSession(mainnetStorage, 1)
-    expect(removeItem).toHaveBeenCalledWith('XummPkceJwt')
-
-    removeItem.mockClear()
-    const testnetStorage = {
-      getItem: vi.fn().mockReturnValue(JSON.stringify({ me: { networkId: '1' } })),
-      removeItem,
-    }
-    clearMismatchedXamanSession(testnetStorage, 1)
-    expect(removeItem).not.toHaveBeenCalled()
-  })
-
-  it('closes the Xaman sign window and restores focus after the wallet returns', async () => {
-    const close = vi.fn()
-    const focus = vi.fn()
-    const originalOpen = vi.fn(() => ({ closed: false, close }))
-    const browserWindow = { open: originalOpen, focus } as unknown as Window
-
-    await expect(
-      withXamanSignWindow(browserWindow, async () => {
-        browserWindow.open('https://xumm.app/sign/request', 'Xaman Sign')
-        return 'signed'
-      }),
-    ).resolves.toBe('signed')
-
-    expect(close).toHaveBeenCalledOnce()
-    expect(focus).toHaveBeenCalledOnce()
-    expect(browserWindow.open).toBe(originalOpen)
-  })
-
-  it('restores the application window when Xaman signing fails', async () => {
-    const close = vi.fn()
-    const focus = vi.fn()
-    const originalOpen = vi.fn(() => ({ closed: false, close }))
-    const browserWindow = { open: originalOpen, focus } as unknown as Window
-
-    await expect(
-      withXamanSignWindow(browserWindow, async () => {
-        browserWindow.open('https://xumm.app/sign/request', 'Xaman Sign')
-        throw new Error('SIGN_FAILED')
-      }),
-    ).rejects.toThrow('SIGN_FAILED')
-
-    expect(close).toHaveBeenCalledOnce()
-    expect(focus).toHaveBeenCalledOnce()
-    expect(browserWindow.open).toBe(originalOpen)
+  it('only reports Otsu as available when its browser provider marker is present', async () => {
+    const otsu = createXrplConnectAdapters().find((adapter) => adapter.id === 'otsu')!
+    vi.stubGlobal('window', { xrpl: {} })
+    await expect(otsu.isAvailable()).resolves.toBe(false)
+    vi.stubGlobal('window', { xrpl: { isOtsu: true } })
+    await expect(otsu.isAvailable()).resolves.toBe(true)
   })
 })

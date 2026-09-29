@@ -14,12 +14,7 @@ import {
   type PayloadFetchConsentToken,
 } from '~/utils/credentialReview'
 import { decodeUtf8HexForDisplay, displayXrplTime } from '~/utils/explorer'
-import {
-  assertLinkProfile,
-  buildCredentialAcceptLink,
-  credentialPermalinkSubjectAction,
-  singleRouteQueryValue,
-} from '~/utils/operationLinks'
+import { assertLinkProfile, singleRouteQueryValue } from '~/utils/operationLinks'
 import { LOCAL_PAYLOAD_LOCATION } from '~/utils/localPayloadStore'
 
 interface ExactCredentialEvidence {
@@ -180,26 +175,6 @@ const claimRows = computed(() => {
   const schema = data.value?.schema.resolved
   return claims && schema ? credentialClaimsToRows(schema, claims) : []
 })
-const subjectActionLink = computed(() => {
-  const evidence = data.value
-  if (!evidence?.currentGeneration) return null
-  const state = evidence.detail.state
-  const generation = evidence.detail.generation
-  const action = credentialPermalinkSubjectAction({
-    currentGeneration: evidence.currentGeneration,
-    accepted: generation.accepted,
-    state,
-  })
-  if (action === null) return null
-  return buildCredentialAcceptLink({
-    profileId: evidence.profileId,
-    issuer: generation.issuer,
-    schemaUid: generation.schemaUid,
-    generationId: generation.generationId,
-    action,
-  })
-})
-
 function clearPayloadReview(): void {
   verificationRevision += 1
   payloadConsentToken.value = null
@@ -410,24 +385,6 @@ useSeoMeta({
         <span v-else-if="copyState === 'error'" class="text-sm text-error" role="status">
           {{ $t('credential.copyFailed') }}
         </span>
-        <UButton
-          v-if="subjectActionLink"
-          color="neutral"
-          variant="outline"
-          size="sm"
-          data-testid="credential-subject-action"
-          :to="localePath(subjectActionLink)"
-        >
-          {{
-            $t(
-              data.detail.generation.accepted
-                ? 'credential.removeCredential'
-                : data.detail.state === 'expired'
-                  ? 'credential.rejectExpired'
-                  : 'credential.managePending',
-            )
-          }}
-        </UButton>
       </div>
 
       <MetadataList data-testid="explorer-metadata">

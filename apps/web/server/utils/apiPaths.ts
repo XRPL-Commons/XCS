@@ -1,4 +1,4 @@
-const API_PREFIXES = ['/v1', '/health', '/internal', '/documentation']
+const API_PREFIXES = ['/v1', '/health', '/internal', '/documentation', '/p']
 
 /**
  * The read API owns these path prefixes. Everything else is a Nuxt page or a

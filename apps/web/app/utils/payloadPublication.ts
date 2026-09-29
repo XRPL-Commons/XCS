@@ -1,6 +1,10 @@
-import { parsePayloadUri, verifyPayloadIntegrity } from '#xcs/core/index.js'
-
-import { canonicalJson, decodeUtf8, parseJson } from './serialization'
+import {
+  canonicalJson,
+  decodeUtf8,
+  parseJson,
+  parsePayloadUri,
+  verifyPayloadIntegrity,
+} from '#xcs/core/index.js'
 
 export const MAX_PILOT_PAYLOAD_BYTES = 1024 * 1024
 export const DEFAULT_PAYLOAD_FETCH_TIMEOUT_MS = 10_000
@@ -68,7 +72,17 @@ export function assertPilotPublicPayloadHostname(hostname: string): void {
 export function inspectPilotHttpsPayloadHost(credentialUri: string): string {
   const parsedUri = parsePayloadUri(credentialUri)
   if (parsedUri.kind !== 'https') throw new Error('PILOT_HTTPS_PAYLOAD_REQUIRED')
-  const hostname = new URL(parsedUri.fetchUrl).hostname
+  const url = new URL(parsedUri.fetchUrl)
+  const hostname = url.hostname
+  // A local HTTPS deployment can read its own immutable payload endpoint.
+  // Never extend this to another origin, arbitrary local URLs, or redirects.
+  if (
+    typeof window !== 'undefined' &&
+    url.origin === window.location.origin &&
+    url.search === '' &&
+    /^(?:\/p\/(?:[0-9a-f]{18}|[0-9a-f]{20})|\/q\/[0-9a-f]{18})$/u.test(url.pathname)
+  )
+    return hostname
   assertPilotPublicPayloadHostname(hostname)
   return hostname
 }
@@ -171,6 +185,12 @@ export async function readCanonicalHttpsPayload(
     }
     if (!isJsonContentType(response.headers.get('content-type'))) {
       throw new Error('PAYLOAD_CONTENT_TYPE_INVALID')
+    }
+    // A deliberately filtered view cannot establish the full payload's digest.
+    // Keep it unavailable to this public reader; never escalate to credentialed access.
+    if (response.headers.get('x-xcs-claim-scope') === 'public') {
+      await response.body?.cancel().catch(() => undefined)
+      throw new Error('PAYLOAD_SCOPE_RESTRICTED')
     }
 
     let bytes: Uint8Array

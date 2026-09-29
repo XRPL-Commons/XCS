@@ -256,6 +256,6 @@ describe('interpretSchemaRegistration', () => {
         profile,
         new Map(),
       ),
-    ).toMatchObject({ status: 'rejected', reasonCode: 'INVALID_JSON' })
+    ).toMatchObject({ status: 'rejected', reasonCode: 'JSON_INVALID' })
   })
 })

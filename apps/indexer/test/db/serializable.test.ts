@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import type { XcsDatabase } from '../../src/lib/db/client.js'
-import { runSerializableTransaction } from '../../src/lib/db/transactions.js'
+import { runSerializableTransaction, type XcsDatabase } from '../../src/lib/db/index.js'
 
 function databaseWithResults(results: unknown[]) {
   const transaction = vi.fn(

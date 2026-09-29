@@ -1,4 +1,4 @@
-// Copied from packages/core/src/json.ts at 54c3486; keep in sync by hand (see CONTRIBUTING.md).
+// Copied from packages/core/src/json.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import canonicalizeRfc8785 from 'canonicalize'
@@ -22,12 +22,12 @@ function assertWellFormed(value: string, path: string): void {
     const codeUnit = value.charCodeAt(index)
     if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
       const next = value.charCodeAt(index + 1)
-      if (next < 0xdc00 || next > 0xdfff) {
-        fail('UNSUPPORTED_JSON_VALUE', 'JSON strings must contain valid Unicode', path)
+      if (!(next >= 0xdc00 && next <= 0xdfff)) {
+        fail('JSON_INVALID_UNICODE', 'JSON strings must contain valid Unicode', path)
       }
       index += 1
     } else if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) {
-      fail('UNSUPPORTED_JSON_VALUE', 'JSON strings must contain valid Unicode', path)
+      fail('JSON_INVALID_UNICODE', 'JSON strings must contain valid Unicode', path)
     }
   }
 }
@@ -40,21 +40,25 @@ function assertJsonValueInternal(value: unknown, path: string, stack: Set<object
   }
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      fail('UNSUPPORTED_JSON_VALUE', 'JSON numbers must be finite', path)
+      fail('JSON_NON_IJSON_NUMBER', 'JSON numbers must be finite', path)
     }
     return
   }
   if (typeof value !== 'object') {
-    fail('UNSUPPORTED_JSON_VALUE', `Unsupported ${typeof value} value`, path)
+    fail('CANONICALIZATION_UNSUPPORTED_VALUE', `Unsupported ${typeof value} value`, path)
   }
-  if (stack.has(value)) fail('UNSUPPORTED_JSON_VALUE', 'Cyclic JSON value', path)
+  if (stack.has(value)) fail('CANONICALIZATION_UNSUPPORTED_VALUE', 'Cyclic JSON value', path)
 
   stack.add(value)
   try {
     if (Array.isArray(value)) {
       for (let index = 0; index < value.length; index += 1) {
         if (!Object.hasOwn(value, index)) {
-          fail('UNSUPPORTED_JSON_VALUE', 'Sparse arrays are not JSON values', `${path}[${index}]`)
+          fail(
+            'CANONICALIZATION_UNSUPPORTED_VALUE',
+            'Sparse arrays are not JSON values',
+            `${path}[${index}]`,
+          )
         }
         assertJsonValueInternal(value[index], `${path}[${index}]`, stack)
       }
@@ -63,7 +67,7 @@ function assertJsonValueInternal(value: unknown, path: string, stack: Set<object
 
     const prototype = Object.getPrototypeOf(value)
     if (prototype !== Object.prototype && prototype !== null) {
-      fail('UNSUPPORTED_JSON_VALUE', 'Only plain objects are JSON values', path)
+      fail('CANONICALIZATION_UNSUPPORTED_VALUE', 'Only plain objects are JSON values', path)
     }
     for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
       assertWellFormed(key, path)
@@ -82,7 +86,11 @@ export function canonicalJson(value: unknown): string {
   assertJsonValue(value)
   const serialized = canonicalizeRfc8785(value)
   if (serialized === undefined) {
-    return fail('UNSUPPORTED_JSON_VALUE', 'Value cannot be represented as canonical JSON', '$')
+    return fail(
+      'CANONICALIZATION_UNSUPPORTED_VALUE',
+      'Value cannot be represented as canonical JSON',
+      '$',
+    )
   }
   return serialized
 }
@@ -99,7 +107,7 @@ export function decodeUtf8(bytes: Uint8Array): string {
   try {
     return decoder.decode(bytes)
   } catch (cause) {
-    return fail('INVALID_JSON', 'Input is not valid UTF-8', '$', { cause: String(cause) })
+    return fail('UTF8_INVALID', 'Input is not valid UTF-8', '$', { cause: String(cause) })
   }
 }
 
@@ -124,7 +132,7 @@ export function parseJson(input: string | Uint8Array): JsonValue {
     allowEmptyContent: false,
   })
   if (!root || errors.length > 0) {
-    return fail('INVALID_JSON', 'Input is not valid JSON', '$')
+    return fail('JSON_INVALID', 'Input is not valid JSON', '$')
   }
   rejectDuplicateObjectKeys(root)
 
@@ -137,7 +145,7 @@ export function parseCanonicalJson(input: string | Uint8Array): JsonValue {
   const text = typeof input === 'string' ? input : decodeUtf8(input)
   const parsed = parseJson(text)
   if (canonicalJson(parsed) !== text) {
-    return fail('NON_CANONICAL_JSON', 'Input must use RFC 8785 canonical JSON', '$')
+    return fail('JSON_INVALID', 'Input must use RFC 8785 canonical JSON', '$')
   }
   assertJsonValue(parsed)
   return parsed
@@ -150,10 +158,10 @@ function rejectDuplicateObjectKeys(node: Node): void {
       const [keyNode, valueNode] = property.children ?? []
       const key = keyNode?.value
       if (typeof key !== 'string' || !valueNode) {
-        return fail('INVALID_JSON', 'Input contains an invalid JSON object', '$')
+        return fail('JSON_INVALID', 'Input contains an invalid JSON object', '$')
       }
       if (keys.has(key)) {
-        return fail('INVALID_JSON', `Input contains duplicate key ${key}`, '$')
+        return fail('JSON_DUPLICATE_KEY', `Input contains duplicate key ${key}`, '$')
       }
       keys.add(key)
       rejectDuplicateObjectKeys(valueNode)
@@ -167,3 +175,9 @@ export function utf8ByteLength(value: string): number {
   assertWellFormed(value, '$')
   return encoder.encode(value).length
 }
+
+/** Backward-compatible names from the normative XCS v0.1 interface. */
+export const canonicalize = canonicalJson
+export const parseJsonStrict = parseJson
+export const encodeUtf8Hex = (value: string): string => encodeHexUtf8(value).toUpperCase()
+export const decodeUtf8Hex = decodeHexUtf8

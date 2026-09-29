@@ -22,7 +22,7 @@ describe('network and native lifecycle', () => {
   it('wraps xrpl.js Ripple-time conversion with strict protocol bounds', () => {
     expect(rippleTimeToIso(0)).toBe('2000-01-01T00:00:00.000Z')
     expect(() => rippleTimeToIso(-1)).toThrow(
-      expect.objectContaining({ code: 'INVALID_RIPPLE_TIME' }),
+      expect.objectContaining({ code: 'RIPPLE_TIME_INVALID' }),
     )
   })
 

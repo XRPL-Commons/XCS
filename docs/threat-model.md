@@ -115,18 +115,16 @@ a separate data-flow, retention and access review.
   applies the current-database grants but does not constitute an anti-administrator attestation or
   audit unrelated databases. Protect and audit the administrator identity and build supply chain
   independently.
-- Bootstrap forces SCRAM-SHA-256 password verifiers for runtime roles, but the
-  operator still owns client transport and `pg_hba.conf` authentication policy. Require TLS where
-  traffic crosses a host boundary and explicit `scram-sha-256` role-to-database allow entries; do
-  not treat verifier format as a network-access control.
-- PostgreSQL connection limits and container limits provide coarse resource bounds, but the
-  provisioned statement, lock and idle-in-transaction timeouts are `USERSET` role defaults rather
-  than security ceilings. A client holding a stolen runtime credential can override them for its
-  session, consume every allowed connection, hold permitted row locks and run expensive authorized
-  work. Operators still need independently enforced connection/query/resource quotas, workload
-  isolation and alerts on long transactions, row-lock pressure and disk growth. The bootstrap's
-  advisory lock only serializes concurrent administrative runs; it is not a runtime security
-  boundary.
+- The managed PostgreSQL service owns runtime-user passwords, rotation metadata and the client
+  authentication policy. Bootstrap never reads or changes those values. Require TLS where traffic
+  crosses a host boundary, keep each generated connection URL in its owning component only, and do
+  not treat a password-verifier format as a network-access control.
+- Application pool limits and container limits provide coarse resource bounds, but they are not
+  database security ceilings. A client holding a stolen runtime credential can open independent
+  connections, hold permitted row locks and run expensive authorized work. Operators still need
+  DigitalOcean connection/query/resource quotas, workload isolation and alerts on long transactions,
+  row-lock pressure and disk growth. The bootstrap's advisory lock only serializes concurrent
+  administrative runs; it is not a runtime security boundary.
 - PostgreSQL's default function and `LISTEN`/`NOTIFY` capabilities are not narrowed by bootstrap. A
   stolen runtime credential can use capabilities PostgreSQL grants through `PUBLIC` and create a
   denial-of-service workload. Operators must constrain connections and workload externally and

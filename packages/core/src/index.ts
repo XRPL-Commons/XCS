@@ -8,27 +8,41 @@ export {
   type EncodedCredentialPayload,
   type PayloadRetrieval,
 } from './credential.js'
-export { XcsError, type XcsErrorCode } from './errors.js'
+export { XCS_ERROR_CODES, XcsError, type XcsErrorCode } from './errors.js'
+export { parseClaims, validateClaims } from './claims.js'
 export {
+  canonicalize,
   canonicalJson,
+  decodeUtf8Hex,
   decodeHexUtf8,
   decodeUtf8,
   encodeCanonicalJson,
   encodeHexUtf8,
   encodeUtf8,
+  encodeUtf8Hex,
   parseCanonicalJson,
   parseJson,
+  parseJsonStrict,
   sha256Hex,
   utf8ByteLength,
   type JsonObject,
   type JsonPrimitive,
   type JsonValue,
 } from './json.js'
-export { parseNetworkProfile, rippleTimeToIso, type NetworkProfile } from './network.js'
 export {
+  parseNetworkProfile,
+  rippleTimeToIso,
+  validateNetworkProfile,
+  type NetworkProfile,
+} from './network.js'
+export {
+  computePayloadSha256Hex,
   createHttpsPayloadUri,
+  createIpfsRawPayloadUri,
   createIpfsPayloadUri,
+  inspectPayloadUri,
   parsePayloadUri,
+  payloadDigest,
   verifyPayloadIntegrity,
   type HttpsPayloadUri,
   type IpfsPayloadUri,
@@ -40,11 +54,19 @@ export {
   type CredentialLifecycleInput,
   type CredentialLifecycleState,
 } from './lifecycle.js'
+export {
+  iso8601ToRippleTime,
+  RIPPLE_EPOCH_UNIX_SECONDS,
+  rippleTimeToIso8601,
+  rippleTimeToUnixSeconds,
+  unixSecondsToRippleTime,
+} from './ripple-time.js'
 export { resolveSchema, type SchemaResolutionContext } from './schema-resolution.js'
 export {
   encodeSchema,
   parseSchema,
   parseSchemaBytes,
+  validateSchema,
   type ArrayFieldDescriptor,
   type FieldDescriptor,
   type ObjectFieldDescriptor,

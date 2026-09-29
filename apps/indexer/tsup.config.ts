@@ -10,6 +10,8 @@ export default defineConfig({
     'src/fixture-cli.ts',
     'src/lib/db/bin/bootstrap.ts',
     'src/lib/db/bin/migrate.ts',
+    'src/lib/db/bin/status.ts',
+    'src/lib/db/bin/admin-bootstrap.ts',
   ],
   format: ['esm'],
   dts: false,

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844" role="img" aria-labelledby="title desc" xml:lang="fr">
+<title id="title">I2 — Votre demande</title>
+<desc id="desc">Vous serez informé après son examen. L’émission depuis cet espace sera disponible après autorisation.</desc>
+<rect x="0" y="0" width="390" height="844" rx="3" fill="#ffffff" stroke="#777777"/>
+<rect x="0" y="0" width="390" height="42" rx="3" fill="#eeeeee" stroke="#777777"/>
+<text x="20" y="12" font-family="Arial, sans-serif" font-size="13" fill="#252525" dominant-baseline="text-before-edge"><tspan x="20" dy="0">XCS / Émetteur</tspan></text>
+<text x="24" y="62" font-family="Arial, sans-serif" font-size="23" fill="#252525" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Votre demande</tspan></text>
+<text x="24" y="103.9" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Vous serez informé après son examen.</tspan></text>
+<rect x="24" y="137.10000000000002" width="342" height="37" rx="3" fill="#eeeeee" stroke="#b4b4b4"/>
+<text x="34" y="147.10000000000002" font-family="Arial, sans-serif" font-size="13" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">En attente d’examen</tspan></text>
+<rect x="24" y="190.10000000000002" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="199.10000000000002" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Organisation</tspan></text>
+<text x="34" y="219.10000000000002" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Atelier Exemple</tspan></text>
+<rect x="24" y="259.3" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="268.3" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Demande envoyée</tspan></text>
+<text x="34" y="288.3" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">23 septembre · Rôle émetteur</tspan></text>
+<rect x="24" y="328.5" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="337.5" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Étape suivante</tspan></text>
+<text x="34" y="357.5" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Après autorisation : créer votre modèle</tspan></text>
+<rect x="24" y="397.7" width="342" height="77.4" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="406.7" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Si la demande est refusée</tspan></text>
+<text x="34" y="426.7" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Le motif et la prochaine étape s’affichent</tspan><tspan x="34" dy="18.2">ici</tspan></text>
+<rect x="24" y="491.1" width="342" height="44" rx="3" fill="#333333" stroke="#333333"/>
+<text x="36" y="504" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" dominant-baseline="text-before-edge"><tspan x="36" dy="0">Consulter les schémas publics</tspan></text>
+<text x="24" y="548.1" font-family="Arial, sans-serif" font-size="12" fill="#555555" dominant-baseline="text-before-edge"><tspan x="24" dy="0">L’émission depuis cet espace sera disponible</tspan><tspan x="24" dy="15.600000000000001">après autorisation.</tspan></text>
+<text x="24" y="821" font-family="Arial, sans-serif" font-size="10" fill="#666666" dominant-baseline="text-before-edge"><tspan x="24" dy="0">MAQUETTE · Exemple fictif · Non fonctionnel</tspan></text>
+</svg>

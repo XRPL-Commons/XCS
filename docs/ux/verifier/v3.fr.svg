@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844" role="img" aria-labelledby="title desc" xml:lang="fr">
+<title id="title">V3 — Émetteur non reconnu</title>
+<desc id="desc">Les contrôles techniques ont réussi. Évaluez l’émetteur séparément. Les contrôles ne prouvent pas la vérité des déclarations. Identité, autorisation et partage sont revérifiés.</desc>
+<rect x="0" y="0" width="390" height="844" rx="3" fill="#ffffff" stroke="#777777"/>
+<rect x="0" y="0" width="390" height="42" rx="3" fill="#eeeeee" stroke="#777777"/>
+<text x="20" y="12" font-family="Arial, sans-serif" font-size="13" fill="#252525" dominant-baseline="text-before-edge"><tspan x="20" dy="0">XCS / Vérificateur</tspan></text>
+<text x="24" y="62" font-family="Arial, sans-serif" font-size="23" fill="#252525" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Émetteur non reconnu</tspan></text>
+<text x="24" y="103.9" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Les contrôles techniques ont réussi.</tspan><tspan x="24" dy="18.2">Évaluez l’émetteur séparément.</tspan></text>
+<rect x="24" y="155.3" width="342" height="54" rx="3" fill="#eeeeee" stroke="#b4b4b4"/>
+<text x="34" y="165.3" font-family="Arial, sans-serif" font-size="13" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Vue complète · Destinataire du partage</tspan><tspan x="34" dy="16.900000000000002">vérifié</tspan></text>
+<rect x="24" y="225.3" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="234.3" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Quatre contrôles indépendants</tspan></text>
+<text x="34" y="254.3" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Ledger : active · Schéma : valide</tspan></text>
+<rect x="24" y="294.5" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="303.5" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Contenu et confiance</tspan></text>
+<text x="34" y="323.5" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Contenu : valide · Émetteur : inconnu</tspan></text>
+<rect x="24" y="363.7" width="342" height="77.4" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="372.7" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Champs complets</tspan></text>
+<text x="34" y="392.7" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Camille Exemple · Initiation XRPL ·</tspan><tspan x="34" dy="18.2">23/09/2026</tspan></text>
+<rect x="24" y="451.1" width="342" height="77.4" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="460.1" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Preuves détaillées</tspan></text>
+<text x="34" y="480.1" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Empreinte, source du contrôle, état du</tspan><tspan x="34" dy="18.2">ledger</tspan></text>
+<rect x="24" y="544.5" width="342" height="44" rx="3" fill="#333333" stroke="#333333"/>
+<text x="36" y="557.4" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" dominant-baseline="text-before-edge"><tspan x="36" dy="0">Consulter les preuves</tspan></text>
+<rect x="24" y="598.5" width="342" height="44" rx="3" fill="#ffffff" stroke="#333333"/>
+<text x="36" y="611.4" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="36" dy="0">Mon historique</tspan></text>
+<text x="24" y="655.5" font-family="Arial, sans-serif" font-size="12" fill="#555555" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Les contrôles ne prouvent pas la vérité des</tspan><tspan x="24" dy="15.600000000000001">déclarations. Identité, autorisation et partage</tspan><tspan x="24" dy="15.600000000000001">sont revérifiés.</tspan></text>
+<text x="24" y="821" font-family="Arial, sans-serif" font-size="10" fill="#666666" dominant-baseline="text-before-edge"><tspan x="24" dy="0">MAQUETTE · Exemple fictif · Non fonctionnel</tspan></text>
+</svg>

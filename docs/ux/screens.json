@@ -1,0 +1,782 @@
+[
+  {
+    "id": "A1",
+    "role": "admin",
+    "title": ["Demandes à examiner", "Applications to review"],
+    "intro": ["Commencer par la demande la plus ancienne.", "Start with the oldest application."],
+    "status": ["2 demandes en attente", "2 applications pending"],
+    "rows": [
+      [
+        ["Filtrer par rôle", "Filter by role"],
+        ["Tous · Émetteur · Vérificateur", "All · Issuer · Verifier"]
+      ],
+      [
+        ["Atelier Exemple · Émetteur", "Example Workshop · Issuer"],
+        ["Reçue le 21 septembre · Dossier complet", "Received 21 September · Complete file"]
+      ],
+      [
+        ["Bureau Exemple · Vérificateur", "Example Office · Verifier"],
+        ["Reçue le 22 septembre · À examiner", "Received 22 September · Needs review"]
+      ],
+      [
+        ["Autres actions", "Other actions"],
+        ["Accès des vérificateurs · Journal", "Verifier permissions · Audit history"]
+      ]
+    ],
+    "actions": [["Examiner Atelier Exemple", "Review Example Workshop"]],
+    "note": [
+      "Autoriser l’accès à l’application ne valide pas les attestations d’un émetteur.",
+      "Approving application access does not endorse an issuer’s attestations."
+    ]
+  },
+  {
+    "id": "A2",
+    "role": "admin",
+    "title": ["Examiner la demande", "Review application"],
+    "intro": [
+      "L’organisation est-elle identifiable ? Quel accès autoriser ?",
+      "Can I identify this organization? Which access should I grant?"
+    ],
+    "status": ["Émetteur · En attente d’examen", "Issuer · Awaiting review"],
+    "rows": [
+      [
+        ["Atelier Exemple", "Example Workshop"],
+        ["Formation · France · Contact fourni", "Training · France · Contact provided"]
+      ],
+      [
+        ["Justificatifs", "Supporting documents"],
+        ["Voir le document ↗ Nouvel onglet", "View document ↗ New tab"]
+      ],
+      [
+        ["Portefeuille et historique", "Wallet and timeline"],
+        ["Adresse liée · Demande reçue le 21/09", "Address linked · Applied on 21 Sep"]
+      ],
+      [
+        ["En cas de refus", "If declining"],
+        ["Motif obligatoire : expliquer la décision", "Required reason: explain the decision"]
+      ]
+    ],
+    "actions": [
+      ["Autoriser le rôle émetteur", "Approve issuer access"],
+      ["Refuser avec un motif", "Decline with a reason"]
+    ],
+    "note": [
+      "La décision sera journalisée. Une notification sera mise en attente d’envoi.",
+      "The decision is audited. A notification will be queued for sending."
+    ]
+  },
+  {
+    "id": "A3",
+    "role": "admin",
+    "title": ["Autorisation du vérificateur", "Verifier approval"],
+    "intro": [
+      "Gérer son accès au portail, sans ouvrir les champs privés.",
+      "Manage portal access without unlocking private fields."
+    ],
+    "status": ["Bureau Exemple · Accès autorisé", "Example Office · Access approved"],
+    "rows": [
+      [
+        ["Organisation", "Organization"],
+        ["Bureau Exemple · Identité vérifiée", "Example Office · Verified identity"]
+      ],
+      [
+        ["Autorisation globale", "Global approval"],
+        ["Active · Le rôle vérificateur est autorisé", "Active · Verifier role approved"]
+      ],
+      [
+        ["Lecture des champs privés", "Reading private fields"],
+        [
+          "Accord du destinataire pour ce vérificateur requis",
+          "Recipient grant for this verifier required"
+        ]
+      ],
+      [
+        ["Retirer l’autorisation", "Withdraw approval"],
+        ["Bloque les prochains accès privés", "Blocks future private access"]
+      ]
+    ],
+    "actions": [
+      ["Suspendre l’autorisation…", "Suspend approval…"],
+      ["Voir les décisions", "View decisions"]
+    ],
+    "note": [
+      "Aucune liste par émetteur. L’administrateur ne peut pas s’accorder la lecture des champs privés.",
+      "No issuer allowlist. An administrator cannot grant themselves access to private claims."
+    ]
+  },
+  {
+    "id": "A4",
+    "role": "admin",
+    "title": ["Historique des décisions", "Decision history"],
+    "intro": ["Qui a modifié les accès, quand et pourquoi ?", "Who changed access, when, and why?"],
+    "status": ["Journal administratif", "Administrative audit"],
+    "rows": [
+      [
+        ["23 septembre · Admin A", "23 September · Admin A"],
+        ["Atelier Exemple : en attente → autorisé", "Example Workshop: pending → approved"]
+      ],
+      [
+        ["23 septembre · Admin B", "23 September · Admin B"],
+        ["Bureau Exemple : autorisation suspendue", "Example Office: approval suspended"]
+      ],
+      [
+        ["Avant / Après", "Before / After"],
+        ["Autorisation active → Suspendue", "Approval active → Suspended"]
+      ],
+      [
+        ["Motif", "Reason"],
+        ["Examen des justificatifs terminé", "Supporting evidence review completed"]
+      ]
+    ],
+    "actions": [["Retour aux demandes", "Back to applications"]],
+    "note": [
+      "Le journal ne contient ni contenu d’attestation ni document privé.",
+      "The audit contains no credential claims or private document contents."
+    ]
+  },
+  {
+    "id": "I1",
+    "role": "issuer",
+    "title": ["Devenir émetteur", "Apply as an issuer"],
+    "intro": [
+      "Présenter votre organisation pour demander l’accès.",
+      "Tell us about your organization to request access."
+    ],
+    "status": ["Compte connecté · Accès à demander", "Signed in · Access required"],
+    "rows": [
+      [
+        ["Organisation et site web", "Organization and website"],
+        ["Atelier Exemple · Site de l’organisation", "Example Workshop · Organization website"]
+      ],
+      [
+        ["Contact et pays", "Contact and jurisdiction"],
+        ["Contact professionnel · France", "Work contact · France"]
+      ],
+      [
+        ["Usage prévu", "Intended use"],
+        ["Attester la fin d’une formation", "Issue course completion attestations"]
+      ],
+      [
+        ["Justificatif de l’organisation", "Organization evidence"],
+        ["Choisir un fichier · Accès restreint", "Choose a file · Restricted access"]
+      ]
+    ],
+    "actions": [["Envoyer ma demande", "Submit application"]],
+    "note": [
+      "Ces justificatifs servent à l’examen de la demande. Ils ne seront pas publiés sur le ledger.",
+      "These documents support the application review. They will not be published on the ledger."
+    ]
+  },
+  {
+    "id": "I2",
+    "role": "issuer",
+    "title": ["Votre demande", "Your application"],
+    "intro": ["Vous serez informé après son examen.", "You will be notified after the review."],
+    "status": ["En attente d’examen", "Awaiting review"],
+    "rows": [
+      [
+        ["Organisation", "Organization"],
+        ["Atelier Exemple", "Example Workshop"]
+      ],
+      [
+        ["Demande envoyée", "Application submitted"],
+        ["23 septembre · Rôle émetteur", "23 September · Issuer role"]
+      ],
+      [
+        ["Étape suivante", "Next step"],
+        ["Après autorisation : créer votre modèle", "Once approved: create your template"]
+      ],
+      [
+        ["Si la demande est refusée", "If the application is declined"],
+        ["Le motif et la prochaine étape s’affichent ici", "The reason and next step appear here"]
+      ]
+    ],
+    "actions": [["Consulter les schémas publics", "Browse public schemas"]],
+    "note": [
+      "L’émission depuis cet espace sera disponible après autorisation.",
+      "Issuing from this workspace becomes available after approval."
+    ]
+  },
+  {
+    "id": "I3",
+    "role": "issuer",
+    "title": ["Créer un modèle", "Create a template"],
+    "intro": [
+      "Définir les informations de votre attestation.",
+      "Choose what your attestation will contain."
+    ],
+    "status": ["Étape 1 · Schéma public", "Step 1 · Public schema"],
+    "rows": [
+      [
+        ["Partir d’un modèle", "Start from a template"],
+        ["Fin de formation ✓ · Diplôme", "Course completion ✓ · Diploma"]
+      ],
+      [
+        ["Champs du modèle", "Template fields"],
+        ["Nom : texte · Formation : texte · Date : date", "Name: text · Course: text · Date: date"]
+      ],
+      [
+        ["Aperçu", "Preview"],
+        ["Nom du destinataire · Formation · Date de fin", "Learner name · Course · Completion date"]
+      ],
+      [
+        ["Avant signature", "Before signing"],
+        [
+          "Compte : Atelier Exemple · Testnet · Frais à afficher",
+          "Account: Example Workshop · Testnet · Show fee"
+        ]
+      ]
+    ],
+    "actions": [
+      ["Vérifier puis publier", "Review and publish"],
+      ["Détails techniques", "Technical details"]
+    ],
+    "note": [
+      "Le schéma devient public. Aucune donnée réelle de destinataire n’est saisie à cette étape.",
+      "The schema becomes public. No actual learner data is entered at this step."
+    ]
+  },
+  {
+    "id": "I4",
+    "role": "issuer",
+    "title": ["Inviter un destinataire", "Invite a learner"],
+    "intro": [
+      "Il choisira son compte et liera son portefeuille.",
+      "They will choose their account and link a wallet."
+    ],
+    "status": ["Étape 2 · Invitation", "Step 2 · Invitation"],
+    "rows": [
+      [
+        ["E-mail du destinataire", "Learner email"],
+        ["camille@example.invalid", "camille@example.invalid"]
+      ],
+      [
+        ["Votre schéma", "Your schema"],
+        ["Fin de formation · Atelier Exemple", "Course completion · Example Workshop"]
+      ],
+      [
+        ["Message facultatif", "Optional message"],
+        ["Votre attestation sera bientôt disponible.", "Your attestation will be available soon."]
+      ],
+      [
+        ["Suivi des invitations", "Invitation tracking"],
+        ["Envoyée → Récupérée → Portefeuille lié", "Sent → Claimed → Wallet linked"]
+      ]
+    ],
+    "actions": [
+      ["Envoyer l’invitation", "Send invitation"],
+      ["Voir les invitations", "View invitations"]
+    ],
+    "note": [
+      "Renvoyer ou révoquer depuis la liste. Émettre seulement après la liaison du portefeuille.",
+      "Resend or revoke from the list. Issue only after the wallet is linked."
+    ]
+  },
+  {
+    "id": "I5",
+    "role": "issuer",
+    "title": ["Vérifier et émettre", "Review and issue"],
+    "intro": [
+      "Confirmer le contenu, le destinataire et la visibilité.",
+      "Confirm the content, recipient and visibility."
+    ],
+    "status": ["Camille Exemple · Portefeuille lié", "Camille Example · Wallet linked"],
+    "rows": [
+      [
+        ["Attestation", "Attestation"],
+        ["Fin de formation · Initiation XRPL", "Course completion · XRPL introduction"]
+      ],
+      [
+        ["Champs à remplir", "Fields to complete"],
+        ["Nom : Camille Exemple · Date : 23/09/2026", "Name: Camille Example · Date: 23 Sep 2026"]
+      ],
+      [
+        ["Visibilité : privée", "Visibility: private"],
+        ["Public : formation · Restreint : nom, date", "Public: course · Restricted: name, date"]
+      ],
+      [
+        ["Signature", "Signature"],
+        ["Atelier Exemple · Testnet · Frais à afficher", "Example Workshop · Testnet · Show fee"]
+      ]
+    ],
+    "actions": [
+      ["Signer dans mon portefeuille", "Sign in my wallet"],
+      ["Modifier la visibilité", "Change visibility"]
+    ],
+    "note": [
+      "Hébergement privé requis. Adresse et cycle de vie restent publics sur XRPL. Détails techniques disponibles.",
+      "Private hosting required. Address and lifecycle remain public on XRPL. Technical details available."
+    ]
+  },
+  {
+    "id": "I6",
+    "role": "issuer",
+    "title": ["Suivre l’attestation", "Track attestation"],
+    "intro": [
+      "Suivre l’émission, le contenu et l’acceptation.",
+      "Track issuance, content and acceptance separately."
+    ],
+    "status": ["Émise · En attente d’acceptation", "Issued · Awaiting acceptance"],
+    "rows": [
+      [
+        ["Destinataire et formation", "Learner and course"],
+        ["Camille Exemple · Initiation XRPL", "Camille Example · XRPL introduction"]
+      ],
+      [
+        ["Émission sur XRPL", "XRPL issuance"],
+        ["Confirmée sur le ledger", "Validated on the ledger"]
+      ],
+      [
+        ["Disponibilité du contenu", "Content availability"],
+        ["Publié · Accès privé", "Published · Restricted access"]
+      ],
+      [
+        ["Acceptation et notification", "Acceptance and notification"],
+        [
+          "Acceptation en attente · Notification en file",
+          "Acceptance pending · Notification queued"
+        ]
+      ]
+    ],
+    "actions": [
+      ["Actualiser le statut", "Refresh status"],
+      ["Révoquer l’attestation…", "Revoke attestation…"]
+    ],
+    "note": [
+      "Révoquer demande confirmation et signature. Une publication en attente se reprend sans réémettre.",
+      "Revocation needs confirmation and signing. Pending publication resumes without issuing again."
+    ]
+  },
+  {
+    "id": "R1",
+    "role": "recipient",
+    "title": ["Une attestation pour vous", "An attestation for you"],
+    "intro": [
+      "Atelier Exemple vous invite à recevoir une attestation.",
+      "Example Workshop invites you to receive an attestation."
+    ],
+    "status": ["1 sur 4 · Récupérer l’invitation", "1 of 4 · Claim invitation"],
+    "rows": [
+      [
+        ["Proposée par", "Offered by"],
+        ["Atelier Exemple", "Example Workshop"]
+      ],
+      [
+        ["Type d’attestation", "Attestation type"],
+        ["Fin de formation", "Course completion"]
+      ],
+      [
+        ["Votre compte", "Your account"],
+        [
+          "Se connecter ou créer un compte XRP Identity",
+          "Sign in or create an XRP Identity account"
+        ]
+      ],
+      [
+        ["Prochaine étape", "Next step"],
+        [
+          "Lier un portefeuille pour recevoir l’attestation",
+          "Link a wallet to receive the attestation"
+        ]
+      ]
+    ],
+    "actions": [["Continuer avec XRP Identity", "Continue with XRP Identity"]],
+    "note": [
+      "Vérifiez le compte utilisé avant de récupérer l’invitation. Aucun portefeuille requis pour se connecter.",
+      "Check the account before claiming the invitation. Signing in does not require a wallet."
+    ]
+  },
+  {
+    "id": "R2",
+    "role": "recipient",
+    "title": ["Lier mon portefeuille", "Link my wallet"],
+    "intro": [
+      "Prouver que l’adresse de réception vous appartient.",
+      "Prove that you control the receiving address."
+    ],
+    "status": ["2 sur 4 · Portefeuille", "2 of 4 · Wallet"],
+    "rows": [
+      [
+        ["Choisir un portefeuille", "Choose a wallet"],
+        ["Liste des portefeuilles compatibles détectés", "Detected compatible wallets"]
+      ],
+      [
+        ["Vous n’en avez pas ?", "Do not have one?"],
+        ["Voir les instructions d’installation", "See installation guidance"]
+      ],
+      [
+        ["Vérifier avant de continuer", "Check before continuing"],
+        ["Compte choisi · Réseau Testnet", "Selected account · Testnet network"]
+      ],
+      [
+        ["Ce que vous autorisez", "What you authorize"],
+        ["Une preuve de contrôle, pas une transaction", "Proof of control, not a transaction"]
+      ]
+    ],
+    "actions": [["Connecter puis prouver le contrôle", "Connect and prove control"]],
+    "note": [
+      "Vos clés restent dans le portefeuille. L’émetteur sera informé après vérification de la preuve.",
+      "Your keys stay in the wallet. The issuer is notified after the proof is verified."
+    ]
+  },
+  {
+    "id": "R3",
+    "role": "recipient",
+    "title": ["Mes attestations", "My attestations"],
+    "intro": [
+      "Retrouver ce qui est prêt et ce qui attend encore.",
+      "See what is ready and what is still pending."
+    ],
+    "status": ["3 sur 4 · Boîte de réception", "3 of 4 · Inbox"],
+    "rows": [
+      [
+        ["À accepter · 1", "Ready to accept · 1"],
+        ["Initiation XRPL · Atelier Exemple", "XRPL introduction · Example Workshop"]
+      ],
+      [
+        ["En préparation · 0", "Being prepared · 0"],
+        ["Vos invitations en attente apparaîtront ici", "Invitations awaiting issuance appear here"]
+      ],
+      [
+        ["Acceptées · 0", "Accepted · 0"],
+        ["Vos attestations acceptées apparaîtront ici", "Accepted attestations appear here"]
+      ],
+      [
+        ["Inactives · 0", "Inactive · 0"],
+        ["Expirées, révoquées ou refusées", "Expired, revoked or declined"]
+      ]
+    ],
+    "actions": [["Examiner l’attestation", "Review attestation"]],
+    "note": [
+      "Cet espace est privé. Il ne crée pas de liste publique de vos attestations.",
+      "This workspace is private. It does not create a public list of your attestations."
+    ]
+  },
+  {
+    "id": "R4",
+    "role": "recipient",
+    "title": ["Examiner avant d’accepter", "Review before accepting"],
+    "intro": [
+      "Lire le contenu seulement après votre accord.",
+      "Read the content only with your consent."
+    ],
+    "status": ["4 sur 4 · À accepter", "4 of 4 · Ready to accept"],
+    "rows": [
+      [
+        ["Émetteur et attestation", "Issuer and attestation"],
+        ["Atelier Exemple · Fin de formation", "Example Workshop · Course completion"]
+      ],
+      [
+        ["Source du contenu", "Content source"],
+        [
+          "Hébergement privé XCS · Lecture sur autorisation",
+          "Private XCS storage · Authorized reading"
+        ]
+      ],
+      [
+        ["Après lecture et contrôles", "After reading and checks"],
+        ["Afficher les champs et le résumé à signer", "Show the fields and signing summary"]
+      ],
+      [
+        ["Avant signature", "Before signing"],
+        ["Votre compte · Testnet · Frais à afficher", "Your account · Testnet · Show fee"]
+      ]
+    ],
+    "actions": [
+      ["Autoriser la lecture du contenu", "Allow reading the content"],
+      ["Refuser sans lire le contenu", "Decline without reading content"]
+    ],
+    "note": [
+      "Émetteur inconnu : accord explicite avant acceptation. Émetteur non fiable : acceptation bloquée. Refuser ne télécharge rien.",
+      "Unknown issuer: acknowledge before accepting. Untrusted issuer: acceptance blocked. Declining downloads nothing."
+    ]
+  },
+  {
+    "id": "R5",
+    "role": "recipient",
+    "title": ["Présenter mon attestation", "Present my attestation"],
+    "intro": [
+      "Choisir qui peut lire les champs, puis gérer le partage.",
+      "Choose who can read the fields, then manage sharing."
+    ],
+    "status": ["Attestation acceptée", "Attestation accepted"],
+    "rows": [
+      [
+        ["Portée du partage", "Sharing scope"],
+        ["Champs publics seuls · Tous les champs ✓", "Public fields only · All fields ✓"]
+      ],
+      [
+        ["Pour partager les champs privés", "To share private fields"],
+        [
+          "Choisir un vérificateur autorisé : Bureau Exemple",
+          "Choose an approved verifier: Example Office"
+        ]
+      ],
+      [
+        ["Durée du partage", "Sharing duration"],
+        ["Jusqu’à révocation · Aucun renouvellement", "Until revoked · No renewal required"]
+      ],
+      [
+        ["Aperçu pour Bureau Exemple", "Preview for Example Office"],
+        ["Nom, formation, date · Connexion requise", "Name, course, date · Sign-in required"]
+      ]
+    ],
+    "actions": [
+      ["Vérifier puis créer le partage", "Review and create sharing"],
+      ["Voir et révoquer mes partages", "View and revoke my sharing"]
+    ],
+    "note": [
+      "Après création : lien et QR. Un lien transféré ne donne pas les champs privés à un autre vérificateur.",
+      "After creation: link and QR. A forwarded link does not give another verifier the private fields."
+    ]
+  },
+  {
+    "id": "V1",
+    "role": "verifier",
+    "title": ["Demander l’accès complet", "Request full-detail access"],
+    "intro": [
+      "Présenter votre organisation et votre besoin.",
+      "Explain your organization and your need."
+    ],
+    "status": ["Vérification publique sans compte", "Public verification needs no account"],
+    "rows": [
+      [
+        ["Organisation", "Organization"],
+        ["Bureau Exemple", "Example Office"]
+      ],
+      [
+        ["But des vérifications", "Verification purpose"],
+        ["Vérifier les formations déclarées", "Check declared course completions"]
+      ],
+      [
+        ["Contact", "Contact"],
+        ["Contact professionnel de l’organisation", "Organization work contact"]
+      ],
+      [
+        ["Après l’envoi", "After submission"],
+        ["En attente ; si refus, motif affiché", "Pending; if declined, show the reason"]
+      ]
+    ],
+    "actions": [
+      ["Envoyer ma demande", "Submit application"],
+      ["Retour à la présentation", "Back to presentation"]
+    ],
+    "note": [
+      "Après autorisation globale, le destinataire doit partager avec votre identité de vérificateur.",
+      "After global approval, the recipient must share with your verifier identity."
+    ]
+  },
+  {
+    "id": "V2",
+    "role": "verifier",
+    "title": ["Vérification partielle", "Partially checked"],
+    "intro": [
+      "L’attestation est active. Le contenu complet n’a pas été contrôlé.",
+      "The attestation is active. Full content has not been checked."
+    ],
+    "status": ["Vue publique · Champs limités", "Public view · Limited fields"],
+    "rows": [
+      [
+        ["Quatre contrôles indépendants", "Four independent checks"],
+        ["Ledger : active · Schéma : valide", "Ledger: active · Schema: valid"]
+      ],
+      [
+        ["Contenu et confiance", "Content and trust"],
+        ["Contenu : non contrôlé · Émetteur : inconnu", "Payload: not checked · Issuer: unknown"]
+      ],
+      [
+        ["Champs publics", "Public fields"],
+        ["Formation : Initiation XRPL", "Course: XRPL introduction"]
+      ],
+      [
+        ["Pour lire les champs privés", "To read private fields"],
+        [
+          "Connexion + rôle autorisé + partage à votre nom",
+          "Sign-in + approved role + grant addressed to you"
+        ]
+      ]
+    ],
+    "actions": [
+      ["Se connecter ou demander l’accès", "Sign in or request access"],
+      ["Voir les preuves disponibles", "View available evidence"]
+    ],
+    "note": [
+      "L’autorisation d’utiliser XCS n’est pas une garantie de l’émetteur. Aucun score de confiance.",
+      "Permission to use XCS is not an endorsement of the issuer. There is no trust score."
+    ]
+  },
+  {
+    "id": "V3",
+    "role": "verifier",
+    "title": ["Émetteur non reconnu", "Issuer not recognized"],
+    "intro": [
+      "Les contrôles techniques ont réussi. Évaluez l’émetteur séparément.",
+      "Technical checks passed. Assess the issuer separately."
+    ],
+    "status": [
+      "Vue complète · Destinataire du partage vérifié",
+      "Full view · Sharing audience verified"
+    ],
+    "rows": [
+      [
+        ["Quatre contrôles indépendants", "Four independent checks"],
+        ["Ledger : active · Schéma : valide", "Ledger: active · Schema: valid"]
+      ],
+      [
+        ["Contenu et confiance", "Content and trust"],
+        ["Contenu : valide · Émetteur : inconnu", "Payload: valid · Issuer: unknown"]
+      ],
+      [
+        ["Champs complets", "Full fields"],
+        [
+          "Camille Exemple · Initiation XRPL · 23/09/2026",
+          "Camille Example · XRPL introduction · 23 Sep 2026"
+        ]
+      ],
+      [
+        ["Preuves détaillées", "Detailed evidence"],
+        ["Empreinte, source du contrôle, état du ledger", "Digest, check provenance, ledger state"]
+      ]
+    ],
+    "actions": [
+      ["Consulter les preuves", "Inspect evidence"],
+      ["Mon historique", "My history"]
+    ],
+    "note": [
+      "Les contrôles ne prouvent pas la vérité des déclarations. Identité, autorisation et partage sont revérifiés.",
+      "Checks do not prove claims are true. Identity, approval and sharing permission are rechecked."
+    ]
+  },
+  {
+    "id": "V4",
+    "role": "verifier",
+    "title": ["Mes vérifications", "My verification history"],
+    "intro": [
+      "Retrouver les résultats sans conserver les contenus.",
+      "Find past results without retaining credential contents."
+    ],
+    "status": ["Historique privé · Métadonnées", "Private history · Metadata only"],
+    "rows": [
+      [
+        ["23 septembre · Présentation A", "23 September · Presentation A"],
+        ["Vérification partielle", "Partially checked"]
+      ],
+      [
+        ["23 septembre · Présentation B", "23 September · Presentation B"],
+        ["Émetteur non reconnu", "Issuer not recognized"]
+      ],
+      [
+        ["Export CSV", "CSV export"],
+        ["Dates et résultats ; aucun champ privé", "Dates and results; no private fields"]
+      ],
+      [
+        ["Consulter à nouveau", "Open again"],
+        [
+          "Revérifier identité, autorisation et partage",
+          "Recheck identity, approval and sharing grant"
+        ]
+      ]
+    ],
+    "actions": [["Exporter les métadonnées", "Export metadata"]],
+    "note": [
+      "Un ancien résultat n’est pas une preuve actuelle. Partage révoqué ou autorisation retirée : aucun accès privé.",
+      "A past result is not current evidence. Revoked sharing or withdrawn approval means no private access."
+    ]
+  },
+  {
+    "id": "F1",
+    "role": "shared",
+    "title": ["Portefeuille indisponible", "Wallet unavailable"],
+    "intro": [
+      "Votre progression est conservée. Préparons le portefeuille.",
+      "Your progress is preserved. Let us get the wallet ready."
+    ],
+    "status": ["Aucune signature demandée", "No signature requested"],
+    "rows": [
+      [
+        ["Déjà installé ?", "Already installed?"],
+        ["Déverrouiller puis relancer la détection", "Unlock it, then refresh detection"]
+      ],
+      [
+        ["Pas encore installé ?", "Not installed yet?"],
+        ["Instructions pour un portefeuille compatible", "Guidance for a compatible wallet"]
+      ],
+      [
+        ["Réseau requis", "Required network"],
+        ["Testnet · Vérifier le compte sélectionné", "Testnet · Check the selected account"]
+      ]
+    ],
+    "actions": [
+      ["Relancer la détection", "Refresh detection"],
+      ["Choisir un autre portefeuille", "Choose another wallet"]
+    ],
+    "note": [
+      "Un compte XRP Identity ne remplace pas un portefeuille. Lire une présentation publique n’en demande pas.",
+      "An XRP Identity account does not replace a wallet. Reading a public presentation needs no wallet."
+    ]
+  },
+  {
+    "id": "F2",
+    "role": "shared",
+    "title": ["Invitation inutilisable", "Invitation unavailable"],
+    "intro": [
+      "Ce lien a expiré ou ne peut plus être utilisé.",
+      "This link has expired or can no longer be used."
+    ],
+    "status": ["Aucune invitation récupérée", "No invitation claimed"],
+    "rows": [
+      [
+        ["Que faire ?", "What can I do?"],
+        ["Demander une nouvelle invitation à l’émetteur", "Ask the issuer for a new invitation"]
+      ],
+      [
+        ["Votre compte", "Your account"],
+        ["Vous pourrez continuer avec le même compte", "You can continue with the same account"]
+      ],
+      [
+        ["Confidentialité", "Privacy"],
+        ["Aucune information de destinataire affichée", "No recipient information is displayed"]
+      ]
+    ],
+    "actions": [["Retour à mon espace", "Back to my workspace"]],
+    "note": [
+      "Utilisez votre contact habituel chez l’émetteur. Ce message ne révèle pas qui a utilisé le lien.",
+      "Use your known issuer contact. This message does not reveal who used the link."
+    ]
+  },
+  {
+    "id": "F3",
+    "role": "shared",
+    "title": ["Vérification indisponible", "Cannot verify now"],
+    "intro": [
+      "L’état actuel de l’attestation ne peut pas être confirmé.",
+      "The current attestation state cannot be confirmed."
+    ],
+    "status": ["Attendre des données à jour", "Waiting for current evidence"],
+    "rows": [
+      [
+        ["Ce que cela signifie", "What this means"],
+        [
+          "Ce n’est ni un résultat valide ni invalide",
+          "This is neither a valid nor an invalid result"
+        ]
+      ],
+      [
+        ["Une opération est déjà signée ?", "Already signed an operation?"],
+        ["Reprendre son suivi sans signer à nouveau", "Resume tracking without signing again"]
+      ],
+      [
+        ["Que faire ?", "What can I do?"],
+        ["Réessayer plus tard ou consulter le statut", "Retry later or check service status"]
+      ]
+    ],
+    "actions": [
+      ["Réessayer la vérification", "Retry verification"],
+      ["Voir l’état du service", "View service status"]
+    ],
+    "note": [
+      "Les nouvelles signatures attendent un état fiable. Vos clés restent toujours dans le portefeuille.",
+      "New signatures wait for reliable evidence. Your keys always stay in your wallet."
+    ]
+  }
+]

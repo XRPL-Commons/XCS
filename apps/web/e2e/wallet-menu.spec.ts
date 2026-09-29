@@ -27,11 +27,13 @@ test('reopens the wallet chooser after disconnecting and navigating', async ({ p
   await expect(trigger).toHaveAttribute('aria-expanded', 'true')
   await page.locator('[data-wallet-id="xcs-browser-e2e"]').click()
   await expect(trigger).toContainText('rHb9CJ')
+  await expect(page.getByTestId('wallet-status')).toContainText('Connected')
 
   await trigger.click()
   await expect(trigger).toContainText(/Connecter un wallet|Connect wallet/u)
+  await expect(page.getByTestId('wallet-status')).toHaveCount(0)
 
-  await page.goto('/accept')
+  await page.goto('/schemas')
   await page.locator('[data-client-ready="true"]').waitFor()
   await page.getByTestId('wallet-toggle').click()
   await expect(page.getByTestId('wallet-toggle')).toHaveAttribute('aria-expanded', 'true')
@@ -43,7 +45,7 @@ test('reopens the wallet chooser after disconnecting and navigating', async ({ p
 })
 
 test('keeps a dismissed wallet chooser closed after slow discovery', async ({ page }) => {
-  await page.goto('/studio')
+  await page.goto('/learn')
   await page.locator('[data-client-ready="true"]').waitFor()
   await page.evaluate(() => {
     const controls = globalThis as typeof globalThis & {
@@ -62,24 +64,63 @@ test('keeps a dismissed wallet chooser closed after slow discovery', async ({ pa
   await expect(trigger).toBeFocused()
 })
 
+test('shows pending approval, prevents duplicate connections and then shows the account', async ({
+  page,
+}) => {
+  await page.goto('/learn')
+  await page.locator('[data-client-ready="true"]').waitFor()
+  const trigger = page.getByTestId('wallet-toggle')
+  await trigger.click()
+  // Use one browser-clock timeline: host Date.now() can already be behind the
+  // installed clock by the time Playwright delivers pauseAt to the browser.
+  await page.clock.install({ time: new Date('2026-01-01T12:00:00Z') })
+  await page.clock.pauseAt(new Date('2026-01-01T12:01:00Z'))
+  await page.evaluate(() => {
+    ;(
+      globalThis as typeof globalThis & { __xcsBrowserE2eWalletDiscoveryDelayMs?: number }
+    ).__xcsBrowserE2eWalletDiscoveryDelayMs = 500
+  })
+  await page.locator('[data-wallet-id="xcs-browser-e2e"]').click()
+  await expect(trigger).toContainText('Connecting to')
+  await expect(page.getByTestId('wallet-pending')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Cancel connection', exact: true })).toBeEnabled()
+  await expect(page.locator('[data-wallet-id="xcs-browser-e2e-subject"]')).toBeDisabled()
+  await page.clock.runFor(600)
+  await expect(page.getByTestId('wallet-status')).toContainText('Connected')
+  await expect(trigger).toContainText('rHb9CJ')
+})
+
 test('shows transaction-specific Credential compatibility in the wallet chooser', async ({
   page,
 }) => {
-  await page.goto('/studio')
+  await page.goto('/learn')
   await page.locator('[data-client-ready="true"]').waitFor()
   await page.getByTestId('wallet-toggle').click()
 
   await expect(page.locator('[data-wallet-choice="gemwallet"]')).toContainText(
-    /Schémas uniquement|Schemas only/u,
+    /Credentials via raw signing — explicit approval required/u,
   )
   await expect(page.locator('[data-credential-support="unverified"]').first()).toContainText(
     /non validée|not validated/u,
   )
 })
 
+test('revokes a stale Otsu origin permission before the first explicit connection', async ({
+  page,
+}) => {
+  await page.goto('/learn')
+  await page.locator('[data-client-ready="true"]').waitFor()
+
+  const trigger = page.getByTestId('wallet-toggle')
+  await trigger.click()
+  await page.locator('[data-wallet-id="otsu"]').click()
+
+  await expect(trigger).toContainText('rHb9CJ')
+})
+
 test('keeps the wallet chooser inside a 320px viewport', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 720 })
-  await page.goto('/studio')
+  await page.goto('/learn')
   await page.locator('[data-client-ready="true"]').waitFor()
 
   await page.getByTestId('wallet-toggle').click()

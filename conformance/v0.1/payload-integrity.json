@@ -1,0 +1,17 @@
+{
+  "version": "0.1",
+  "cases": [
+    {
+      "name": "hello as raw CIDv1",
+      "contentUtf8": "hello",
+      "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+      "uri": "ipfs://bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq"
+    },
+    {
+      "name": "hello over HTTPS",
+      "contentUtf8": "hello",
+      "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+      "uri": "https://issuer.example/credentials/1.json#xcs-sha256=2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+    }
+  ]
+}

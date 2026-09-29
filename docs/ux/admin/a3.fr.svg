@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844" role="img" aria-labelledby="title desc" xml:lang="fr">
+<title id="title">A3 — Autorisation du vérificateur</title>
+<desc id="desc">Gérer son accès au portail, sans ouvrir les champs privés. Aucune liste par émetteur. L’administrateur ne peut pas s’accorder la lecture des champs privés.</desc>
+<rect x="0" y="0" width="390" height="844" rx="3" fill="#ffffff" stroke="#777777"/>
+<rect x="0" y="0" width="390" height="42" rx="3" fill="#eeeeee" stroke="#777777"/>
+<text x="20" y="12" font-family="Arial, sans-serif" font-size="13" fill="#252525" dominant-baseline="text-before-edge"><tspan x="20" dy="0">XCS / Administration</tspan></text>
+<text x="24" y="62" font-family="Arial, sans-serif" font-size="23" fill="#252525" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Autorisation du</tspan><tspan x="24" dy="29.900000000000002">vérificateur</tspan></text>
+<text x="24" y="133.8" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Gérer son accès au portail, sans ouvrir les</tspan><tspan x="24" dy="18.2">champs privés.</tspan></text>
+<rect x="24" y="185.20000000000002" width="342" height="37" rx="3" fill="#eeeeee" stroke="#b4b4b4"/>
+<text x="34" y="195.20000000000002" font-family="Arial, sans-serif" font-size="13" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Bureau Exemple · Accès autorisé</tspan></text>
+<rect x="24" y="238.20000000000002" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="247.20000000000002" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Organisation</tspan></text>
+<text x="34" y="267.20000000000005" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Bureau Exemple · Identité vérifiée</tspan></text>
+<rect x="24" y="307.40000000000003" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="316.40000000000003" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Autorisation globale</tspan></text>
+<text x="34" y="336.40000000000003" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Active · Le rôle vérificateur est autorisé</tspan></text>
+<rect x="24" y="376.6" width="342" height="77.4" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="385.6" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Lecture des champs privés</tspan></text>
+<text x="34" y="405.6" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Accord du destinataire pour ce vérificateur</tspan><tspan x="34" dy="18.2">requis</tspan></text>
+<rect x="24" y="464" width="342" height="59.2" rx="3" fill="#ffffff" stroke="#b4b4b4"/>
+<text x="34" y="473" font-family="Arial, sans-serif" font-size="13" fill="#555555" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Retirer l’autorisation</tspan></text>
+<text x="34" y="493" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="34" dy="0">Bloque les prochains accès privés</tspan></text>
+<rect x="24" y="539.2" width="342" height="44" rx="3" fill="#333333" stroke="#333333"/>
+<text x="36" y="552.1" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" dominant-baseline="text-before-edge"><tspan x="36" dy="0">Suspendre l’autorisation…</tspan></text>
+<rect x="24" y="593.2" width="342" height="44" rx="3" fill="#ffffff" stroke="#333333"/>
+<text x="36" y="606.1" font-family="Arial, sans-serif" font-size="14" fill="#252525" dominant-baseline="text-before-edge"><tspan x="36" dy="0">Voir les décisions</tspan></text>
+<text x="24" y="650.2" font-family="Arial, sans-serif" font-size="12" fill="#555555" dominant-baseline="text-before-edge"><tspan x="24" dy="0">Aucune liste par émetteur. L’administrateur ne</tspan><tspan x="24" dy="15.600000000000001">peut pas s’accorder la lecture des champs privés.</tspan></text>
+<text x="24" y="821" font-family="Arial, sans-serif" font-size="10" fill="#666666" dominant-baseline="text-before-edge"><tspan x="24" dy="0">MAQUETTE · Exemple fictif · Non fonctionnel</tspan></text>
+</svg>

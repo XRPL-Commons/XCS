@@ -15,19 +15,17 @@ jobs:
     env:
       COMPOSE_PROJECT_NAME: xcs-ci-${{ github.run_id }}-${{ github.run_attempt }}
       XCS_POSTGRES_ADMIN_PASSWORD: compose-ci-admin-password-00000001
-      # The three runtime roles are created by db/compose-initdb/01-runtime-roles.sql
-      # with published local-development passwords; they are not inputs.
+      XCS_AUTH_ORIGIN: https://compose.invalid
+      XCS_IDENTITY_CLIENT_ID: compose-ci-client
+      XCS_IDENTITY_CLIENT_SECRET: compose-ci-identity-secret-000001
+      XCS_ADMIN_DOCUMENT_KEY: compose-ci-document-signing-key-000001
       XCS_METRICS_TOKEN: compose-ci-metrics-token-000000000001
       XCS_RPC_URL_PRIMARY: wss://primary.invalid.example
       XCS_RPC_URL_SECONDARY: wss://secondary.invalid.example
-      # XCS_NETWORK_PROFILE is deliberately unset. The only committed profile,
-      # config/networks/testnet.example.json, is an invalid template, and both
-      # services now read this file: the indexer (not started here) would refuse
-      # it at preflight and the web service, which derives the browser-visible
-      # profile identifier from it, would refuse to start.
       XCS_PUBLIC_RPC_URL: wss://submission.invalid.example
       XCS_INDEXER_IMAGE: xcs-indexer:ci
       XCS_WEB_IMAGE: xcs-web:ci
+      XCS_NOTIFIER_IMAGE: xcs-notifier:ci
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,48 +47,8 @@ jobs:
           chmod 644 ops/secrets/xcs_metrics_token
           test -s ops/secrets/xcs_metrics_token
 
-      - name: Render and validate every Compose profile
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker compose config --quiet
-          docker compose --profile monitoring --profile demo-pinning config --quiet
-          docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile monitoring config --quiet
-
-          mapfile -t DEFAULT_SERVICES < <(docker compose config --services | sort)
-          EXPECTED=(db-bootstrap indexer postgres web)
-          if [[ "${DEFAULT_SERVICES[*]}" != "${EXPECTED[*]}" ]]; then
-            printf 'Unexpected default services: %s\n' "${DEFAULT_SERVICES[*]}" >&2
-            exit 1
-          fi
-
-          docker compose --profile monitoring --profile demo-pinning config --format json \
-            > "$RUNNER_TEMP/xcs-compose.json"
-          jq -e '
-            (.services.postgres.ports == null) and
-            (.services.prometheus.ports == null) and
-            (.services.grafana.ports == null) and
-            (.services["postgres-exporter"].ports == null) and
-            (.services["node-exporter"].ports == null) and
-            (.services.ipfs.ports == null) and
-            (.services.prometheus.profiles | index("monitoring") != null) and
-            (.services.grafana.profiles | index("monitoring") != null) and
-            (.networks.database.internal == true) and
-            (.networks.monitoring.internal == true) and
-            ([.services[] | select(.image | endswith(":latest"))] | length == 0)
-          ' "$RUNNER_TEMP/xcs-compose.json"
-
-          docker compose -f docker-compose.yml -f docker-compose.dev.yml \
-            --profile monitoring --profile demo-pinning config --format json \
-            > "$RUNNER_TEMP/xcs-compose-dev.json"
-          jq -e '
-            [
-              .services.postgres.ports[],
-              .services.prometheus.ports[],
-              .services.grafana.ports[],
-              .services.ipfs.ports[]
-            ] | all(.host_ip == "127.0.0.1")
-          ' "$RUNNER_TEMP/xcs-compose-dev.json"
+      - name: Render and validate every Compose overlay and profile
+        run: node ops/ci/check-compose-overlays.mjs
 
       - name: Validate monitoring configuration with Prometheus
         shell: bash
@@ -108,13 +66,13 @@ jobs:
           jq empty ops/monitoring/grafana/dashboards/*.json
 
       - name: Build production-only core images
-        run: docker compose build web indexer
+        run: docker compose -f docker-compose.yml -f docker-compose.application.yml build web indexer admin-notifier
 
       - name: Assert runtime images exclude development tools
         shell: bash
         run: |
           set -euo pipefail
-          for IMAGE in "$XCS_WEB_IMAGE" "$XCS_INDEXER_IMAGE"; do
+          for IMAGE in "$XCS_WEB_IMAGE" "$XCS_INDEXER_IMAGE" "$XCS_NOTIFIER_IMAGE"; do
             docker run --rm --entrypoint sh "$IMAGE" -c \
               'test ! -e node_modules/typescript && test ! -e node_modules/vitest && test ! -e node_modules/tsx'
           done
@@ -157,39 +115,30 @@ jobs:
           fi
 
           # The bootstrap is deliberately restart-safe. Run it again after the
-          # dependency chain has completed to prove repeated initialization and
-          # role provisioning do not require a clean volume.
+          # dependency chain has completed to prove repeated migrations and
+          # privilege grants do not require a clean volume.
           "${COMPOSE[@]}" run --rm --no-deps db-bootstrap
 
           curl --fail --silent --show-error http://127.0.0.1:3000/health/live > /dev/null
           READY_STATUS="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/health/ready)"
           test "$READY_STATUS" = '503'
-          # The metrics routes are enabled by the presence of a valid
-          # XCS_METRICS_TOKEN, which this job supplies to the web service, so they
-          # are registered here and must be gated rather than absent: an
-          # unauthenticated request is rejected and the job's own token is
-          # accepted. The routes deliberately stay 200 while the database is
-          # unavailable, which is the state this stack is in.
-          for METRICS_PATH in /internal/metrics /internal/metrics/prometheus; do
-            METRICS_STATUS="$(curl --silent --output /dev/null --write-out '%{http_code}' \
-              "http://127.0.0.1:3000${METRICS_PATH}")"
-            test "$METRICS_STATUS" = '401'
-            WRONG_TOKEN_STATUS="$(curl --silent --output /dev/null --write-out '%{http_code}' \
-              --header 'Authorization: Bearer compose-ci-wrong-token-0000000000001' \
-              "http://127.0.0.1:3000${METRICS_PATH}")"
-            test "$WRONG_TOKEN_STATUS" = '401'
-            AUTHENTICATED_STATUS="$(curl --silent --output /dev/null --write-out '%{http_code}' \
-              --header "Authorization: Bearer $XCS_METRICS_TOKEN" \
-              "http://127.0.0.1:3000${METRICS_PATH}")"
-            test "$AUTHENTICATED_STATUS" = '200'
-          done
+          UNAUTHENTICATED_STATUS="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/internal/metrics/prometheus)"
+          test "$UNAUTHENTICATED_STATUS" = '401'
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $XCS_METRICS_TOKEN" \
+            http://127.0.0.1:3000/internal/metrics/prometheus \
+            | grep --fixed-strings 'xcs_database_available'
 
           if "${COMPOSE[@]}" ps --services --status running | grep --extended-regexp '^(prometheus|grafana|postgres-exporter|node-exporter|ipfs)$'; then
             echo 'A non-core profile service started unexpectedly' >&2
             exit 1
           fi
-          if PUBLISHED_POSTGRES="$("${COMPOSE[@]}" port postgres 5432 2>/dev/null)" && [[ -n "$PUBLISHED_POSTGRES" ]]; then
-            echo "PostgreSQL was unexpectedly published at $PUBLISHED_POSTGRES" >&2
+          POSTGRES_CONTAINER="$("${COMPOSE[@]}" ps --quiet postgres)"
+          # Compose versions can report "invalid IP:0" for an exposed but
+          # unpublished port. Inspect the actual Engine bindings instead.
+          if ! docker inspect --format '{{json .NetworkSettings.Ports}}' "$POSTGRES_CONTAINER" \
+            | jq --exit-status '[.[]? | select(. != null) | .[]?] | length == 0' > /dev/null; then
+            echo 'PostgreSQL unexpectedly has published host ports' >&2
             exit 1
           fi
 
@@ -197,11 +146,14 @@ jobs:
             --command "
               SELECT
                 pg_has_role('xcs_monitor', 'pg_monitor', 'MEMBER')
-                AND (SELECT bool_and(rolcanlogin) FROM pg_roles
-                     WHERE rolname IN ('xcs_indexer', 'xcs_api', 'xcs_monitor'))
-                AND (SELECT rolconnlimit FROM pg_roles WHERE rolname = 'xcs_indexer') = 12
-                AND (SELECT rolconnlimit FROM pg_roles WHERE rolname = 'xcs_api') = 12
-                AND (SELECT rolconnlimit FROM pg_roles WHERE rolname = 'xcs_monitor') = 3
+                AND NOT EXISTS (
+                  SELECT 1 FROM pg_roles
+                  WHERE rolname IN ('xcs_indexer', 'xcs_api', 'xcs_monitor')
+                    AND (
+                      NOT rolcanlogin OR rolsuper OR rolcreaterole OR rolcreatedb
+                      OR rolreplication OR rolbypassrls
+                    )
+                )
                 AND NOT has_schema_privilege('xcs_monitor', 'public', 'CREATE')
                 AND NOT EXISTS (
                   SELECT 1
@@ -229,6 +181,35 @@ jobs:
                       OR has_table_privilege('xcs_monitor', relation.oid, 'TRUNCATE')
                     )
                 );
+            " | grep --fixed-strings --line-regexp t
+
+          "${COMPOSE[@]}" exec -T postgres psql -U xcs_admin -d xcs --no-psqlrc --tuples-only --no-align \
+            --command "
+              SELECT
+                has_table_privilege('xcs_payload_writer', 'hosted_payloads', 'INSERT')
+                AND has_table_privilege('xcs_issuer', 'app_issuer_payloads', 'INSERT')
+                AND has_table_privilege('xcs_app', 'app_sessions', 'INSERT')
+                AND has_column_privilege('xcs_admin_app', 'app_organization_applications', 'status', 'UPDATE')
+                AND has_column_privilege('xcs_notifier', 'app_admin_notifications', 'status', 'UPDATE')
+                AND NOT EXISTS (
+                  SELECT 1 FROM pg_roles
+                  WHERE rolname IN ('xcs_app', 'xcs_admin_app', 'xcs_notifier', 'xcs_issuer', 'xcs_payload_writer')
+                    AND (
+                      NOT rolcanlogin OR rolsuper OR rolcreaterole OR rolcreatedb
+                      OR rolreplication OR rolbypassrls
+                    )
+                )
+                AND NOT EXISTS (
+                  SELECT 1 FROM pg_class relation
+                  JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+                  CROSS JOIN (VALUES ('xcs_api'), ('xcs_indexer'), ('xcs_payload_writer')) AS runtime(role_name)
+                  WHERE namespace.nspname = 'public' AND relation.relname LIKE 'app_%'
+                    AND relation.relkind IN ('r', 'p')
+                    AND has_table_privilege(runtime.role_name, relation.oid, 'SELECT,INSERT,UPDATE,DELETE')
+                )
+                AND NOT has_table_privilege('xcs_admin_app', 'app_issuer_payloads', 'SELECT')
+                AND NOT has_table_privilege('xcs_notifier', 'app_issuer_payloads', 'SELECT')
+                AND NOT has_table_privilege('xcs_app', 'app_issuer_payloads', 'SELECT');
             " | grep --fixed-strings --line-regexp t
 
           "${COMPOSE[@]}" --profile monitoring up --no-build --detach --wait postgres-exporter prometheus
@@ -274,7 +255,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for DOCKERFILE in apps/web/Dockerfile apps/indexer/Dockerfile; do
+          for DOCKERFILE in apps/web/Dockerfile apps/indexer/Dockerfile apps/notifier/Dockerfile apps/db-bootstrap/Dockerfile; do
             grep --fixed-strings -- 'USER node' "$DOCKERFILE"
             grep --fixed-strings -- 'pnpm install --frozen-lockfile' "$DOCKERFILE"
             if grep --extended-regexp 'RUN --mount|<<[A-Z]' "$DOCKERFILE"; then

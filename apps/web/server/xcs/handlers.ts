@@ -34,6 +34,11 @@ import {
   encodeSchemaRegistrationCursor,
 } from './pagination.js'
 import { PinningError, type DemoPinningService } from './pinning.js'
+import {
+  HostedPayloadError,
+  HOSTED_PAYLOAD_LOCATOR_PATTERN,
+  type HostedPayloadService,
+} from './hosted-payloads.js'
 import { authoritativeSchemaCatalogBundle } from './schema-catalog.js'
 import {
   authoritativeResolvedSchema,
@@ -105,6 +110,7 @@ export interface CreateApiOptions {
   trustPolicy: TrustPolicy
   allowedOrigins?: string[]
   pinningService?: DemoPinningService
+  hostedPayloadService?: HostedPayloadService
   operationalMetrics?: {
     token: string
     repository: OperationalMetricsRepository
@@ -167,7 +173,7 @@ function validationMessage(context: string, validate: ValidateFunction): string 
 }
 
 export function mapError(error: unknown): ApiReply {
-  if (error instanceof PinningError) {
+  if (error instanceof PinningError || error instanceof HostedPayloadError) {
     return {
       statusCode: error.statusCode,
       headers: {},
@@ -395,6 +401,82 @@ export function createApiHandlers(options: CreateApiOptions): ApiHandlers {
   }
 
   const routes: RouteDefinition[] = []
+
+  if (options.hostedPayloadService) {
+    const service = options.hostedPayloadService
+    const params = {
+      type: 'object',
+      additionalProperties: false,
+      required: ['locator'],
+      properties: { locator: { type: 'string', pattern: HOSTED_PAYLOAD_LOCATOR_PATTERN } },
+    }
+    routes.push(
+      route<{ locator: string }>(
+        'GET',
+        '/p/:locator',
+        {
+          schema: { params },
+          rateLimit: { max: 300, timeWindowMs: 60_000, scope: 'route' },
+        },
+        async (request, reply) => {
+          const payload = await service.get(request.params.locator)
+          return reply
+            .header('cache-control', 'public, max-age=31536000, immutable')
+            .header('content-type', 'application/json; charset=utf-8')
+            .header('etag', `"${payload.digestHex}"`)
+            .header('x-content-type-options', 'nosniff')
+            .send(payload.content)
+        },
+      ),
+    )
+    routes.push(
+      route<
+        { locator: string },
+        Record<string, string | undefined>,
+        { network: string; payloadBase64: string; signedTransactionBlob: string }
+      >(
+        'POST',
+        '/v1/payloads/:locator',
+        {
+          schema: {
+            params,
+            body: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['network', 'payloadBase64', 'signedTransactionBlob'],
+              properties: {
+                network: { type: 'string', pattern: PROFILE_PATTERN },
+                payloadBase64: { type: 'string', minLength: 4, maxLength: 90_000 },
+                signedTransactionBlob: {
+                  type: 'string',
+                  pattern: '^(?:[0-9A-Fa-f]{2})+$',
+                  maxLength: 32768,
+                },
+              },
+            },
+            response: {
+              400: errorResponseSchema,
+              401: errorResponseSchema,
+              403: errorResponseSchema,
+              404: errorResponseSchema,
+              409: errorResponseSchema,
+              413: errorResponseSchema,
+              429: errorResponseSchema,
+              503: errorResponseSchema,
+            },
+          },
+          bodyLimitBytes: 128 * 1024,
+          rateLimit: { max: 20, timeWindowMs: 60_000, scope: 'route' },
+        },
+        async (request) =>
+          service.publish({
+            ...request.body,
+            locator: request.params.locator,
+            ipAddress: request.ip,
+          }),
+      ),
+    )
+  }
 
   for (const path of ['/health/live', '/health']) {
     routes.push(

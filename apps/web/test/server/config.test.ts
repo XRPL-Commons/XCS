@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { loadApiConfig } from '../../server/xcs/config.js'
+import { loadApiConfig, loadHostedPayloadConfig } from '../../server/xcs/config.js'
 import {
   DisabledPayloadResolver,
   PayloadUnavailableError,
@@ -121,6 +121,31 @@ describe('API configuration', () => {
         XCS_UNTRUSTED_ISSUERS: issuer,
       }),
     ).toThrow('must not overlap')
+  })
+
+  it('derives hosted payload publication from one complete server contract', () => {
+    const hostedEnvironment = {
+      XCS_PUBLIC_PAYLOAD_BASE_URL: 'https://p.xcs.test',
+      XCS_PAYLOAD_STORAGE_IP_HASH_SECRET: 'test-only-hosted-payload-secret-0001',
+      XCS_HOSTED_PAYLOAD_NETWORKS: 'testnet-a,testnet-b',
+    }
+    expect(loadHostedPayloadConfig(hostedEnvironment)).toEqual({
+      enabled: true,
+      publicBaseUrl: 'https://p.xcs.test',
+      ipHashSecret: 'test-only-hosted-payload-secret-0001',
+      networks: ['testnet-a', 'testnet-b'],
+    })
+    expect(loadHostedPayloadConfig({})).toEqual({ enabled: false })
+    expect(() => loadHostedPayloadConfig({ XCS_HOSTED_PAYLOAD_NETWORKS: 'testnet-a' })).toThrow(
+      'XCS_PUBLIC_PAYLOAD_BASE_URL is required',
+    )
+    expect(
+      loadApiConfig({
+        ...hostedEnvironment,
+        XCS_DATABASE_URL: 'postgres://xcs_api:password@localhost/xcs',
+        XCS_PAYLOAD_DATABASE_URL: 'postgres://xcs_payload_writer:password@localhost/xcs',
+      }).hostedPayloads,
+    ).toMatchObject({ enabled: true, publicBaseUrl: 'https://p.xcs.test' })
   })
 
   it('uses a network-free resolver when fetching is disabled', async () => {

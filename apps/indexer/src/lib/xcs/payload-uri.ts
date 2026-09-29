@@ -1,4 +1,4 @@
-// Copied from packages/core/src/payload-uri.ts at 54c3486; keep in sync by hand (see CONTRIBUTING.md).
+// Copied from packages/core/src/payload-uri.ts at a9777cc; keep in sync by hand (see CONTRIBUTING.md).
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex } from '@noble/hashes/utils.js'
 import { CID } from 'multiformats/cid'
@@ -30,7 +30,8 @@ export type PayloadUri = IpfsPayloadUri | HttpsPayloadUri
 
 export interface PayloadIntegrityResult {
   valid: boolean
-  expectedDigestHex: string
+  status: 'valid' | 'tampered' | 'invalid_uri'
+  expectedDigestHex?: string
   actualDigestHex: string
 }
 
@@ -48,10 +49,10 @@ export function payloadBytes(content: string | Uint8Array): Uint8Array {
   if (typeof content === 'string') utf8ByteLength(content)
   const bytes = typeof content === 'string' ? new TextEncoder().encode(content) : content
   if (!(bytes instanceof Uint8Array)) {
-    return fail('INVALID_CREDENTIAL_PAYLOAD', 'Payload must be UTF-8 text or bytes', '$payload')
+    return fail('PAYLOAD_INVALID', 'Payload must be UTF-8 text or bytes', '$payload')
   }
   if (bytes.length > MAX_PAYLOAD_BYTES) {
-    return fail('INVALID_CREDENTIAL_PAYLOAD', 'Payload exceeds 1 MiB', '$payload', {
+    return fail('PAYLOAD_INVALID', 'Payload exceeds 1 MiB', '$payload', {
       size: bytes.length,
     })
   }
@@ -185,7 +186,7 @@ function parseIpfsUri(uri: string): IpfsPayloadUri | undefined {
       cid.multihash.size !== 32 ||
       cid.toString(base32.encoder) !== cidText
     ) {
-      return fail('INVALID_PAYLOAD_URI', 'Expected a canonical raw SHA-256 CIDv1', '$uri')
+      return fail('PAYLOAD_URI_INVALID', 'Expected a canonical raw SHA-256 CIDv1', '$uri')
     }
     return {
       kind: 'ipfs',
@@ -195,30 +196,30 @@ function parseIpfsUri(uri: string): IpfsPayloadUri | undefined {
     }
   } catch (cause) {
     if (cause instanceof XcsError) throw cause
-    return fail('INVALID_PAYLOAD_URI', 'Invalid IPFS CID', '$uri', { cause: String(cause) })
+    return fail('PAYLOAD_URI_INVALID', 'Invalid IPFS CID', '$uri', { cause: String(cause) })
   }
 }
 
 export function parsePayloadUri(uri: string): PayloadUri {
   if (typeof uri !== 'string') {
-    return fail('INVALID_PAYLOAD_URI', 'URI must be a string', '$uri')
+    return fail('PAYLOAD_URI_INVALID', 'URI must be a string', '$uri')
   }
   const length = utf8ByteLength(uri)
   if (length < 1 || length > 256) {
-    return fail('INVALID_PAYLOAD_URI', 'URI must contain 1 to 256 UTF-8 bytes', '$uri')
+    return fail('PAYLOAD_URI_INVALID', 'URI must contain 1 to 256 UTF-8 bytes', '$uri')
   }
   const ipfs = parseIpfsUri(uri)
   if (ipfs !== undefined) return ipfs
 
   if (!uri.startsWith(HTTPS_PREFIX) || INVALID_RAW_HTTPS_CHARACTER.test(uri)) {
-    return fail('INVALID_PAYLOAD_URI', 'Expected a canonical HTTPS or IPFS URI', '$uri')
+    return fail('PAYLOAD_URI_INVALID', 'Expected a canonical HTTPS or IPFS URI', '$uri')
   }
   const remainder = uri.slice(HTTPS_PREFIX.length)
   const authorityEnd = remainder.search(/[/?#]/)
   const authority = authorityEnd === -1 ? remainder : remainder.slice(0, authorityEnd)
   if (authority === '' || authority.includes('@')) {
     return fail(
-      'INVALID_PAYLOAD_URI',
+      'PAYLOAD_URI_INVALID',
       'HTTPS authority cannot be empty or contain userinfo',
       '$uri',
     )
@@ -226,14 +227,14 @@ export function parsePayloadUri(uri: string): PayloadUri {
 
   const normalizedUri = normalizeHttpsAuthority(uri)
   if (normalizedUri === undefined) {
-    return fail('INVALID_PAYLOAD_URI', 'Invalid HTTPS authority', '$uri')
+    return fail('PAYLOAD_URI_INVALID', 'Invalid HTTPS authority', '$uri')
   }
   const fetchUrl = buildFetchUrl(normalizedUri)
   let parsed: URL
   try {
     parsed = new URL(normalizedUri)
   } catch (cause) {
-    return fail('INVALID_PAYLOAD_URI', 'Invalid HTTPS URI', '$uri', { cause: String(cause) })
+    return fail('PAYLOAD_URI_INVALID', 'Invalid HTTPS URI', '$uri', { cause: String(cause) })
   }
   if (
     fetchUrl === undefined ||
@@ -243,7 +244,7 @@ export function parsePayloadUri(uri: string): PayloadUri {
     !/^#xcs-sha256=[0-9a-f]{64}$/.test(parsed.hash)
   ) {
     return fail(
-      'INVALID_PAYLOAD_URI',
+      'PAYLOAD_URI_INVALID',
       'HTTPS URI must end in #xcs-sha256=<lowercase-sha256>',
       '$uri',
     )
@@ -261,12 +262,12 @@ export function createHttpsPayloadUri(baseUrl: string, content: string | Uint8Ar
   try {
     url = new URL(baseUrl)
   } catch (cause) {
-    return fail('INVALID_PAYLOAD_URI', 'Invalid HTTPS base URL', '$url', {
+    return fail('PAYLOAD_URI_INVALID', 'Invalid HTTPS base URL', '$url', {
       cause: String(cause),
     })
   }
   if (url.protocol !== 'https:' || url.username !== '' || url.password !== '' || url.hash !== '') {
-    return fail('INVALID_PAYLOAD_URI', 'Base URL must be fragment-free HTTPS', '$url')
+    return fail('PAYLOAD_URI_INVALID', 'Base URL must be fragment-free HTTPS', '$url')
   }
   url.hash = `xcs-sha256=${payloadDigest(content)}`
   const uri = url.toString()
@@ -283,11 +284,25 @@ export function verifyPayloadIntegrity(
   content: string | Uint8Array,
   uri: string,
 ): PayloadIntegrityResult {
-  const expectedDigestHex = parsePayloadUri(uri).digestHex
   const actualDigestHex = payloadDigest(content)
+  let expectedDigestHex: string
+  try {
+    expectedDigestHex = parsePayloadUri(uri).digestHex
+  } catch (error) {
+    if (error instanceof XcsError && error.code === 'PAYLOAD_URI_INVALID') {
+      return { valid: false, status: 'invalid_uri', actualDigestHex }
+    }
+    throw error
+  }
+  const valid = expectedDigestHex === actualDigestHex
   return {
-    valid: expectedDigestHex === actualDigestHex,
+    valid,
+    status: valid ? 'valid' : 'tampered',
     expectedDigestHex,
     actualDigestHex,
   }
 }
+
+export const computePayloadSha256Hex = payloadDigest
+export const createIpfsRawPayloadUri = createIpfsPayloadUri
+export const inspectPayloadUri = parsePayloadUri

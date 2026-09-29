@@ -1,10 +1,12 @@
+import { sign as signMessageBytes } from 'ripple-keypairs'
 import { decode, hashes, Wallet, type Client, type SubmittableTransaction } from 'xrpl'
 import type {
   AccountInfo,
+  ConnectOptions,
+  NetworkInfo,
   SignedTransaction,
   Transaction,
   WalletAdapter,
-  WalletManager,
 } from 'xrpl-connect'
 
 export const BROWSER_E2E_WALLET_ID = 'xcs-browser-e2e'
@@ -12,6 +14,7 @@ export const BROWSER_E2E_ACCOUNT = 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh'
 export const BROWSER_E2E_SUBJECT_WALLET_ID = 'xcs-browser-e2e-subject'
 export const BROWSER_E2E_SUBJECT_ACCOUNT = 'r9cZA1mLK5R5Am25ArfXFmqgNwjZgnfk59'
 export const BROWSER_E2E_GEMWALLET_ID = 'gemwallet'
+export const BROWSER_E2E_OTSU_WALLET_ID = 'otsu'
 
 interface BrowserE2eEffects {
   walletSignatures: number
@@ -19,7 +22,9 @@ interface BrowserE2eEffects {
 }
 
 interface BrowserE2eControls {
+  __xcsBrowserE2eAuthWallet?: boolean
   __xcsBrowserE2eWalletDiscoveryDelayMs?: number
+  __xcsBrowserE2eCredentialObjects?: Record<string, unknown>[]
 }
 
 function browserE2eEffects(): BrowserE2eEffects {
@@ -32,6 +37,7 @@ function browserE2eEffects(): BrowserE2eEffects {
 
 const NETWORK_ID = 1
 const LEDGER_INDEX = 100_001
+const LEDGER_HASH = 'cd'.repeat(32)
 const LAST_LEDGER_SEQUENCE = LEDGER_INDEX + 20
 
 const BROWSER_E2E_SIGNERS = new Map([
@@ -55,8 +61,6 @@ const BROWSER_E2E_SIGNERS = new Map([
   ],
 ])
 
-type WalletListener = (payload?: unknown) => void
-
 const BROWSER_E2E_WALLETS = [
   {
     id: BROWSER_E2E_WALLET_ID,
@@ -73,74 +77,79 @@ const BROWSER_E2E_WALLETS = [
     name: 'GemWallet',
     address: BROWSER_E2E_ACCOUNT,
   },
+  {
+    id: BROWSER_E2E_OTSU_WALLET_ID,
+    name: 'Otsu Wallet',
+    address: BROWSER_E2E_ACCOUNT,
+  },
 ] as const
 
-class BrowserE2eWalletManager {
-  private readonly listeners = new Map<string, Set<WalletListener>>()
-  private readonly walletAdapters = BROWSER_E2E_WALLETS.map(({ id, name }) => ({
-    id,
-    name,
-    isAvailable: async () => true,
-    fetchAccount: async () => this.cloneCurrentAccount(),
-  })) as unknown as WalletAdapter[]
+class BrowserE2eWalletAdapter implements WalletAdapter {
+  public readonly capabilities = { sign: true, signAndSubmit: false, signMessage: false }
   private currentAccount: AccountInfo | null = null
-  private currentWalletId: string | null = null
+  private staleOriginPermission: boolean
 
-  public get account(): AccountInfo | null {
-    return this.currentAccount
+  public constructor(
+    public readonly id: string,
+    public readonly name: string,
+    private readonly address: string,
+  ) {
+    this.staleOriginPermission = id === BROWSER_E2E_OTSU_WALLET_ID
+    if (
+      id === BROWSER_E2E_GEMWALLET_ID &&
+      (globalThis as typeof globalThis & BrowserE2eControls).__xcsBrowserE2eAuthWallet
+    ) {
+      const signer = Wallet.fromEntropy(Uint8Array.from({ length: 16 }, (_, i) => 31 - i))
+      this.address = signer.classicAddress
+      BROWSER_E2E_SIGNERS.set(this.address, signer)
+      this.capabilities.signMessage = true
+    }
   }
 
-  public get connected(): boolean {
-    return this.currentAccount !== null
-  }
-
-  public get wallet(): WalletAdapter | null {
-    return this.walletAdapters.find((wallet) => wallet.id === this.currentWalletId) ?? null
-  }
-
-  public get wallets(): WalletAdapter[] {
-    return [...this.walletAdapters]
-  }
-
-  public on(event: string, listener: WalletListener): this {
-    const listeners = this.listeners.get(event) ?? new Set<WalletListener>()
-    listeners.add(listener)
-    this.listeners.set(event, listeners)
-    return this
-  }
-
-  public async getAvailableWallets(): Promise<WalletAdapter[]> {
+  public async isAvailable(): Promise<boolean> {
     const delay = (globalThis as typeof globalThis & BrowserE2eControls)
       .__xcsBrowserE2eWalletDiscoveryDelayMs
     if (typeof delay === 'number' && delay > 0) {
       await new Promise((resolve) => setTimeout(resolve, delay))
     }
-    return [...this.walletAdapters]
+    return true
   }
 
-  public async connect(walletId: string, options?: { network?: string }): Promise<AccountInfo> {
-    const wallet = BROWSER_E2E_WALLETS.find((candidate) => candidate.id === walletId)
-    if (!wallet) throw new Error('BROWSER_E2E_WALLET_UNKNOWN')
+  public async connect(options?: ConnectOptions): Promise<AccountInfo> {
     if (options?.network !== undefined && options.network !== 'testnet') {
       throw new Error('BROWSER_E2E_TESTNET_REQUIRED')
     }
+    if (this.staleOriginPermission) {
+      throw new Error('BROWSER_E2E_OTSU_STALE_PERMISSION_NOT_REVOKED')
+    }
     this.currentAccount = {
-      address: wallet.address,
+      address: this.address,
       network: {
         id: 'testnet',
         name: 'XRPL Testnet (deterministic E2E)',
         wss: 'ws://127.0.0.1:1',
       },
     }
-    this.currentWalletId = walletId
-    this.emit('connect', this.currentAccount)
-    return this.currentAccount
+    return this.cloneCurrentAccount()!
   }
 
   public async disconnect(): Promise<void> {
     this.currentAccount = null
-    this.currentWalletId = null
-    this.emit('disconnect')
+    this.staleOriginPermission = false
+  }
+
+  public async getAccount(): Promise<AccountInfo | null> {
+    return this.cloneCurrentAccount()
+  }
+
+  public async getNetwork(): Promise<NetworkInfo> {
+    return (
+      this.currentAccount?.network ?? {
+        id: 'testnet',
+        name: 'XRPL Testnet (deterministic E2E)',
+        wss: 'ws://127.0.0.1:1',
+      }
+    )
   }
 
   public async fetchAccount(): Promise<AccountInfo | null> {
@@ -169,8 +178,23 @@ class BrowserE2eWalletManager {
     }
   }
 
-  private emit(event: string, payload?: unknown): void {
-    for (const listener of this.listeners.get(event) ?? []) listener(payload)
+  public async signAndSubmit(): Promise<never> {
+    throw new Error('BROWSER_E2E_SIGN_AND_SUBMIT_FORBIDDEN')
+  }
+
+  public async signMessage(message: string) {
+    if (!this.capabilities.signMessage || !this.currentAccount)
+      throw new Error('BROWSER_E2E_SIGN_MESSAGE_UNSUPPORTED')
+    const signer = BROWSER_E2E_SIGNERS.get(this.currentAccount.address)!
+    const bytes = Array.from(new TextEncoder().encode(message), (b) =>
+      b.toString(16).padStart(2, '0'),
+    ).join('')
+    return {
+      message,
+      signature: signMessageBytes(bytes, signer.privateKey),
+      publicKey: signer.publicKey,
+      signerAddress: this.currentAccount.address,
+    }
   }
 
   private cloneCurrentAccount(): AccountInfo | null {
@@ -260,6 +284,18 @@ class BrowserE2eLedgerClient implements BrowserE2eClientShape {
     if (request.command === 'ledger_current') {
       return { result: { ledger_current_index: LEDGER_INDEX } }
     }
+    if (request.command === 'account_objects') {
+      const controls = globalThis as typeof globalThis & BrowserE2eControls
+      return {
+        result: {
+          account: request.account,
+          account_objects: controls.__xcsBrowserE2eCredentialObjects ?? [],
+          ledger_hash: LEDGER_HASH,
+          ledger_index: LEDGER_INDEX,
+          validated: true,
+        },
+      }
+    }
     throw new Error(`BROWSER_E2E_XRPL_COMMAND_UNSUPPORTED:${String(request.command)}`)
   }
 
@@ -268,8 +304,10 @@ class BrowserE2eLedgerClient implements BrowserE2eClientShape {
   }
 }
 
-export function createBrowserE2eWalletManager(): WalletManager {
-  return new BrowserE2eWalletManager() as unknown as WalletManager
+export function createBrowserE2eWalletAdapters(): WalletAdapter[] {
+  return BROWSER_E2E_WALLETS.map(
+    ({ id, name, address }) => new BrowserE2eWalletAdapter(id, name, address),
+  )
 }
 
 export function createBrowserE2eLedgerClient(): Client {

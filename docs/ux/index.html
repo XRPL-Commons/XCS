@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>XCS — parcours et maquettes / journeys and wireframes</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f4f4f4;
+        color: #242424;
+        font:
+          16px/1.5 system-ui,
+          sans-serif;
+      }
+      header,
+      main {
+        max-width: 1360px;
+        margin: auto;
+        padding: 24px;
+      }
+      h1 {
+        font-size: clamp(1.6rem, 4vw, 2.5rem);
+        line-height: 1.15;
+      }
+      a {
+        color: #222;
+        text-underline-offset: 3px;
+      }
+      a:focus-visible,
+      input:focus-visible {
+        outline: 3px solid #333;
+        outline-offset: 4px;
+      }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 24px;
+        margin: 16px 0;
+      }
+      nav a,
+      .downloads a {
+        display: inline-block;
+        padding: 10px 0;
+        min-height: 44px;
+      }
+      .notice {
+        border-left: 4px solid #555;
+        padding: 12px 16px;
+        background: #fff;
+        max-width: 850px;
+      }
+      .language {
+        display: inline-block;
+        padding: 12px 8px 12px 0;
+        cursor: pointer;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+        gap: 24px;
+        align-items: start;
+      }
+      figure {
+        margin: 0;
+        min-width: 0;
+      }
+      figcaption {
+        margin: 10px 0;
+        font-size: 14px;
+      }
+      img {
+        display: block;
+        width: 100%;
+        max-width: 390px;
+        height: auto;
+        margin: 0 auto;
+      }
+      section {
+        scroll-margin-top: 12px;
+        margin: 36px 0 56px;
+      }
+      .en {
+        display: none;
+      }
+      body:has(#locale-en:checked) .fr {
+        display: none;
+      }
+      body:has(#locale-en:checked) .en {
+        display: revert;
+      }
+      @media print {
+        nav,
+        .language,
+        input {
+          display: none;
+        }
+        figure {
+          break-inside: avoid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <p>ISSUE #29 / XCS</p>
+      <h1>Parcours et maquettes<br /><span lang="en">Journeys and wireframes</span></h1>
+      <p class="notice fr">
+        Proposition à tester avec deux personnes par rôle. Aucune session réalisée. Données fictives
+        ; les boutons dessinés ne réalisent aucune action.
+      </p>
+      <p class="notice en" lang="en">
+        Draft for testing with two people per role. No sessions conducted. Fictional data; controls
+        drawn in the screens perform no action.
+      </p>
+      <input type="radio" id="locale-fr" name="locale" checked /><label
+        class="language"
+        for="locale-fr"
+        >Français</label
+      >
+      <input type="radio" id="locale-en" name="locale" /><label
+        class="language"
+        for="locale-en"
+        lang="en"
+        >English</label
+      >
+      <nav aria-label="Rôles / Roles">
+        <a href="#admin"
+          ><span class="fr">Administration</span><span class="en" lang="en">Administration</span></a
+        ><a href="#issuer"
+          ><span class="fr">Émetteur</span><span class="en" lang="en">Issuer</span></a
+        ><a href="#recipient"
+          ><span class="fr">Destinataire</span><span class="en" lang="en">Recipient</span></a
+        ><a href="#verifier"
+          ><span class="fr">Vérificateur</span><span class="en" lang="en">Verifier</span></a
+        ><a href="#shared"
+          ><span class="fr">États partagés</span><span class="en" lang="en">Shared states</span></a
+        >
+      </nav>
+      <p>
+        <a href="README.md">Contexte et décisions / Context and decisions</a> ·
+        <a href="usability.md">Protocole et sessions / Protocol and sessions</a>
+      </p>
+    </header>
+    <main>
+      <section id="admin">
+        <h2>
+          <span class="fr">Administration</span><span class="en" lang="en">Administration</span>
+        </h2>
+        <p class="downloads">
+          <a href="admin/README.md">Parcours / Journey</a> ·
+          <a href="admin/wireframes.fr.excalidraw" download>Excalidraw FR</a> ·
+          <a href="admin/wireframes.en.excalidraw" download>Excalidraw EN</a>
+        </p>
+        <div class="grid">
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption><a href="admin/a1.fr.svg">A1 — Demandes à examiner</a></figcaption>
+              <img
+                src="admin/a1.fr.svg"
+                width="390"
+                height="844"
+                alt="Demandes à examiner. Commencer par la demande la plus ancienne."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="admin/a1.en.svg">A1 — Applications to review</a></figcaption>
+              <img
+                src="admin/a1.en.svg"
+                width="390"
+                height="844"
+                alt="Applications to review. Start with the oldest application."
+              />
+            </div>
+          </figure>
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption><a href="admin/a2.fr.svg">A2 — Examiner la demande</a></figcaption>
+              <img
+                src="admin/a2.fr.svg"
+                width="390"
+                height="844"
+                alt="Examiner la demande. L’organisation est-elle identifiable ? Quel accès autoriser ?"
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="admin/a2.en.svg">A2 — Review application</a></figcaption>
+              <img
+                src="admin/a2.en.svg"
+                width="390"
+                height="844"
+                alt="Review application. Can I identify this organization? Which access should I grant?"
+              />
+            </div>
+          </figure>
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption>
+                <a href="admin/a3.fr.svg">A3 — Autorisation du vérificateur</a>
+              </figcaption>
+              <img
+                src="admin/a3.fr.svg"
+                width="390"
+                height="844"
+                alt="Autorisation du vérificateur. Gérer son accès au portail, sans ouvrir les champs privés."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="admin/a3.en.svg">A3 — Verifier approval</a></figcaption>
+              <img
+                src="admin/a3.en.svg"
+                width="390"
+                height="844"
+                alt="Verifier approval. Manage portal access without unlocking private fields."
+              />
+            </div>
+          </figure>
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption><a href="admin/a4.fr.svg">A4 — Historique des décisions</a></figcaption>
+              <img
+                src="admin/a4.fr.svg"
+                width="390"
+                height="844"
+                alt="Historique des décisions. Qui a modifié les accès, quand et pourquoi ?"
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="admin/a4.en.svg">A4 — Decision history</a></figcaption>
+              <img
+                src="admin/a4.en.svg"
+                width="390"
+                height="844"
+                alt="Decision history. Who changed access, when, and why?"
+              />
+            </div>
+          </figure>
+        </div>
+      </section>
+      <section id="issuer">
+        <h2><span class="fr">Émetteur</span><span class="en" lang="en">Issuer</span></h2>
+        <p class="downloads">
+          <a href="issuer/README.md">Parcours / Journey</a> ·
+          <a href="issuer/wireframes.fr.excalidraw" download>Excalidraw FR</a> ·
+          <a href="issuer/wireframes.en.excalidraw" download>Excalidraw EN</a>
+        </p>
+        <div class="grid">
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption><a href="issuer/i1.fr.svg">I1 — Devenir émetteur</a></figcaption>
+              <img
+                src="issuer/i1.fr.svg"
+                width="390"
+                height="844"
+                alt="Devenir émetteur. Présenter votre organisation pour demander l’accès."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="issuer/i1.en.svg">I1 — Apply as an issuer</a></figcaption>
+              <img
+                src="issuer/i1.en.svg"
+                width="390"
+                height="844"
+                alt="Apply as an issuer. Tell us about your organization to request access."
+              />
+            </div>
+          </figure>
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption><a href="issuer/i2.fr.svg">I2 — Votre demande</a></figcaption>
+              <img
+                src="issuer/i2.fr.svg"
+                width="390"
+                height="844"
+                alt="Votre demande. Vous serez informé après son examen."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="issuer/i2.en.svg">I2 — Your application</a></figcaption>
+              <img
+                src="issuer/i2.en.svg"
+                width="390"
+                height="844"
+                alt="Your application. You will be notified after the review."
+              />
+            </div>
+          </figure>
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption><a href="issuer/i3.fr.svg">I3 — Créer un modèle</a></figcaption>
+              <img
+                src="issuer/i3.fr.svg"
+                width="390"
+                height="844"
+                alt="Créer un modèle. Définir les informations de votre attestation."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="issuer/i3.en.svg">I3 — Create a template</a></figcaption>
+              <img
+                src="issuer/i3.en.svg"
+                width="390"
+                height="844"
+                alt="Create a template. Choose what your attestation will contain."
+              />
+            </div>
+          </figure>
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption><a href="issuer/i4.fr.svg">I4 — Inviter un destinataire</a></figcaption>
+              <img
+                src="issuer/i4.fr.svg"
+                width="390"
+                height="844"
+                alt="Inviter un destinataire. Il choisira son compte et liera son portefeuille."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="issuer/i4.en.svg">I4 — Invite a learner</a></figcaption>
+              <img
+                src="issuer/i4.en.svg"
+                width="390"
+                height="844"
+                alt="Invite a learner. They will choose their account and link a wallet."
+              />
+            </div>
+          </figure>
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption><a href="issuer/i5.fr.svg">I5 — Vérifier et émettre</a></figcaption>
+              <img
+                src="issuer/i5.fr.svg"
+                width="390"
+                height="844"
+                alt="Vérifier et émettre. Confirmer le contenu, le destinataire et la visibilité."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="issuer/i5.en.svg">I5 — Review and issue</a></figcaption>
+              <img
+                src="issuer/i5.en.svg"
+                width="390"
+                height="844"
+                alt="Review and issue. Confirm the content, recipient and visibility."
+              />
+            </div>
+          </figure>
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption><a href="issuer/i6.fr.svg">I6 — Suivre l’attestation</a></figcaption>
+              <img
+                src="issuer/i6.fr.svg"
+                width="390"
+                height="844"
+                alt="Suivre l’attestation. Suivre l’émission, le contenu et l’acceptation."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="issuer/i6.en.svg">I6 — Track attestation</a></figcaption>
+              <img
+                src="issuer/i6.en.svg"
+                width="390"
+                height="844"
+                alt="Track attestation. Track issuance, content and acceptance separately."
+              />
+            </div>
+          </figure>
+        </div>
+      </section>
+      <section id="recipient">
+        <h2><span class="fr">Destinataire</span><span class="en" lang="en">Recipient</span></h2>
+        <p class="downloads">
+          <a href="recipient/README.md">Parcours / Journey</a> ·
+          <a href="recipient/wireframes.fr.excalidraw" download>Excalidraw FR</a> ·
+          <a href="recipient/wireframes.en.excalidraw" download>Excalidraw EN</a>
+        </p>
+        <div class="grid">
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption>
+                <a href="recipient/r1.fr.svg">R1 — Une attestation pour vous</a>
+              </figcaption>
+              <img
+                src="recipient/r1.fr.svg"
+                width="390"
+                height="844"
+                alt="Une attestation pour vous. Atelier Exemple vous invite à recevoir une attestation."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="recipient/r1.en.svg">R1 — An attestation for you</a></figcaption>
+              <img
+                src="recipient/r1.en.svg"
+                width="390"
+                height="844"
+                alt="An attestation for you. Example Workshop invites you to receive an attestation."
+              />
+            </div>
+          </figure>
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption><a href="recipient/r2.fr.svg">R2 — Lier mon portefeuille</a></figcaption>
+              <img
+                src="recipient/r2.fr.svg"
+                width="390"
+                height="844"
+                alt="Lier mon portefeuille. Prouver que l’adresse de réception vous appartient."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="recipient/r2.en.svg">R2 — Link my wallet</a></figcaption>
+              <img
+                src="recipient/r2.en.svg"
+                width="390"
+                height="844"
+                alt="Link my wallet. Prove that you control the receiving address."
+              />
+            </div>
+          </figure>
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption><a href="recipient/r3.fr.svg">R3 — Mes attestations</a></figcaption>
+              <img
+                src="recipient/r3.fr.svg"
+                width="390"
+                height="844"
+                alt="Mes attestations. Retrouver ce qui est prêt et ce qui attend encore."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="recipient/r3.en.svg">R3 — My attestations</a></figcaption>
+              <img
+                src="recipient/r3.en.svg"
+                width="390"
+                height="844"
+                alt="My attestations. See what is ready and what is still pending."
+              />
+            </div>
+          </figure>
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption>
+                <a href="recipient/r4.fr.svg">R4 — Examiner avant d’accepter</a>
+              </figcaption>
+              <img
+                src="recipient/r4.fr.svg"
+                width="390"
+                height="844"
+                alt="Examiner avant d’accepter. Lire le contenu seulement après votre accord."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption>
+                <a href="recipient/r4.en.svg">R4 — Review before accepting</a>
+              </figcaption>
+              <img
+                src="recipient/r4.en.svg"
+                width="390"
+                height="844"
+                alt="Review before accepting. Read the content only with your consent."
+              />
+            </div>
+          </figure>
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption>
+                <a href="recipient/r5.fr.svg">R5 — Présenter mon attestation</a>
+              </figcaption>
+              <img
+                src="recipient/r5.fr.svg"
+                width="390"
+                height="844"
+                alt="Présenter mon attestation. Choisir qui peut lire les champs, puis gérer le partage."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="recipient/r5.en.svg">R5 — Present my attestation</a></figcaption>
+              <img
+                src="recipient/r5.en.svg"
+                width="390"
+                height="844"
+                alt="Present my attestation. Choose who can read the fields, then manage sharing."
+              />
+            </div>
+          </figure>
+        </div>
+      </section>
+      <section id="verifier">
+        <h2><span class="fr">Vérificateur</span><span class="en" lang="en">Verifier</span></h2>
+        <p class="downloads">
+          <a href="verifier/README.md">Parcours / Journey</a> ·
+          <a href="verifier/wireframes.fr.excalidraw" download>Excalidraw FR</a> ·
+          <a href="verifier/wireframes.en.excalidraw" download>Excalidraw EN</a>
+        </p>
+        <div class="grid">
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption>
+                <a href="verifier/v1.fr.svg">V1 — Demander l’accès complet</a>
+              </figcaption>
+              <img
+                src="verifier/v1.fr.svg"
+                width="390"
+                height="844"
+                alt="Demander l’accès complet. Présenter votre organisation et votre besoin."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption>
+                <a href="verifier/v1.en.svg">V1 — Request full-detail access</a>
+              </figcaption>
+              <img
+                src="verifier/v1.en.svg"
+                width="390"
+                height="844"
+                alt="Request full-detail access. Explain your organization and your need."
+              />
+            </div>
+          </figure>
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption><a href="verifier/v2.fr.svg">V2 — Vérification partielle</a></figcaption>
+              <img
+                src="verifier/v2.fr.svg"
+                width="390"
+                height="844"
+                alt="Vérification partielle. L’attestation est active. Le contenu complet n’a pas été contrôlé."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="verifier/v2.en.svg">V2 — Partially checked</a></figcaption>
+              <img
+                src="verifier/v2.en.svg"
+                width="390"
+                height="844"
+                alt="Partially checked. The attestation is active. Full content has not been checked."
+              />
+            </div>
+          </figure>
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption><a href="verifier/v3.fr.svg">V3 — Émetteur non reconnu</a></figcaption>
+              <img
+                src="verifier/v3.fr.svg"
+                width="390"
+                height="844"
+                alt="Émetteur non reconnu. Les contrôles techniques ont réussi. Évaluez l’émetteur séparément."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="verifier/v3.en.svg">V3 — Issuer not recognized</a></figcaption>
+              <img
+                src="verifier/v3.en.svg"
+                width="390"
+                height="844"
+                alt="Issuer not recognized. Technical checks passed. Assess the issuer separately."
+              />
+            </div>
+          </figure>
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption><a href="verifier/v4.fr.svg">V4 — Mes vérifications</a></figcaption>
+              <img
+                src="verifier/v4.fr.svg"
+                width="390"
+                height="844"
+                alt="Mes vérifications. Retrouver les résultats sans conserver les contenus."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="verifier/v4.en.svg">V4 — My verification history</a></figcaption>
+              <img
+                src="verifier/v4.en.svg"
+                width="390"
+                height="844"
+                alt="My verification history. Find past results without retaining credential contents."
+              />
+            </div>
+          </figure>
+        </div>
+      </section>
+      <section id="shared">
+        <h2>
+          <span class="fr">États partagés</span><span class="en" lang="en">Shared states</span>
+        </h2>
+        <p class="downloads">
+          <a href="shared/README.md">Parcours / Journey</a> ·
+          <a href="shared/wireframes.fr.excalidraw" download>Excalidraw FR</a> ·
+          <a href="shared/wireframes.en.excalidraw" download>Excalidraw EN</a>
+        </p>
+        <div class="grid">
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption><a href="shared/f1.fr.svg">F1 — Portefeuille indisponible</a></figcaption>
+              <img
+                src="shared/f1.fr.svg"
+                width="390"
+                height="844"
+                alt="Portefeuille indisponible. Votre progression est conservée. Préparons le portefeuille."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="shared/f1.en.svg">F1 — Wallet unavailable</a></figcaption>
+              <img
+                src="shared/f1.en.svg"
+                width="390"
+                height="844"
+                alt="Wallet unavailable. Your progress is preserved. Let us get the wallet ready."
+              />
+            </div>
+          </figure>
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption><a href="shared/f2.fr.svg">F2 — Invitation inutilisable</a></figcaption>
+              <img
+                src="shared/f2.fr.svg"
+                width="390"
+                height="844"
+                alt="Invitation inutilisable. Ce lien a expiré ou ne peut plus être utilisé."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="shared/f2.en.svg">F2 — Invitation unavailable</a></figcaption>
+              <img
+                src="shared/f2.en.svg"
+                width="390"
+                height="844"
+                alt="Invitation unavailable. This link has expired or can no longer be used."
+              />
+            </div>
+          </figure>
+          <figure>
+            <div class="fr" lang="fr">
+              <figcaption><a href="shared/f3.fr.svg">F3 — Vérification indisponible</a></figcaption>
+              <img
+                src="shared/f3.fr.svg"
+                width="390"
+                height="844"
+                alt="Vérification indisponible. L’état actuel de l’attestation ne peut pas être confirmé."
+              />
+            </div>
+            <div class="en" lang="en">
+              <figcaption><a href="shared/f3.en.svg">F3 — Cannot verify now</a></figcaption>
+              <img
+                src="shared/f3.en.svg"
+                width="390"
+                height="844"
+                alt="Cannot verify now. The current attestation state cannot be confirmed."
+              />
+            </div>
+          </figure>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

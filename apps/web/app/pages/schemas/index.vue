@@ -27,7 +27,7 @@ useSeoMeta({
   <UContainer class="py-10 sm:py-14">
     <PageHeader eyebrow="Registry" :title="$t('schemas.title')">
       <template #actions>
-        <UButton :to="localePath('/schemas/register')" color="neutral" variant="solid">
+        <UButton :to="localePath('/issuer/schemas/new')" color="neutral" variant="solid">
           {{ $t('schemas.register') }}
         </UButton>
       </template>

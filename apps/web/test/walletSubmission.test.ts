@@ -28,9 +28,12 @@ import {
   applyJournalEntry,
   canAbandonOperation,
   canRetryOperation,
+  completeOperationPublication,
   operationBusinessKey,
+  operationConflictsWith,
   serializeOperationReceipts,
   toSanitizedOperationReceipt,
+  validateOperationBusinessContext,
   type StoredOperation,
 } from '../app/utils/operationJournal'
 import {
@@ -69,6 +72,57 @@ function storedOperation(overrides: Partial<StoredOperation> = {}): StoredOperat
 }
 
 describe('wallet sign-only normalization', () => {
+  it('releases the business lock when a fresh wallet signature expires before persistence or relay', async () => {
+    const wallet = Wallet.generate()
+    const subject = Wallet.generate().address
+    const schemaUid = '12'.repeat(32)
+    const transaction = {
+      TransactionType: 'CredentialCreate' as const,
+      Account: wallet.address,
+      Subject: subject,
+      CredentialType: schemaUid,
+      Fee: '12',
+      Sequence: 1,
+      LastLedgerSequence: 100,
+    }
+    const signed = wallet.sign(transaction)
+    const initial = storedOperation({
+      account: wallet.address,
+      transactionType: 'CredentialCreate',
+      business: { action: 'credential-issue', issuer: wallet.address, subject, schemaUid },
+    })
+    const entries: SubmissionJournalEntry[] = []
+    const submit = vi.fn()
+    const persist = vi.fn()
+    await expect(
+      signPreparedAndSubmit(
+        {
+          isConnected: () => true,
+          submit,
+          request: async () => ({ result: { ledger_current_index: 101 } }),
+        } as unknown as Client,
+        transaction,
+        createWalletSigner({ sign: async () => ({ hash: '', tx_blob: signed.tx_blob }) }),
+        {
+          journal: {
+            append: async (entry) => {
+              entries.push(entry)
+            },
+          },
+          onValidatedSignature: persist,
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'XCS_SDK_TRANSACTION_EXPIRED' })
+    const failed = entries.reduce(applyJournalEntry, initial)
+    expect(failed.stage).toBe('failed')
+    expect(failed.txBlob).toBeUndefined()
+    expect(failed.txHash).toBeUndefined()
+    expect(persist).not.toHaveBeenCalled()
+    expect(submit).not.toHaveBeenCalled()
+    expect(operationConflictsWith(initial, { ...initial, operationId: 'fresh-review' })).toBe(true)
+    expect(operationConflictsWith(failed, { ...initial, operationId: 'fresh-review' })).toBe(false)
+  })
+
   it('derives the XRPL hash when the wallet returns an empty hash', () => {
     const { signed } = signedPayment()
     const normalized = normalizeWalletSignature({ hash: '', tx_blob: signed.tx_blob })
@@ -249,7 +303,11 @@ describe('wallet sign-only normalization', () => {
     const persist = vi.fn()
     const submit = vi.fn()
     const entries: SubmissionJournalEntry[] = []
-    const client = { isConnected: () => true, submit } as unknown as Client
+    const client = {
+      isConnected: () => true,
+      submit,
+      request: async () => ({ result: { ledger_current_index: 99 } }),
+    } as unknown as Client
 
     await expect(
       signPreparedAndSubmit(
@@ -276,7 +334,11 @@ describe('wallet sign-only normalization', () => {
     const changed = attacker.sign({ ...transaction, Account: attacker.address })
     const persist = vi.fn()
     const submit = vi.fn()
-    const client = { isConnected: () => true, submit } as unknown as Client
+    const client = {
+      isConnected: () => true,
+      submit,
+      request: async () => ({ result: { ledger_current_index: 99 } }),
+    } as unknown as Client
 
     await expect(
       signPreparedAndSubmit(
@@ -318,6 +380,7 @@ describe('wallet sign-only normalization', () => {
       request: async () => ({
         result: {
           validated: true,
+          ledger_current_index: 99,
           ledger_index: 99,
           meta: { TransactionResult: 'tesSUCCESS' },
         },
@@ -347,6 +410,40 @@ describe('wallet sign-only normalization', () => {
     ])
   })
 
+  it('retains publication recovery before a volatile submission guard rejects the signed operation', async () => {
+    const { transaction, signed } = signedPayment()
+    const events: string[] = []
+    const persistPublication = vi.fn(async () => {
+      events.push('publication:persisted')
+    })
+    const submit = vi.fn()
+    await expect(
+      signPreparedAndSubmit(
+        {
+          isConnected: () => true,
+          submit,
+          request: async () => ({ result: { ledger_current_index: 99 } }),
+        } as unknown as Client,
+        transaction,
+        createWalletSigner({ sign: async () => ({ hash: '', tx_blob: signed.tx_blob }) }),
+        {
+          journal: { append: async () => {} },
+          onValidatedSignature: async (signature) => {
+            events.push('signed:persisted')
+            expect(signature.lastLedgerSequence).toBe(transaction.LastLedgerSequence)
+            await persistPublication()
+          },
+          beforeSubmit: async () => {
+            events.push('guard:rejected')
+            throw new Error('READINESS_UNAVAILABLE')
+          },
+        },
+      ),
+    ).rejects.toThrow('READINESS_UNAVAILABLE')
+    expect(events).toEqual(['signed:persisted', 'publication:persisted', 'guard:rejected'])
+    expect(submit).not.toHaveBeenCalled()
+  })
+
   it('never persists or submits when issuer trust changes during the wallet dialog', async () => {
     const { transaction, signed } = signedPayment()
     const issuer = 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh'
@@ -374,7 +471,11 @@ describe('wallet sign-only normalization', () => {
     const persistSigned = vi.fn()
     const submit = vi.fn()
     const entries: SubmissionJournalEntry[] = []
-    const client = { isConnected: () => true, submit } as unknown as Client
+    const client = {
+      isConnected: () => true,
+      submit,
+      request: async () => ({ result: { ledger_current_index: 99 } }),
+    } as unknown as Client
 
     await expect(
       signPreparedAndSubmit(
@@ -581,6 +682,78 @@ describe('reliable submission outcome', () => {
 })
 
 describe('operation journal state', () => {
+  const publicationJobId = '12345678-1234-4234-8234-123456789abc'
+  const hostedBusiness = {
+    action: 'credential-issue' as const,
+    issuer: 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh',
+    subject: 'r9cZA1mLK5R5Am25ArfXFmqgNwjZgnfk59',
+    schemaUid: '12'.repeat(32),
+    publicationJobId,
+  }
+
+  it('validates and preserves the publication link in stored and portable business context', () => {
+    expect(validateOperationBusinessContext(hostedBusiness)).toEqual(hostedBusiness)
+    expect(
+      toSanitizedOperationReceipt(storedOperation({ business: hostedBusiness })).business,
+    ).toEqual(hostedBusiness)
+    expect(() =>
+      validateOperationBusinessContext({ ...hostedBusiness, publicationJobId: '../invalid' }),
+    ).toThrow('OPERATION_PUBLICATION_JOB_ID_INVALID')
+  })
+
+  it.each(['validated', 'expired', 'failed'] as const)(
+    'retains a hosted signature after %s until explicit publication verification',
+    (stage) => {
+      const operation = storedOperation({
+        stage: 'pending',
+        business: hostedBusiness,
+        txBlob: 'SIGNED_BLOB',
+      })
+      const terminal = applyJournalEntry(operation, {
+        operationId: operation.operationId,
+        at: '2026-09-21T12:00:00.000Z',
+        stage,
+      })
+      expect(terminal.txBlob).toBe('SIGNED_BLOB')
+      expect(canRetryOperation(terminal)).toBe(false)
+      toSanitizedOperationReceipt(terminal)
+      expect(terminal.txBlob).toBe('SIGNED_BLOB')
+      const completed = completeOperationPublication(terminal, publicationJobId)
+      expect(completed.txBlob).toBeUndefined()
+      expect(completed.publicationCompleted).toBe(true)
+      expect(completeOperationPublication(completed, publicationJobId)).toEqual(completed)
+    },
+  )
+
+  it('keeps pending ledger recovery when publication verification finishes first', () => {
+    const pending = storedOperation({
+      stage: 'pending',
+      business: hostedBusiness,
+      txBlob: 'SIGNED_BLOB',
+    })
+    const published = completeOperationPublication(pending, publicationJobId)
+    expect(published.publicationCompleted).toBe(true)
+    expect(published.txBlob).toBe('SIGNED_BLOB')
+    expect(canRetryOperation(published)).toBe(true)
+    const validated = applyJournalEntry(published, {
+      operationId: pending.operationId,
+      at: '2026-09-21T12:00:00.000Z',
+      stage: 'validated',
+    })
+    expect(validated.txBlob).toBeUndefined()
+  })
+
+  it('does not purge an unrelated publication', () => {
+    const operation = storedOperation({
+      stage: 'validated',
+      business: hostedBusiness,
+      txBlob: 'SIGNED_BLOB',
+    })
+    expect(completeOperationPublication(operation, '87654321-1234-4234-8234-123456789abc')).toBe(
+      operation,
+    )
+  })
+
   it('uses action-independent business locks for one credential generation', () => {
     const profileId = 'xrpl-testnet-xcs-v0.1'
     const tuple = {
@@ -603,6 +776,71 @@ describe('operation journal state', () => {
         schemaUid: tuple.schemaUid,
       }),
     ).not.toBe(operationBusinessKey(profileId, { action: 'credential-accept', ...tuple }))
+  })
+
+  it('preserves public tuple exclusion while locking one issuer invitation across recipient wallets', () => {
+    const business = validateOperationBusinessContext({
+      action: 'credential-issue',
+      issuer: 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh',
+      subject: 'r9cZA1mLK5R5Am25ArfXFmqgNwjZgnfk59',
+      schemaUid: 'a'.repeat(64),
+      issuerInviteId: '12345678-1234-4234-8234-123456789abc',
+    })
+    const existing = storedOperation({ business, stage: 'signed' })
+    const differentWallet = storedOperation({
+      operationId: 'second',
+      business: {
+        ...business,
+        action: 'credential-issue',
+        issuer: 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh',
+        subject: 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh',
+        schemaUid: 'a'.repeat(64),
+      },
+    })
+    expect(operationConflictsWith(existing, differentWallet)).toBe(true)
+    const publicBusiness = validateOperationBusinessContext({
+      ...business,
+      issuerInviteId: undefined,
+    })
+    expect(operationConflictsWith(existing, storedOperation({ business: publicBusiness }))).toBe(
+      true,
+    )
+    expect(operationConflictsWith(storedOperation({ business: publicBusiness }), existing)).toBe(
+      true,
+    )
+    expect(
+      operationConflictsWith(
+        {
+          ...existing,
+          stage: 'validated',
+          engineResult: 'tesSUCCESS',
+          businessConfirmation: 'confirmed',
+        },
+        differentWallet,
+      ),
+    ).toBe(true)
+    expect(operationConflictsWith({ ...existing, stage: 'expired' }, differentWallet)).toBe(false)
+    expect(
+      operationConflictsWith(
+        { ...existing, stage: 'validated', engineResult: 'tecNO_TARGET' },
+        differentWallet,
+      ),
+    ).toBe(false)
+    expect(
+      operationConflictsWith(existing, { ...differentWallet, profileId: 'other-profile' }),
+    ).toBe(false)
+  })
+
+  it('rejects malformed portal invitation identifiers instead of silently dropping the lock', () => {
+    expect(() =>
+      validateOperationBusinessContext({
+        action: 'credential-issue',
+        issuer: 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh',
+        subject: 'r9cZA1mLK5R5Am25ArfXFmqgNwjZgnfk59',
+        schemaUid: 'a'.repeat(64),
+        issuerInviteId: 'bearer-token-is-not-an-invitation-UUID',
+      }),
+    ).toThrow('OPERATION_ISSUER_INVITE_ID_INVALID')
   })
 
   it('allows abandoning only an unsigned prepared draft', () => {

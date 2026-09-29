@@ -1,9 +1,10 @@
 # XCS Testnet web app
 
-The Nuxt application is the accountless, non-custodial Testnet site for XCS. Its public navigation
-keeps four entries—Explorer, Create, Verify and Docs—while preserving the schema, issuance,
-lifecycle and developer workflows in one deployment. EAS and EASScan are interaction-design
-references only; the site constructs native XRPL transactions under the frozen XCS v0.1 protocol.
+The Nuxt application is the non-custodial Testnet site for XCS. Public read-only discovery remains
+accountless; authenticated business mutations use the guided `/issuer` and `/recipient` portals,
+and shared attestations open through `/presentations`. The site constructs native XRPL transactions
+under the frozen XCS v0.1 protocol while keeping protocol identifiers in integration surfaces, not
+business forms.
 
 The same Nitro server also **is** the XCS read and verification API: `/v1/**`, `/health/*`,
 `/internal/metrics*` and `/documentation` are served from this application, on the same origin as the
@@ -36,10 +37,10 @@ The site is built on Nuxt UI 4 and Tailwind CSS 4. The XCS identity lives in
 `EmptyState`); pages compose Nuxt UI primitives with it and keep their workflow logic in
 `composables/` and `utils/`.
 
-For every write, the application constructs and autofills an XRPL transaction, shows those exact
-final fields to the user, then asks an external wallet to sign without submitting. The private key
-or seed never enters the application. There is no XCS user or organization account, server session,
-team administration or batch issuer in the Testnet beta; one wallet action is prepared at a time.
+For every write, the application constructs and autofills an XRPL transaction, presents a readable
+business summary, then asks an external wallet to sign without submitting. The private key or seed
+never enters the application. Application accounts and organization approval do not replace wallet
+authorization. One wallet action is prepared at a time; batch issuance is not implemented.
 
 Immediately before opening the wallet, the site requires a fresh, profile-bound readiness proof
 from the authoritative indexer. It repeats that proof after the wallet returns and before retaining
@@ -65,14 +66,15 @@ The current application organizes the existing workflows as follows:
   statistics and exact search. `/schemas` and `/schemas/:uid` provide paginated schema discovery,
   `/activity` shows schema registrations only, `/credentials/:generationId` and
   `/transactions/:hash` expose exact evidence, and `/status` shows the indexer/network view;
-- **Create:** `/studio` is the single creation hub. It emphasizes schema registration and
-  single-credential issuance, then links acceptance, revocation and local operation recovery.
-  Schema registration has a guided scalar-field editor, course-completion and diploma templates,
-  plus the advanced JSON editor. Issuance can derive a guided claims form from a compatible
-  resolved schema and retains the advanced JSON path;
-- **Verify:** `/verify` accepts a shared generation ID and opens its exact permalink, or exposes the
-  complete issuer/subject/schema tuple as an advanced lookup. The permalink reports ledger state,
-  schema validity, payload integrity and issuer trust separately;
+- **Issuer:** `/issuer` derives one next action from application approval, linked issuer wallet,
+  templates, invitations and issuance state. The guided screens use business names and readable
+  fields; wallet signing remains explicit;
+- **Recipient:** `/recipient` joins claimed invitations, external wallet preparation, attestation
+  review, acceptance and sharing. Private content is fetched only after the explicit “show and
+  verify” action;
+- **Verify:** `/presentations` removes a bearer fragment before resolving it, opens public shares
+  without an account, resumes private shares through the one-time login handoff, and leads with
+  issuer admission, XRPL lifecycle and recipient-wallet proof;
 - **Docs:** `/developers` loads the active runtime profile, executes the privacy-explicit
   exact-generation verification flow, derives REST/cURL, TypeScript and monorepo CLI examples from
   that evidence, documents the wallet `Signer` boundary and catalogs aggregate versus exact API
@@ -113,12 +115,16 @@ third-party integrator call. It reads the indexer's PostgreSQL projection as the
 | `POST` | `/v1/pinning/challenges`                                                                |
 | `POST` | `/v1/pinning/pins`                                                                      |
 
-The two pinning routes answer `404` unless demo pinning is turned on for the requested profile in
-`server/xcs/settings.ts`. It is off in the checked-in settings.
+The two pinning routes answer `404` unless `XCS_DEMO_PINNING_ENABLED=true` for the requested profile.
+Optional hosted publication adds signed `POST /v1/payloads/:locator` and immutable public reads at
+`/p/:locator`. Managed issuer payloads use `/api/issuer/payloads` and `/q/:locator` with separate
+application authorization; their bytes are not exposed through projection discovery routes.
+SSR calls use Nuxt's in-process request fetch on `/v1`; browsers call the same origin without an
+external API base URL.
 
 Authoritative ledger-derived routes fail closed: they return `503` when the indexer's writer lease,
 source agreement, checkpoint, transaction-root evidence or freshness
-(`readinessMaxLedgerAgeSeconds` in `server/xcs/settings.ts`, 120 seconds) do not hold. Discovery is deliberately
+(`XCS_READINESS_MAX_LEDGER_AGE_SECONDS`, default 120 seconds) do not hold. Discovery is deliberately
 exact — there is no subject feed, account-wide enumeration or claims search.
 
 ### OpenAPI
@@ -141,8 +147,9 @@ process — and restrict all three at the ingress to the load balancer and monit
 
 ### Metrics
 
-Setting `XCS_METRICS_TOKEN` to 32 to 256 URL-safe characters exposes two routes, both requiring
-`Authorization: Bearer $XCS_METRICS_TOKEN`, both `Cache-Control: no-store`, neither consuming the public rate-limit budget:
+Supplying a valid `XCS_METRICS_TOKEN` exposes two routes, both requiring `Authorization: Bearer
+$XCS_METRICS_TOKEN`, both `Cache-Control: no-store`, neither consuming the public rate-limit budget.
+With no token, neither route is registered:
 
 - `GET /internal/metrics` — a bounded JSON operator snapshot (schema version 1);
 - `GET /internal/metrics/prometheus` — the Prometheus exposition Prometheus scrapes.
@@ -164,50 +171,81 @@ need a shared edge or store-backed limiter.
 
 ## Wallet support
 
-The web app pins `xrpl-connect@1.0.0-rc.0` and registers its eight official adapters: Xaman,
-Crossmark, GemWallet, WalletConnect, Ledger, Xyra, Otsu and MetaMask Snap. Crossmark, GemWallet,
-Ledger, Xyra, Otsu and MetaMask Snap are registered without deployment-specific configuration.
-Xaman is added only when `NUXT_PUBLIC_XAMAN_API_KEY` is set, and WalletConnect only when
-`NUXT_PUBLIC_WALLET_CONNECT_PROJECT_ID` is set. Both values identify a public application to its
-wallet provider; they are browser-visible identifiers, not secrets. One Xaman application key is
-used by every visitor of that XCS deployment. Register the deployment origin with a trailing slash
-as an exact redirect URI in the Xaman Developer Console. XCS uses that stable root callback from
-every page; it never uses the current route as the OAuth callback.
+The chooser shows the pending wallet name while approval and network confirmation are outstanding.
+Connection errors stay at the top of the scrollable chooser. If the wallet reports another
+network, select XRP Ledger Testnet and retry; an existing app permission in the extension does not
+by itself establish the site's current session. Reloading the page requires connecting again
+because automatic reconnection is disabled.
+A connection must finish within 90 seconds; **Cancel connection** invalidates the attempt immediately,
+so a late extension response cannot reconnect it. Once approved, the header shows the wallet name,
+address, network and an explicit **Disconnect** action. Rejection and timeout errors remain visible.
+The open chooser updates when Crossmark emits its real provider-detection event; it does not require
+closing and reopening the menu. Account refresh before preparation/signing has a 10-second deadline.
+A timeout invalidates the session immediately, even if extension teardown hangs; late replies cannot
+restore the old account.
 
-Two third-party wallet licences are not plain permissive SPDX identifiers, and
-`docs/third-party-licenses.md` records why XCS may ship them. The GemWallet permission, granted by
-Florent Bouron in January 2026, covers public and beta use of the GemWallet API, which its dual
-`LICENSE` otherwise reserves (its MIT-like arm allows only personal, educational and non-public
-research use). The WalletConnect Community License Agreement is covered by its attribution and
-usage-threshold conditions: attribution is carried by `packages/xrpl-connect/THIRD_PARTY_NOTICES.md`
-upstream in `XRPL-Commons/xrpl-connect`, and the XCS maintainer attested on 2026-09-28 that XRPL
-Commons is below the agreement's usage thresholds. No CI job verifies any of this, so re-read that
-note before a release that changes wallet dependencies. Reclassifying either licence as MIT,
-returning to `0.8.2` or deleting the declared dependencies would only hide the same bundled code; it
-is not a compliant workaround, and the upstream adapter packages are not yet published separately.
+The rc.2 Crossmark adapter does not forward session-change events. XCS listens to the official
+Crossmark SDK's `signout`, `user-change` and `network-change` events. Signout clears the connection;
+user/network notifications trigger an authoritative account refresh. Duplicate initialization
+notifications retain the approved session when its account and network are unchanged. Changed or
+unverifiable sessions are disconnected with an explanation. Pending sign-in events and other wallets
+are left alone. This does not replace the account/network and signature checks at submission.
 
-`vaul-vue@0.4.1` arrives through Nuxt UI's drawer component, reports no licence and ships no licence
-file, so `patches/vaul-vue@0.4.1.patch` adds the verbatim upstream MIT text (Copyright (c) 2025
-unovue). Keep that patch: distributing the component without its licence text would breach the MIT
-notice condition.
+`pnpm --dir apps/web exec playwright test --config playwright.crossmark.config.ts` checks the full production
+connection path against `https://localhost:3443` (override with `XCS_WALLET_TEST_URL`). The test uses
+an isolated browser with a fixture of Crossmark's extension messages, including response envelopes
+and duplicate initialization notifications; it does not replace SDK methods or modify the deployed
+site. Set `XCS_BROWSER_EXECUTABLE` to Brave's executable when using the macOS-trusted local CA.
+Actual wallet approval still requires a manual extension test.
 
-The workspace applies `patches/xrpl-connect@1.0.0-rc.0.patch` while that release candidate is
-pinned. Xaman's OAuth provider serializes `network_id` as a decimal string and may omit optional
-network metadata from a later `ping()`, whereas the published adapter requires a complete
-string/number pair. The patch accepts only canonical safe-integer IDs, preserves missing optional
-metadata and rejects a network that contradicts the explicit transaction target. Because Xaman's
-public browser SDK does not expose its supported OAuth `force_network` parameter, the XCS adapter
-adds `force_network=TESTNET` only to the official Xaman authorization URL and evicts an older cached
-XCS OAuth session when it cannot prove Testnet. The patch also accepts an absent or empty
-`multisign_account` in a valid single-signature response: Xaman uses both forms for that
-inapplicable field, while the release candidate incorrectly requires an explicit `null`. Every
-signing payload separately carries `force_network: TESTNET`, and the adapter validates the resolved
-signing network. The patch also retries the authoritative resolved-payload read for sign-only
-requests: Xaman can report the signature before that payload is immediately readable, and the RC
-otherwise abandons the operation before XCS can validate and submit the blob. Remove these
-compatibility measures only after equivalent behavior ships in the pinned dependency.
-After a sign request resolves, the XCS adapter closes the script-opened Xaman window when browser
-policy allows it and restores focus to the application so submission progress remains visible.
+The web app pins `xrpl-connect@1.0.0-rc.2` and
+`@xrpl-commons/xrpl-connect-vue@1.0.0-rc.2`. The official Vue plugin owns the application-scoped
+`WalletManager` and reactive account state. XCS uses its documented headless `connect()` API from a
+small CSP-compatible chooser: the packaged `<WalletConnector>` loads Google Fonts and inline styles,
+which do not satisfy XCS's current browser policy. XCS does not subclass wallet adapters.
+One versioned pnpm patch fixes the rc.2 ESM Crossmark adapter used by this application:
+it validates the network returned with the fresh SignIn approval instead of discarding it
+and reading Crossmark's separately hydrated background replica. Older responses that omit
+the network still require the live query. A present but incomplete network is rejected;
+Mainnet never becomes Testnet. Account refresh and pre-signature checks validate the documented
+SDK session network, updated by approval and network-change events. The raw background getter
+is stale in Crossmark 0.2.19; it is not used as a second network gate. Missing/malformed session
+data still fails closed, without falling back to the adapter's previous network. See
+[`patches/README.md`](./patches/README.md) for scope and removal criteria.
+It registers Xaman, Crossmark, GemWallet, WalletConnect, Ledger, Xyra, Otsu and MetaMask Snap. Xaman is added only when `NUXT_PUBLIC_XAMAN_API_KEY` is set, and
+WalletConnect only when `NUXT_PUBLIC_WALLET_CONNECT_PROJECT_ID` is set. Both values identify a
+public application to its wallet provider; they are browser-visible identifiers, not secrets.
+
+For local testing, keep Otsu and Crossmark in separate browser profiles. The inspected Otsu
+unpacked extension locks `window.xrpl` and `window.crossmark`; Crossmark 0.2.19 also writes
+those globals. Co-installation can prevent Crossmark's provider from initializing. This is
+an extension collision, not something the application should hide by faking availability.
+
+The pinned XRPL Connect packages declare MIT, but that does not clear every transitive dependency.
+The standalone license-policy run reports unresolved `Unknown` entries for
+`@gemwallet/api@3.8.0`, `@walletconnect/types@2.25.0` and `vaul-vue@0.4.1`, plus
+`nodemailer@10.0.10` (`MIT-0`, outside the current allowlist). Review the installed dependency
+artifacts and required notices; no license exception or policy relaxation was added by this port.
+Run dependency reports against the standalone lockfile with `--ignore-workspace`.
+
+`autoConnect` is disabled: an explicit selection in the XCS chooser is the only connection trigger,
+so a cached Xaman session is never presented as a fresh user action. Xaman may replace
+`LastLedgerSequence` during signing; XCS omits that volatile field from the Xaman request, then
+cryptographically checks the complete returned blob and permits only the SDK's explicit
+`LastLedgerSequence` refresh rule. The initial wallet network, active XCS profile and configured
+XRPL RPC are all required to resolve to Testnet before submission. XCS does not use Xaman's later
+optional `ping()` metadata as a second network gate.
+
+Otsu stores dApp permissions by origin and otherwise resolves a later `connect()` from the stored
+address without presenting the wallet approval again. Before an explicit Otsu selection, XCS calls
+the adapter's public `disconnect()` method to revoke that stale origin permission, then delegates the
+new connection to XRPL Connect. This keeps the selected account bound to a fresh user-approved Otsu
+session instead of silently reusing an older address. Otsu's extension service worker can retain the
+public account while its signing key is locked. XRPL Connect rc.2 currently mislabels the resulting
+Otsu `Account not found` failure as an uninstalled wallet. XCS rechecks the adapter's public
+availability, reports the signing-account failure accurately and closes that unusable session. The
+user must unlock Otsu and explicitly reconnect before retrying; XCS never accesses wallet keys or
+repeats a rejected signing request automatically.
 
 XCS filters this surface to adapters that expose `sign()` and never calls `signAndSubmit`. A wallet
 may return a `tx_blob` or signed `tx_json`; the application normalizes the artifact, derives and
@@ -218,9 +256,19 @@ before persistence or relay.
 
 Wallet capability is transaction-specific. GemWallet 3.8.x embeds an XRPL validator from before
 native XLS-70 Credentials: it can sign the `Payment` used for schema registration but rejects
-`CredentialCreate`, `CredentialAccept` and `CredentialDelete` before signing. XCS therefore keeps
-GemWallet available for schemas while blocking those three transactions early with
-`WALLET_CREDENTIAL_TRANSACTION_UNSUPPORTED`. Xaman has native Credential handling in its current
+`CredentialCreate`, `CredentialAccept` and `CredentialDelete` before signing. For these three types,
+XCS offers an explicit raw-signing path. The full reviewed transaction remains visible, and a new
+acknowledgement is required for every attempt: GemWallet displays a hex message, not decoded fields.
+This is a transaction authorization, not a login signature. XCS uses `GemWalletAPI.signMessage(hex,
+true)`, exported by XRPL Connect, because rc.2's generic message adapter discards the hex flag.
+`xrpl.js` validates and serializes the exact prepared transaction, binds its public key to the
+connected Testnet account, assembles the returned signature and verifies it through the same SDK
+boundary before journaling or submission. No keys enter XCS, no automatic fallback follows a
+rejection, and schema Payments still use the normal adapter. Raw signing currently supports master
+keys only; delegated regular keys and multisigning are rejected rather than guessed.
+See [the real GemWallet Testnet qualification](../../docs/runbooks/gemwallet-raw-signing.md) for
+validated create/accept/delete transactions, popup limitations and local rollback.
+Xaman has native Credential handling in its current
 source and is the preferred candidate when its public application identifier is configured, but it
 still requires the real-wallet Testnet gate below. Unknown adapters remain visible as unvalidated;
 if one emits the exact legacy `Invalid field TransactionType` error, XCS converts it to the same
@@ -236,7 +284,7 @@ signature, persistence and submission invariants, not a released wallet UI.
 
 The required Playwright gate exercises schema registration and credential issuance in Chromium,
 including the two distinct finality stages. Issuance first receives deliberately mismatched indexed
-evidence, withholds XCS success, then proves that `/operations` can re-confirm the exact event
+evidence, withholds XCS success, then proves that role recovery can re-confirm the exact event
 without signing or submitting again. The same deterministic journey accepts the pending Credential,
 removes the resulting active generation through the subject wallet, opens its exact deleted
 permalink and exports the sanitized `subject_removed` receipt. A separate case proves that rejecting
@@ -257,7 +305,7 @@ proves that an external IPFS CID absent from local storage is never described as
 
 ```bash
 pnpm --dir apps/web exec playwright install chromium
-pnpm test:e2e
+pnpm --dir apps/web test:e2e
 ```
 
 Playwright starts its own Nuxt development server with `XCS_BROWSER_E2E=1`. In that process only,
@@ -301,6 +349,52 @@ Private and public runtime switches must match exactly, and both the Nitro start
 plugin reject the mode outside a development bundle. `nuxt.config.ts` also rejects
 `XCS_BROWSER_E2E=1` when `NODE_ENV=production`.
 
+## Schema text fields
+
+Schema names (1–64 UTF-8 bytes) and descriptions (1–256 UTF-8 bytes) are required
+single-line protocol fields. The guided editor uses single-line inputs with byte
+counters and field-specific validation messages. Accents and emoji can use several
+bytes; the UI does not truncate or replace the submitted text. JSON mode uses the
+same protocol checks and identifies the failing field instead of discarding its
+error path.
+
+## Hosted HTTPS payloads
+
+Supply the complete hosted-payload contract, including `XCS_PUBLIC_PAYLOAD_BASE_URL`; the server
+derives the browser-visible origin from that validated value. Hosted issuance requires explicit
+public-storage consent and `XCS_LOCAL_PAYLOAD_STORE=0`.
+Canonical payloads larger than **64 KiB of UTF-8 bytes** are rejected before preparation and again
+before signing, matching the hosted API limit. External issuer-managed storage keeps its own limit.
+The page builds the immutable URI, signs and submits `CredentialCreate`, waits for
+ledger/indexer confirmation, then publishes the canonical bytes with the validated
+signed blob. It checks the publication receipt and reads the HTTPS bytes back.
+Before signing, a credential-specific HEAD request checks that the public host is
+reachable. A 404 is expected before first publication; network/CORS failures or
+server errors block signing. This does not prove future availability or successful
+publication. Sharing/acceptance links appear only after exact-byte publication
+verification succeeds, never just because the ledger transaction was validated.
+Issuer-managed external HTTPS hosting still requires publication before signing.
+
+The consented public payload is saved in a per-job browser recovery queue before opening the wallet.
+The validated signature is persisted before submission and linked to the operation journal. This
+link also recovers an interrupted second storage write. Storage/quota failures block submission;
+pending copies are never silently evicted. Up to 20 pending copies are retained until successful
+publication or explicit removal. Do not clear browser data while recovery is needed.
+
+After a reload, **Issue** and **Operations** show pending publications. **Retry payload publication**
+only uploads the same payload and signed transaction; it never signs or submits another credential.
+The API still requires validated, indexed evidence. If submission timed out, reconcile the original
+operation in Operations, then retry publication. Recovery is removed only after the receipt and
+HTTPS bytes verify; terminal journal signatures are then purged. Damaged records are isolated and
+can be explicitly removed without blocking valid jobs. An interrupted wallet approval with no
+recorded signature requires checking the wallet/Operations first, not blindly issuing again.
+Download the payload copy before removing an unfinished recovery record. Recovery is local to this
+browser profile and origin, not a backup across devices; it uses no test payload-serving fallback.
+
+Do not use a rotating tunnel domain for durable credentials: the URI on XRPL cannot
+follow a domain change. A tunnel can prove a disposable Testnet flow, but production
+requires a fixed domain and persistent, backed-up storage.
+
 ## Local browser payload store
 
 For manual Testnet flows without an issuer-controlled HTTPS host, start the development site with:
@@ -328,9 +422,9 @@ when enabled in a production build.
 ## Browser response security
 
 The Node SSR deployment emits defensive browser headers and a nonce-based strict Content Security
-Policy in `Content-Security-Policy-Report-Only`. The observed policy has no `unsafe-inline` or
+Policy in `Content-Security-Policy-Report-Only`. Scripts do not allow `unsafe-inline` or
 `unsafe-eval`: Nuxt's server-rendered scripts and styles receive a fresh random nonce for every HTML
-response. Production browser connections are limited to the same origin, HTTPS and WSS. Local
+response. Inline style attributes remain allowed for Nuxt UI positioning. Production browser connections are limited to the same origin, HTTPS and WSS. Local
 development additionally permits HTTP and WS for Vite HMR.
 
 The CSP is intentionally report-only until every enabled XRPL Connect adapter passes the manual
@@ -357,12 +451,7 @@ XRPL WSS endpoint.
 
 ## Configuration
 
-The complete contract is [`.env.example`](./.env.example): secrets and per-deployment values only.
-Behavioural settings and feature flags -- payload fetching, demo pinning, the metrics routes, the
-IPFS endpoints, the readiness threshold and the static issuer trust policy -- are checked-in code in
-[`server/xcs/settings.ts`](./server/xcs/settings.ts), with the same parsing and the same error
-messages as before. Changing one is a reviewed code change and an image rebuild, and a deployment
-variable of the same name has no effect. A minimal deployment sets:
+The complete contract is [`.env.example`](./.env.example). A minimal deployment sets:
 
 ```bash
 XCS_DATABASE_URL=postgres://xcs_api:...@db.example:5432/xcs
@@ -371,12 +460,13 @@ XCS_TRUSTED_PROXY_CIDRS=10.42.0.2/32
 XCS_NETWORK_PROFILE=/workspace/config/networks/testnet.json
 NUXT_PUBLIC_RPC_URL=wss://s.altnet.rippletest.net:51233
 NUXT_PUBLIC_XAMAN_API_KEY=optional-public-xaman-application-id
-NUXT_PUBLIC_XAMAN_REDIRECT_URL=https://xcs.example/
 NUXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=optional-public-reown-project-id
 ```
 
 `XCS_DATABASE_URL` authenticates as the read-only `xcs_api` role that `db:bootstrap` provisions; the
-web app has no migration command and must never receive the admin URL. The database itself is
+web app has no migration command and must never receive the admin URL. Optional hosted publication,
+auth/admin and issuer services use distinct restricted writer pools configured in `.env.example`;
+none may reuse the projection reader connection for writes. The database itself is
 provisioned outside this repository, and the indexer owns every database command.
 
 Forwarded client addresses are ignored unless the immediate peer matches `XCS_TRUSTED_PROXY_CIDRS`.
@@ -386,27 +476,17 @@ behind an undeclared proxy.
 
 The active network profile is read from this application's own `/v1` API, parsed locally and matched
 against the RPC server's reported `network_id` before autofill and again before signing or recovery.
-This alpha rejects profiles other than XRPL Testnet (`networkId: 1`).
-
-The browser-visible profile identifier is the `profileId` inside the profile file named by
-`XCS_NETWORK_PROFILE` -- the same published file the indexer indexes -- rather than a variable of its
-own. The retired `NUXT_PUBLIC_PROFILE_ID` duplicated that value with nothing checking the two agreed,
-so a mismatch could have labelled one network's data with another network's name. A named profile is
-parsed at start-up and fails closed. If `XCS_NETWORK_PROFILE` is omitted the identifier is empty, and
-then exactly one Testnet profile must be available.
+This alpha rejects profiles other than XRPL Testnet (`networkId: 1`). The browser-visible profile ID
+is derived from `XCS_NETWORK_PROFILE`; if the file is omitted, exactly one Testnet profile must be
+available.
 
 `NUXT_PUBLIC_XAMAN_API_KEY` and `NUXT_PUBLIC_WALLET_CONNECT_PROJECT_ID` are optional public
 application identifiers. Omitting either variable removes only that adapter; it does not prevent the
 other six adapters from loading. Do not put a Xaman secret, WalletConnect relay secret, wallet key or
-other credential in either value. `NUXT_PUBLIC_XAMAN_REDIRECT_URL` is optional and otherwise defaults
-to the current application origin with a trailing slash. When set, it must be that exact same-origin
-root URL; non-loopback deployments require HTTPS. Add the same exact URL to the Xaman application's
-redirect allowlist.
-
-Each independently hosted XCS deployment needs its own Xaman public application key and registered
-origin. The Commons key is not a universal credential for arbitrary self-hosted domains. Follow
-Xaman's [browser SDK setup](https://docs.xaman.dev/environments/browser-web3); API secrets remain
-server-side and are not used by this browser integration.
+other credential in either value. Xaman redirect selection is delegated to its SDK; the old
+`NUXT_PUBLIC_XAMAN_REDIRECT_URL` variable is no longer consumed. Register the deployment's actual
+callback URLs and qualify homepage and deep-link sign-in separately. Each independently hosted
+deployment needs its own provider configuration.
 
 `XCS_LOCAL_PAYLOAD_STORE` is a source-time development gate rather than a deployment setting. Do not
 pass it through Compose or expose it as a general Commons storage option.
@@ -423,9 +503,10 @@ rather than either private indexer source.
 
 ## Pilot payload publication
 
-The deployed Commons beta issuance and acceptance flows support issuer-hosted public HTTPS payloads
-only; the loopback development aid documented above is intentionally not deployable. Commons does
-not store, cache or search credential claims. The issuer payload host must
+The public issuance and acceptance flows support public HTTPS payloads, either externally hosted or
+published through the optional signed-upload service above. The ledger projection does not contain
+claims; enabled payload services store them separately. Managed issuer private payloads follow the
+authorization rules below; the recipient workspace uses a separate authenticated private reader. The payload host must
 allow the web origin through CORS and return `application/json` (or a `+json` media type). Acceptance
 first displays only indexed metadata, the URI and its host. The subject must explicitly consent
 before the browser contacts that host. Consent stays in memory and is bound to the displayed
@@ -452,13 +533,12 @@ resolve the URI, so its remote resolver may remain disabled. There is intentiona
 fetch proxy, avoiding an SSRF trust boundary. IPFS remains part of the protocol and CLI, but is
 outside the Commons-hosted browser beta.
 
-The standalone `/verify` page opens `/credentials/:generationId` directly when the verifier has a
-shared generation ID. Its advanced tuple flow follows the same privacy boundary: it first reads and
-displays indexed credential metadata without contacting the issuer. Only after the verifier consents
-to the exact displayed host does the browser fetch the payload with credentials omitted, CORS
-enabled and redirects disabled, then POST the parsed object to the API. Verification never requests
-API-side URI resolution. A link generation constraint is checked before the host fetch and again
-before the result is accepted.
+The read-only exact Credential page preserves the integration-oriented verification boundary: it
+first reads indexed metadata without contacting the issuer. Only after explicit host consent does
+the browser fetch the payload with credentials omitted, CORS enabled and redirects disabled, then
+POST the parsed object to the API. Verification never requests API-side URI resolution. This is an
+Explorer/integrator surface; the guided verifier journey uses `/presentations` and never asks for a
+generation ID or tuple.
 
 The exact `/credentials/:generationId` permalink applies the same boundary while also showing the
 schema and bounded lifecycle timeline. Its server-rendered response loads only indexed generation,
@@ -483,8 +563,10 @@ exactly equal the reviewed transaction. SDK journal stages are retained with the
 `LastLedgerSequence`, profile, XRPL result and the minimum business context needed to reconcile the
 operation. Schema registration stores publisher, canonical schema digest and exact memo size.
 Issuance stores the tuple, public URI, payload digest and optional expiration. Tuple-only actions
-store the exact reviewed generation ID. The `/operations` page first checks transaction status by
-hash, but only after decoding the blob and matching its derived hash, `LastLedgerSequence`, account,
+store the exact reviewed generation ID. Managed issuer records keep only nonsecret references and
+visibility selections locally, never private claims, invitation tokens or email addresses. Role
+recovery first checks transaction status by hash, but only after decoding the blob and matching its
+derived hash, `LastLedgerSequence`, account,
 transaction type and any explicit `NetworkID` against the journal. Only a still-unvalidated
 transaction may be resubmitted, after checking that its generation is still current. The blob is
 removed from the local record as soon as the operation becomes `validated`, `expired`, or `failed`.
@@ -504,7 +586,12 @@ publisher and schema digest for registration; profile and credential tuple for i
 tuple and generation for every lifecycle action, independently of the selected action. A second
 recoverable operation with the same key is rejected. Ownership is checked atomically again after the
 wallet returns the signed blob and before submission. Only a `prepared` draft that has neither hash
-nor signed blob may be abandoned to release its key.
+nor signed blob may be abandoned to release its key. Managed issuance additionally reserves the
+invitation ID across recipient and issuer wallet choices. This survives reloads and excludes concurrent
+tabs in one browser profile, including a ledger-successful operation awaiting metadata recovery.
+It is not a distributed lock across browsers or devices: simultaneous devices can still sign an
+extra ledger object that the application refuses to attach. Backend metadata uniqueness does not
+reserve ledger execution.
 
 The profile-bound readiness endpoint is checked just before the wallet call and again after the
 wallet response. Once the SDK has validated the wallet artifact, the application immediately
@@ -531,8 +618,8 @@ treated as XCS-confirmed without new exact evidence.
 Receipts are sanitized local records, not signatures from Commons or independent trust anchors; a
 verifier must still resolve the referenced transaction against an authoritative XCS indexer.
 
-For any complete operation already validated with `tesSUCCESS`, `/operations` can re-check a
-`pending`, `timeout` or `mismatch` business confirmation. Schema registration uses the exact
+For any complete operation already validated with `tesSUCCESS`, the originating role screen can
+re-check a `pending`, `timeout` or `mismatch` business confirmation. Schema registration uses the exact
 `GET /v1/networks/:network/schema-registrations/:transactionHash` proof and requires its publisher
 and canonical digest before accepting the returned UID. Credential issuance and lifecycle actions
 use `GET /v1/networks/:network/credentials/:issuer/:subject/:schemaUid/events/:transactionHash` and
@@ -546,3 +633,51 @@ removal and issuer revocation return to that same generation page so its updated
 can be reviewed. A generation-bound subject action resolves that generation before the tuple lookup
 and rejects a connected wallet that is not its subject, instead of surfacing a misleading tuple 404.
 Reconfirmation never reads a signed blob, connects to XRPL or rebroadcasts the transaction.
+
+## Optional accounts and issuer workspace
+
+Authentication is disabled by default. `/account` supports XRP Identity authorization code/PKCE,
+PostgreSQL sessions, CSRF-protected mutations, role guards and verified Testnet wallet linking.
+Provision the application migrations and dedicated `xcs_app` pool before enabling it. Supported
+wallet message formats and real OIDC registration requirements are in the
+[authentication runbook](../../docs/runbooks/authentication.md). Public Explorer reads and public
+presentation resolution remain accountless; web mutations are role-guided.
+
+The admin workspace reviews issuer/verifier applications and documents, records decisions and
+manages approval/suspension. Approval grants application access, not issuer trust or protocol validity;
+admin status alone does not grant access to private credential claims. See
+[ADR 0005](../../docs/adr/0005-role-based-application.md).
+
+The optional issuer workspace provides onboarding, owned schemas, recipient invitations, issuance
+and revocation. It reuses the public transaction engine with server-derived organization, schema and
+claimant context, a linked issuer wallet and renewed approval checks before signing. The delivery
+email is not identity evidence: review the actual authenticated claimant and their verified wallet.
+A bearer link can be claimed by any authenticated holder. The recipient inbox provides consented
+private acceptance through the same wallet engine and revocable presentation links/QR codes.
+Approved verifiers open designated full presentations and retain metadata-only history/CSV.
+See the [issuer runbook](../../docs/runbooks/issuer.md) for provisioning and delivery semantics.
+
+Managed issuance defaults to private. The issuer reviews the complete authorized view and selected
+public claims before signing. Canonical bytes stay in private application storage; the immutable
+`/q/:locator` URI and digest, issuer/subject addresses and schema remain public on XRPL. Authorized
+issuer/recipient sessions may read the full payload; anonymous private views receive only selected
+claims. This is access control, not end-to-end encryption. Public disclosure cannot recall copies.
+The public reader omits credentials and treats a filtered `x-xcs-claim-scope: public` response as
+`PAYLOAD_SCOPE_RESTRICTED`, with integrity not checked, rather than claiming the full digest failed.
+
+After a confirmed ledger transaction, issuer recovery records its metadata or reconciles revocation
+without signing again. Pending or unknown journal outcomes remain blocked. An explicit reset requires
+matching durable proof of expiry or a validated failing transaction; it never treats a timeout as
+proof that signing is safe again. Browser-local recovery is lost when site data is cleared. Email
+notification status is separate from successful ledger recording and cannot undo it.
+
+See the [recipient/verifier runbook](../../docs/runbooks/recipient-verifier.md) for routes, grants,
+login handoff and upgrade order. These workspaces reuse the restricted issuer pool; they add no new
+connection URL. Presentation scope and current approval are checked server-side on each disclosure.
+
+The guided role journey now returns recipients to their inbox after wallet linking and shows
+issuers whether the actual claimant has a verified wallet ready for issuance. Every new presentation
+requires a separate wallet message signature bound to that exact credential, disclosure and audience.
+The verifier opens only the shared link: current organization admission, recipient address/ledger
+state and dated holder proof are displayed without manual URI input. Master-key proof limitations,
+legacy unsigned links and additive migration 0008 are described in the recipient/verifier runbook.

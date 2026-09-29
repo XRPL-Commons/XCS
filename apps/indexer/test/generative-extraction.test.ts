@@ -290,14 +290,14 @@ describe('generative indexer extraction', () => {
       },
       {
         name: 'malformed JSON',
-        reasonCode: 'INVALID_JSON',
+        reasonCode: 'JSON_INVALID',
         mutate: (candidate) => {
           registrationMemo(candidate).MemoData = utf8Hex('{"xcsVersion":')
         },
       },
       {
         name: 'invalid schema',
-        reasonCode: 'INVALID_SCHEMA',
+        reasonCode: 'SCHEMA_INVALID',
         mutate: (candidate) => {
           const invalidSchema = { ...schema, future: true } as unknown as JsonValue
           registrationMemo(candidate).MemoData = utf8Hex(canonicalJson(invalidSchema))

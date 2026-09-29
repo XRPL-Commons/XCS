@@ -1,4 +1,6 @@
-import { Client } from 'xrpl'
+import { createHash } from 'node:crypto'
+import { decodeLedgerData } from 'ripple-binary-codec'
+import { Client, decode, hashes } from 'xrpl'
 
 import {
   assertRegistryPolicy,
@@ -70,8 +72,78 @@ function nonEmptyString(value: unknown, label: string): string {
   return value
 }
 
+function binaryHex(value: unknown, label: string): string {
+  if (typeof value !== 'string' || !/^(?:[0-9a-fA-F]{2})+$/u.test(value)) {
+    return sourceFailure('SOURCE_RESPONSE_INVALID', `${label} must be binary hex`)
+  }
+  return value.toUpperCase()
+}
+
+function decodedTransaction(envelope: Record<string, unknown>): Record<string, unknown> {
+  const blob = binaryHex(envelope.tx_blob, 'transaction blob')
+  const meta = binaryHex(
+    Object.hasOwn(envelope, 'meta_blob') ? envelope.meta_blob : envelope.meta,
+    'transaction metadata blob',
+  )
+  if (
+    Object.hasOwn(envelope, 'meta_blob') &&
+    Object.hasOwn(envelope, 'meta') &&
+    binaryHex(envelope.meta, 'transaction metadata blob') !== meta
+  ) {
+    return sourceFailure('SOURCE_RESPONSE_INVALID', 'Binary metadata representations disagree')
+  }
+  try {
+    const transaction = decode(blob)
+    const metadata = decode(meta)
+    // xrpl's signed-transaction helper deliberately rejects protocol pseudo-transactions.
+    // Their ID uses the same TXN\0 domain, although no account signs these ledger operations.
+    const pseudo = ['EnableAmendment', 'SetFee', 'UNLModify'].includes(
+      String(transaction.TransactionType),
+    )
+    const transactionHash = pseudo
+      ? createHash('sha512')
+          .update(Buffer.from('54584E00' + blob, 'hex'))
+          .digest('hex')
+          .slice(0, 64)
+      : hashes.hashSignedTx(blob)
+    if (
+      envelope.hash !== undefined &&
+      hash(envelope.hash, 'transaction hash') !== transactionHash.toLowerCase()
+    ) {
+      return sourceFailure('SOURCE_RESPONSE_INVALID', 'Binary transaction hash values disagree')
+    }
+    // Always decode the serialized fields: API v2 JSON can rename Amount to DeliverMax.
+    return { hash: transactionHash, tx_json: transaction, meta: metadata }
+  } catch (error) {
+    if (error instanceof XrplSourceError) throw error
+    return sourceFailure('SOURCE_RESPONSE_INVALID', 'Cannot decode binary transaction or metadata')
+  }
+}
+
+function decodedLedgerHeader(envelope: Record<string, unknown>): Record<string, unknown> {
+  const blob = binaryHex(envelope.ledger_data, 'ledger header blob')
+  // The canonical header is 118 bytes, excluding the LWR\0 hash prefix.
+  if (blob.length !== 236)
+    return sourceFailure('SOURCE_RESPONSE_INVALID', 'Binary ledger header length is invalid')
+  try {
+    const header = asRecord(decodeLedgerData(blob), 'decoded ledger header')
+    return {
+      ...header,
+      ledger_hash: hashes.hashLedgerHeader(
+        header as unknown as Parameters<typeof hashes.hashLedgerHeader>[0],
+      ),
+      closed: envelope.closed,
+      transactions: envelope.transactions,
+    }
+  } catch (error) {
+    if (error instanceof XrplSourceError) throw error
+    return sourceFailure('SOURCE_RESPONSE_INVALID', 'Cannot decode binary ledger header')
+  }
+}
+
 function normalizeTransaction(value: unknown): LedgerTransaction {
-  const envelope = asRecord(value, 'expanded ledger transaction')
+  const raw = asRecord(value, 'expanded ledger transaction')
+  const envelope = Object.hasOwn(raw, 'tx_blob') ? decodedTransaction(raw) : raw
   const transaction =
     typeof envelope.tx_json === 'object' && envelope.tx_json !== null
       ? asRecord(envelope.tx_json, 'tx_json')
@@ -97,10 +169,18 @@ function normalizeTransaction(value: unknown): LedgerTransaction {
   delete cleanTransaction.metaData
   delete cleanTransaction.hash
 
+  // Nodes add these API conveniences at request time; they are not hashed ledger metadata.
+  const cleanMetadata = { ...metadata }
+  delete cleanMetadata.nftoken_id
+  delete cleanMetadata.nftoken_ids
+  delete cleanMetadata.offer_id
+  delete cleanMetadata.mpt_issuance_id
+  delete cleanMetadata.delivered_amount
+
   return {
     hash: transactionHash,
     transaction: cleanTransaction,
-    metadata: { ...metadata },
+    metadata: cleanMetadata,
     transactionIndex,
   }
 }
@@ -110,7 +190,10 @@ export function normalizeLedgerResponse(value: unknown): ValidatedLedger {
   if (result.validated !== true) {
     return sourceFailure('SOURCE_RESPONSE_INVALID', 'XRPL server returned a non-validated ledger')
   }
-  const ledger = asRecord(result.ledger, 'ledger')
+  const rawLedger = asRecord(result.ledger, 'ledger')
+  const ledger = Object.hasOwn(rawLedger, 'ledger_data')
+    ? decodedLedgerHeader(rawLedger)
+    : rawLedger
   if (ledger.closed !== true) {
     return sourceFailure('SOURCE_RESPONSE_INVALID', 'Validated ledger must be marked closed')
   }
@@ -298,7 +381,9 @@ export class XrplLedgerSource implements LedgerSource {
       ledger_index: ledgerIndex,
       transactions: true,
       expand: true,
-      binary: false,
+      // Large expanded JSON responses can exceed provider WebSocket limits. Binary retains
+      // the complete ledger and canonical fields while reducing transport size; no partial retry.
+      binary: true,
     })
     const ledger = normalizeLedgerResponse(result)
     if (ledger.ledgerIndex !== ledgerIndex) {
